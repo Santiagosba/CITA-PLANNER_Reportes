@@ -1,0 +1,39 @@
+---
+description: No limitar filas en consultas de datos; traer el dataset completo necesario
+globs: "**/*.{ts,tsx,js}"
+alwaysApply: true
+---
+
+# Sin límites artificiales en datos
+
+Al consultar listados (peticiones, citas, reportes, etc.) **no capes filas** salvo que el usuario pida paginación explícita en UI.
+
+## Prohibido en datos de negocio
+
+- `TOP N`, `LIMIT n`, `.limit(n)` en listados completos
+- `.slice(0, n)` para ocultar filas del dataset (sí permitido solo para presentación visual con scroll)
+- Devolver “muestras” cuando la pantalla necesita el total
+
+## Obligatorio
+
+- **SQL Server / API**: consultas sin `TOP`; filtros solo por taller, fechas, caller, tipo
+- **Supabase**: paginar con `.range()` en bucle (1000 filas/página) hasta agotar resultados
+- **Stats y export CSV**: calcular sobre **todas** las filas del periodo, no un subconjunto
+
+## Excepciones válidas
+
+- `.limit(1)` para lookup de un único registro (login, branding, config)
+- Chunking de IDs en `.in()` (p. ej. citas por lotes de 80 UUID) — sigue trayendo **todos** los IDs
+- Paginación **explícita** en UI cuando el usuario la pida
+
+## Ejemplo Supabase
+
+```typescript
+// ❌ BAD — máximo 1000 filas por defecto
+const { data } = await supabase.from('chatbotpeticiones').select('*').in('idtaller', ids)
+
+// ✅ GOOD — todas las páginas
+const rows = await fetchAllSupabasePages(() =>
+  supabase.from('chatbotpeticiones').select('*').in('idtaller', ids).order('fechainicio', { ascending: false })
+)
+```

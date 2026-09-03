@@ -100,15 +100,13 @@ export default function App() {
   const faviconAppliedFor = useRef<string | null>(null)
 
   const [selectedWorkshop, setSelectedWorkshop] = useState<Workshop | null>(null)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
   const [licenseLogoUrl, setLicenseLogoUrl] = useState<string | null>(null)
   const [crmHubWebBranding, setCrmHubWebBranding] = useState<CrmHubWebBranding | null>(null)
   const [isDarkMode, setIsDarkMode] = useState(() => {
     try {
-      return localStorage.getItem(THEME_KEY) !== 'light'
+      return localStorage.getItem(THEME_KEY) === 'dark'
     } catch {
-      return true
+      return false
     }
   })
 
@@ -592,8 +590,6 @@ export default function App() {
     }
   }, [selectedWorkshop])
 
-  const toggleTheme = useCallback(() => setIsDarkMode((d) => !d), [])
-
   const handleLogout = useCallback(async () => {
     try {
       await signOut()
@@ -605,14 +601,14 @@ export default function App() {
     } catch (e) {
       console.error('Logout error', e)
     }
-  }, [session])
+  }, [])
 
   const rootClass = isDarkMode ? 'dark' : ''
 
   if (authLoading || bootLoading) {
     return (
-      <div className={`${rootClass} flex h-screen items-center justify-center bg-slate-50 dark:bg-slate-950`}>
-        <Loader2 size={40} className="text-teal-500 animate-spin" />
+      <div className={`${rootClass} flex h-screen items-center justify-center`}>
+        <Loader2 size={40} className="animate-spin" style={{ color: 'var(--color-brand)' }} />
       </div>
     )
   }
@@ -657,12 +653,6 @@ export default function App() {
         workshop={selectedWorkshop}
         sessionUser={(session as { user?: unknown })?.user}
         licenseLogoUrl={mergedSidebarLogo}
-        sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        isDarkMode={isDarkMode}
-        toggleTheme={toggleTheme}
         onLogout={() => void handleLogout()}
         onClearWorkshop={() => setSelectedWorkshop(null)}
       />

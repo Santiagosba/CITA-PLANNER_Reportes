@@ -3,6 +3,7 @@
  */
 
 import { supabaseAviOld } from './supabase'
+import { fetchAllSupabasePages } from './supabaseFetchAll'
 import type { Workshop } from '../types'
 import { fetchContainerRow, fetchLicenciaModuleTalleres } from './licenciaGrupo'
 import {
@@ -34,12 +35,12 @@ export function getPeticionesSourceNotice(): string | null {
 }
 
 async function fetchTiposPeticionSupabase(): Promise<TipoPeticionRow[]> {
-  const { data, error } = await supabaseAviOld
-    .from('chatbottipopeticiones')
-    .select('idtipopeticion,tipopeticion')
-    .order('tipopeticion')
-  if (error) throw new Error(error.message)
-  return (data ?? []) as TipoPeticionRow[]
+  return fetchAllSupabasePages<TipoPeticionRow>(() =>
+    supabaseAviOld
+      .from('chatbottipopeticiones')
+      .select('idtipopeticion,tipopeticion')
+      .order('tipopeticion'),
+  )
 }
 
 async function withSqlFallback<T>(label: string, fn: () => Promise<T>, supabaseFn: () => Promise<T>): Promise<T> {
@@ -59,14 +60,17 @@ async function withSqlFallback<T>(label: string, fn: () => Promise<T>, supabaseF
     sqlServerLoginBlocked = false
     return result
   } catch (e) {
-    if (!isSqlServerFallbackEnabled()) throw e
+    const apiDown =
+      e instanceof SqlServerApiError &&
+      (/no está en marcha|Falta MSSQL_PASSWORD|no responde/i.test(e.message) || /502|503/i.test(e.message))
+    if (apiDown || !isSqlServerFallbackEnabled()) throw e
     if (e instanceof SqlServerApiError && /login sql server/i.test(e.message)) {
       sqlServerLoginBlocked = true
     }
     lastResolvedSource = 'supabase'
     lastSourceNotice =
       e instanceof SqlServerApiError
-        ? `${e.message} Mostrando datos desde Supabase (copia en la nube) hasta que corrijas SQL Server.`
+        ? `${e.message} Mostrando datos desde Supabase (copia) hasta corregir SQL Server.`
         : `No se pudo usar SQL Server (${label}). Mostrando datos desde Supabase.`
     if (!sqlServerLoginBlocked || label === 'peticiones') {
       console.warn('[peticionesPendientes]', lastSourceNotice)
@@ -122,14 +126,25 @@ export type PeticionesFilters = {
   soloNoGestionadas?: boolean
   from?: string
   to?: string
-  limit?: number
 }
 
 export type PeticionesStats = {
+  /** Total peticiones en el periodo filtrado */
   total: number
+  /** Sin IDCita → aún pendientes de cita en calendario */
+  pendientes: number
+  /** Con IDCita → ya tienen cita, no pendientes */
   conCita: number
+  pctPendientes: number
+  pctConCita: number
+  /** @deprecated usar pendientes */
   sinCita: number
   tipos: Record<string, number>
+}
+
+/** Pendiente = sin cita vinculada en ChatBotPeticiones.IDCita */
+export function isPeticionPendiente(p: Pick<PeticionPendiente, 'idcita'>): boolean {
+  return !p.idcita || String(p.idcita).trim() === ''
 }
 
 const PETICION_SELECT =
@@ -302,29 +317,25 @@ async function fetchPendingPeticionesFromSupabase(
   ids: string[],
   filters: PeticionesFilters = {},
 ): Promise<PeticionPendiente[]> {
-  let q = supabaseAviOld
-    .from('chatbotpeticiones')
-    .select(PETICION_SELECT)
-    .in('idtaller', ids)
+  const rows = (await fetchAllSupabasePages(() => {
+    let q = supabaseAviOld
+      .from('chatbotpeticiones')
+      .select(PETICION_SELECT)
+      .in('idtaller', ids)
 
-  if (filters.soloSesionAbierta) q = q.is('fechafin', null)
-  if (filters.soloNoGestionadas) q = q.or('gestionado.is.null,gestionado.eq.false')
+    if (filters.soloSesionAbierta) q = q.is('fechafin', null)
+    if (filters.soloNoGestionadas) q = q.or('gestionado.is.null,gestionado.eq.false')
 
-  const caller = filters.caller?.trim()
-  if (caller) q = q.ilike('caller', `%${caller}%`)
+    const caller = filters.caller?.trim()
+    if (caller) q = q.ilike('caller', `%${caller}%`)
 
-  if (filters.tipoPeticionId != null) q = q.eq('idtipopeticion', filters.tipoPeticionId)
+    if (filters.tipoPeticionId != null) q = q.eq('idtipopeticion', filters.tipoPeticionId)
 
-  if (filters.from) q = q.gte('fechainicio', filters.from)
-  if (filters.to) q = q.lte('fechainicio', `${filters.to}T23:59:59`)
+    if (filters.from) q = q.gte('fechainicio', filters.from)
+    if (filters.to) q = q.lte('fechainicio', `${filters.to}T23:59:59`)
 
-  q = q.order('fechainicio', { ascending: false })
-  if (filters.limit) q = q.limit(filters.limit)
-
-  const { data, error } = await q
-  if (error) throw new Error(error.message)
-
-  const rows = (data ?? []) as Record<string, unknown>[]
+    return q.order('fechainicio', { ascending: false })
+  })) as Record<string, unknown>[]
   const [tiposRows, citaIds] = await Promise.all([
     fetchTiposPeticionSupabase(),
     Promise.resolve(rows.map((r) => (r.idcita ? String(r.idcita) : '')).filter(Boolean)),
@@ -344,9 +355,20 @@ export function computePeticionesStats(items: PeticionPendiente[]): PeticionesSt
   for (const p of items) {
     const label = p.tipopeticion || 'Sin tipo'
     tipos[label] = (tipos[label] ?? 0) + 1
-    if (p.idcita) conCita++
+    if (!isPeticionPendiente(p)) conCita++
   }
-  return { total: items.length, conCita, sinCita: items.length - conCita, tipos }
+  const total = items.length
+  const pendientes = total - conCita
+  const pct = (n: number) => (total > 0 ? Math.round((n / total) * 1000) / 10 : 0)
+  return {
+    total,
+    pendientes,
+    conCita,
+    pctPendientes: pct(pendientes),
+    pctConCita: pct(conCita),
+    sinCita: pendientes,
+    tipos,
+  }
 }
 
 export type GestionPatch = {
@@ -383,6 +405,7 @@ function csvEscape(v: string): string {
 export function buildPeticionesCsv(items: PeticionPendiente[], tallerNombre: string): string {
   const headers = [
     'Taller',
+    'Estado',
     'ID Petición',
     'Teléfono',
     'Tipo',
@@ -403,6 +426,7 @@ export function buildPeticionesCsv(items: PeticionPendiente[], tallerNombre: str
     lines.push(
       [
         tallerNombre,
+        isPeticionPendiente(p) ? 'Pendiente' : 'Con cita',
         p.idpeticion,
         p.caller ?? '',
         p.tipopeticion ?? '',

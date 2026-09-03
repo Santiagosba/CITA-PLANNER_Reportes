@@ -30,34 +30,13 @@ type TabDef = {
   id: SettingsShellTab
   label: string
   icon: LucideIcon
-  activeClass: string
 }
 
 const TABS: TabDef[] = [
-  {
-    id: 'general',
-    label: 'General',
-    icon: Building,
-    activeClass: 'border-teal-500 text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-900/10',
-  },
-  {
-    id: 'centers',
-    label: 'Centros',
-    icon: MapPin,
-    activeClass: 'border-indigo-500 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/10',
-  },
-  {
-    id: 'team',
-    label: 'Equipo',
-    icon: Users,
-    activeClass: 'border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/10',
-  },
-  {
-    id: 'branding',
-    label: 'Marca',
-    icon: Palette,
-    activeClass: 'border-rose-500 text-rose-600 dark:text-rose-400 bg-rose-900/10',
-  },
+  { id: 'general', label: 'General', icon: Building },
+  { id: 'centers', label: 'Centros', icon: MapPin },
+  { id: 'team', label: 'Equipo', icon: Users },
+  { id: 'branding', label: 'Marca', icon: Palette },
 ]
 
 type Props = {
@@ -108,11 +87,7 @@ const MOCK_TEAM = [
 
 function SaveButton({ label, onClick }: { label: string; onClick?: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex items-center gap-2 rounded-lg bg-teal-600 px-6 py-2 font-medium text-white shadow-sm transition-all hover:bg-teal-500 active:scale-95"
-    >
+    <button type="button" onClick={onClick} className="client-submit">
       <Save size={18} />
       {label}
     </button>
@@ -120,9 +95,11 @@ function SaveButton({ label, onClick }: { label: string; onClick?: () => void })
 }
 
 function inputCls(disabled?: boolean): string {
-  return `w-full rounded-lg border border-slate-300 bg-slate-50 px-4 py-2 text-slate-800 outline-none focus:ring-2 focus:ring-teal-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 ${
-    disabled ? 'cursor-not-allowed opacity-60' : ''
-  }`
+  return `field-input${disabled ? ' opacity-60 cursor-not-allowed' : ''}`
+}
+
+function Panel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <div className={`glass card-pad-md ${className}`.trim()}>{children}</div>
 }
 
 export default function SettingsShellView({ workshop, isDarkMode: _isDarkMode, showBrandingTab = false }: Props) {
@@ -154,54 +131,54 @@ export default function SettingsShellView({ workshop, isDarkMode: _isDarkMode, s
     switch (activeTab) {
       case 'general':
         return (
-          <div className="space-y-6 animate-fade-in">
+          <div className="panel-stack animate-fade-in">
             {isDemo && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/25 dark:text-amber-200">
+              <div className="alert alert-warning">
                 Modo demo: la ficha es solo maqueta y <strong>no guarda</strong> en AVI.
               </div>
             )}
 
-            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4 md:p-6">
-              <h3 className="mb-6 flex items-center gap-2 text-lg font-semibold text-slate-800 dark:text-white">
-                <Building size={20} className="text-teal-500" /> Datos del Concesionario
+            <Panel>
+              <h3 className="section-title mb-6 flex items-center gap-2" style={{ fontSize: 'var(--font-lg)' }}>
+                <Building size={20} style={{ color: 'var(--color-brand)' }} /> Datos del Concesionario
               </h3>
               <div className="grid grid-cols-1 gap-3 sm:gap-6 md:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Razón Social</label>
+                  <label className="field-label">Razón Social</label>
                   <input type="text" defaultValue={workshop.name} className={inputCls()} />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">CIF / NIF</label>
+                  <label className="field-label">CIF / NIF</label>
                   <input type="text" placeholder="B00000000" className={inputCls()} />
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Dirección Fiscal</label>
+                  <label className="field-label">Dirección Fiscal</label>
                   <input type="text" placeholder="Calle ejemplo 1" className={inputCls()} />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Código postal</label>
+                  <label className="field-label">Código postal</label>
                   <input type="text" placeholder="28001" className={inputCls()} />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Código Taller Oficial</label>
+                  <label className="field-label">Código Taller Oficial</label>
                   <input
                     type="text"
                     placeholder="codigoexterno en AVI"
-                    className={`${inputCls()} placeholder:text-slate-400`}
+                    className={inputCls()}
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Población</label>
+                  <label className="field-label">Población</label>
                   <input type="text" placeholder="Madrid" className={inputCls()} />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Provincia</label>
+                  <label className="field-label">Provincia</label>
                   <input type="text" placeholder="Madrid" className={inputCls()} />
                 </div>
 
                 <div className="col-span-1 md:col-span-2">
                   <div className="mb-2 flex items-center justify-between">
-                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    <label className="field-label">
                       Marcas Oficiales / Representadas
                     </label>
                     <label className="flex cursor-pointer items-center gap-2 select-none">
@@ -213,64 +190,64 @@ export default function SettingsShellView({ workshop, isDarkMode: _isDarkMode, s
                         onChange={(e) => setGeneralMulti(e.target.checked)}
                       />
                       <div
-                        className={`relative h-6 w-10 rounded-full transition-colors ${generalMulti ? 'bg-teal-500' : 'bg-slate-200 dark:bg-slate-700'}`}
+                        className={`relative h-6 w-10 rounded-full transition-colors ${generalMulti ? 'bg-[var(--color-brand)]' : 'bg-[rgba(15,17,21,0.12)]'}`}
                       >
                         <span
                           className={`absolute top-1 left-1 block h-4 w-4 rounded-full bg-white transition-transform ${generalMulti ? 'translate-x-4' : ''}`}
                         />
                       </div>
-                      <span className="text-xs font-medium text-slate-500">Concesionario Multimarca</span>
+                      <span className="text-xs font-medium text-[var(--muted)]">Concesionario Multimarca</span>
                     </label>
                   </div>
                   <div className="relative">
                     <Tag
                       size={16}
-                      className={`absolute top-1/2 left-3 -translate-y-1/2 ${generalMulti ? 'text-slate-300' : 'text-slate-400'}`}
+                      className={`absolute top-1/2 left-3 -translate-y-1/2 ${generalMulti ? 'text-[var(--muted)] opacity-50' : 'text-[var(--muted)]'}`}
                     />
                     <input
                       type="text"
                       readOnly={generalMulti}
                       placeholder="Ej: Peugeot, Citroën, Opel"
-                      className={`w-full rounded-lg border border-slate-300 py-2 pr-4 pl-10 text-slate-800 outline-none focus:ring-2 focus:ring-teal-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200 ${generalMulti ? 'cursor-not-allowed bg-slate-100 italic text-slate-400 dark:bg-slate-900' : 'bg-slate-50'}`}
+                      className={`field-input pl-10 ${generalMulti ? 'cursor-not-allowed italic opacity-60' : ''}`}
                       value={generalMulti ? 'Todas las marcas (Multimarca)' : dealerBrands}
                       onChange={(e) => setDealerBrands(e.target.value)}
                     />
                   </div>
-                  <p className="mt-1.5 ml-1 text-[10px] text-slate-400">
+                  <p className="mt-1.5 ml-1 text-[10px] text-[var(--muted)]">
                     Se guarda en el campo <span className="font-medium">grupo</span> de AVI en la app real.
                   </p>
                 </div>
               </div>
-            </div>
+            </Panel>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4 md:p-6">
-              <h3 className="mb-6 flex items-center gap-2 text-lg font-semibold text-slate-800 dark:text-white">
-                <Phone size={20} className="text-teal-500" /> Información de Contacto
+            <Panel>
+              <h3 className="section-title mb-6 flex items-center gap-2" style={{ fontSize: 'var(--font-lg)' }}>
+                <Phone size={20} style={{ color: 'var(--color-brand)' }} /> Información de Contacto
               </h3>
               <div className="grid grid-cols-1 gap-3 sm:gap-6 md:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Email General</label>
+                  <label className="field-label">Email General</label>
                   <div className="relative">
-                    <Mail size={16} className="absolute top-1/2 left-3 -translate-y-1/2 text-slate-400" />
+                    <Mail size={16} className="absolute top-1/2 left-3 -translate-y-1/2 text-[var(--muted)]" />
                     <input type="email" className={`${inputCls()} pl-10`} placeholder="contacto@ejemplo.es" />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Teléfono Principal</label>
+                  <label className="field-label">Teléfono Principal</label>
                   <div className="relative">
-                    <Phone size={16} className="absolute top-1/2 left-3 -translate-y-1/2 text-slate-400" />
+                    <Phone size={16} className="absolute top-1/2 left-3 -translate-y-1/2 text-[var(--muted)]" />
                     <input type="tel" className={`${inputCls()} pl-10`} placeholder="+34 …" />
                   </div>
                 </div>
                 <div className="space-y-2 md:col-span-2">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Sitio Web</label>
+                  <label className="field-label">Sitio Web</label>
                   <div className="relative">
-                    <Globe size={16} className="absolute top-1/2 left-3 -translate-y-1/2 text-slate-400" />
+                    <Globe size={16} className="absolute top-1/2 left-3 -translate-y-1/2 text-[var(--muted)]" />
                     <input type="url" placeholder="https://" className={`${inputCls()} pl-10`} />
                   </div>
                 </div>
               </div>
-            </div>
+            </Panel>
 
             <div className="flex justify-end">
               <SaveButton label="Guardar cambios" />
@@ -280,21 +257,18 @@ export default function SettingsShellView({ workshop, isDarkMode: _isDarkMode, s
 
       case 'centers':
         return (
-          <div className="space-y-6 animate-fade-in">
-            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4 md:p-6">
+          <div className="panel-stack animate-fade-in">
+            <Panel>
               <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-800 dark:text-white">
-                    <MapPin size={20} className="text-teal-500" /> Gestión de Centros
+                  <h3 className="section-title flex items-center gap-2" style={{ fontSize: 'var(--font-lg)' }}>
+                    <MapPin size={20} style={{ color: 'var(--color-brand)' }} /> Gestión de Centros
                   </h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                  <p className="section-subtitle mt-1">
                     Centros del taller en AVI (tabla centros). En plantilla solo se muestra el diseño.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-600 transition-colors hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400"
-                >
+                <button type="button" className="confirm-action">
                   <Plus size={16} /> Añadir Centro
                 </button>
               </div>
@@ -303,40 +277,37 @@ export default function SettingsShellView({ workshop, isDarkMode: _isDarkMode, s
                 {MOCK_CENTERS.map((center) => (
                   <div
                     key={center.id}
-                    className="group relative flex h-full flex-col rounded-xl border border-slate-200 bg-slate-50 p-4 transition-colors hover:border-teal-500/50 dark:border-slate-800 dark:bg-slate-950/30"
+                    className="glass-inline group relative flex h-full flex-col rounded-[var(--radius-md)] p-4 transition-colors hover:border-[rgba(11,99,214,0.25)]"
                   >
                     <div className="absolute top-4 right-4 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-                      <span className="rounded bg-white p-1.5 text-blue-500 shadow-sm dark:bg-slate-800">
+                      <span className="ghost-action is-neutral p-1.5">
                         <Edit2 size={14} />
                       </span>
-                      <span className="rounded bg-white p-1.5 text-rose-500 shadow-sm dark:bg-slate-800">
+                      <span className="ghost-action p-1.5">
                         <Trash2 size={14} />
                       </span>
                     </div>
 
-                    <h4 className="mb-1 pr-12 font-bold text-slate-800 dark:text-white">{center.name}</h4>
-                    <p className="mb-3 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                    <h4 className="list-row-title mb-1 pr-12">{center.name}</h4>
+                    <p className="list-row-meta mb-3 flex items-center gap-1">
                       <MapPin size={12} /> {center.address}, {center.city}
                     </p>
 
                     <div className="mb-4 flex-1 space-y-2">
-                      <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                        <Clock size={12} className="text-slate-400" /> {center.schedule}
+                      <div className="list-row-meta flex items-center gap-2">
+                        <Clock size={12} /> {center.schedule}
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                        <PhoneCall size={12} className="text-slate-400" /> {center.phone}
+                      <div className="list-row-meta flex items-center gap-2">
+                        <PhoneCall size={12} /> {center.phone}
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                        <Tag size={12} className="text-slate-400" /> {center.brand}
+                      <div className="list-row-meta flex items-center gap-2">
+                        <Tag size={12} /> {center.brand}
                       </div>
                     </div>
 
                     <div className="mt-auto flex flex-wrap gap-1">
                       {center.repairTypes.map((type) => (
-                        <span
-                          key={type}
-                          className="rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-400"
-                        >
+                        <span key={type} className="badge tone-muted">
                           {type}
                         </span>
                       ))}
@@ -344,22 +315,22 @@ export default function SettingsShellView({ workshop, isDarkMode: _isDarkMode, s
                   </div>
                 ))}
               </div>
-            </div>
+            </Panel>
           </div>
         )
 
       case 'team':
         return (
-          <div className="space-y-6 animate-fade-in">
-            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4 md:p-6">
+          <div className="panel-stack animate-fade-in">
+            <Panel>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-800 dark:text-white">
-                    <Users size={20} className="text-blue-500" /> Equipo (tu licencia y esta web)
+                  <h3 className="section-title flex items-center gap-2" style={{ fontSize: 'var(--font-lg)' }}>
+                    <Users size={20} style={{ color: 'var(--color-brand)' }} /> Equipo (tu licencia y esta web)
                   </h3>
-                  <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                  <p className="section-subtitle mt-1 max-w-3xl">
                     Vista maqueta: en producción enlazas Hub allowlist +{' '}
-                    <code className="rounded bg-slate-100 px-1 py-0.5 text-[10px] dark:bg-slate-800">taller_users</code> como
+                    <code className="rounded bg-[rgba(15,17,21,0.06)] px-1 py-0.5 text-[10px]">taller_users</code> como
                     en el CRM.
                   </p>
                 </div>
@@ -367,15 +338,15 @@ export default function SettingsShellView({ workshop, isDarkMode: _isDarkMode, s
                   type="button"
                   disabled
                   title="Invita desde Hub Connect / gestión de usuarios."
-                  className="flex cursor-not-allowed items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-sm font-bold text-slate-400 dark:border-slate-700 dark:bg-slate-800"
+                  className="ghost-button cursor-not-allowed opacity-60"
                 >
                   <UserPlus size={16} /> Invitar usuario
                 </button>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="border-b border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-800 dark:bg-slate-950/50">
+              <div className="scroll-panel overflow-x-auto">
+                <table className="w-full min-w-[640px] text-left text-sm">
+                  <thead className="border-b border-[rgba(15,17,21,0.08)] text-[var(--muted)]">
                     <tr>
                       <th className="px-4 py-3 font-medium">Nombre</th>
                       <th className="px-4 py-3 font-medium">Email</th>
@@ -384,123 +355,106 @@ export default function SettingsShellView({ workshop, isDarkMode: _isDarkMode, s
                       <th className="px-4 py-3 font-medium">Último acceso</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  <tbody className="divide-y divide-[rgba(15,17,21,0.06)]">
                     {MOCK_TEAM.map((member, idx) => (
-                      <tr key={`${member.email}-${idx}`} className="hover:bg-slate-50 dark:hover:bg-slate-800/30">
-                        <td className="px-4 py-3 font-bold text-slate-700 dark:text-slate-200">{member.display_name}</td>
-                        <td className="px-4 py-3 text-slate-500">{member.email}</td>
-                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{member.taller_roles}</td>
+                      <tr key={`${member.email}-${idx}`} className="hover:bg-[rgba(255,255,255,0.55)]">
+                        <td className="px-4 py-3 font-semibold text-[var(--fog-strong)]">{member.display_name}</td>
+                        <td className="px-4 py-3 text-[var(--muted)]">{member.email}</td>
+                        <td className="px-4 py-3">{member.taller_roles}</td>
                         <td className="px-4 py-3">
-                          <span
-                            className={`rounded-full px-2 py-1 text-xs font-bold ${
-                              member.is_banned
-                                ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300'
-                                : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                            }`}
-                          >
+                          <span className={`badge ${member.is_banned ? 'tone-negative' : 'tone-positive'}`}>
                             {member.is_banned ? 'Restringido' : 'Activo'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-mono text-slate-500 tabular-nums">{member.last_sign_in}</td>
+                        <td className="px-4 py-3 font-mono text-[var(--muted)] tabular-nums">{member.last_sign_in}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            </div>
+            </Panel>
           </div>
         )
 
       case 'branding':
         return (
-          <div className="space-y-6 animate-fade-in">
-            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-4 md:p-6">
-              <h3 className="mb-6 flex items-center gap-2 text-lg font-semibold text-slate-800 dark:text-white">
-                <Palette size={20} className="text-teal-500" /> Identidad Visual
+          <div className="panel-stack animate-fade-in">
+            <Panel>
+              <h3 className="section-title mb-6 flex items-center gap-2" style={{ fontSize: 'var(--font-lg)' }}>
+                <Palette size={20} style={{ color: 'var(--color-brand)' }} /> Identidad Visual
               </h3>
 
-              <div className="space-y-8">
+              <div className="panel-stack">
                 <div className="space-y-3">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Logo del Concesionario</label>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    En producción enlazas <code className="rounded bg-slate-100 px-0.5 text-[10px] dark:bg-slate-800">ui_branding</code>{' '}
+                  <label className="field-label">Logo del Concesionario</label>
+                  <p className="section-subtitle">
+                    En producción enlazas <code className="rounded bg-[rgba(15,17,21,0.06)] px-0.5 text-[10px]">ui_branding</code>{' '}
                     y bucket de marca.
                   </p>
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex flex-1 cursor-pointer items-center gap-2 truncate rounded-lg border border-slate-300 bg-slate-50 px-2 py-2 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-950">
+                    <div className="field-input flex flex-1 cursor-pointer items-center gap-2 truncate text-xs text-[var(--muted)]">
                       <Image size={14} />
                       Sin archivo (solo diseño)
                     </div>
-                    <button
-                      type="button"
-                      className="rounded-lg border border-slate-200 bg-slate-100 p-2 text-slate-500 dark:border-slate-700 dark:bg-slate-800"
-                    >
+                    <button type="button" className="ghost-button min-h-0 px-3 py-2">
                       <Upload size={16} />
                     </button>
                   </div>
                 </div>
 
-                <hr className="border-slate-100 dark:border-slate-800" />
+                <hr className="border-[rgba(15,17,21,0.08)]" />
 
                 <div className="space-y-3">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Paleta de acento (plantilla)
-                  </label>
+                  <label className="field-label">Paleta de acento (plantilla)</label>
                   <div className="flex flex-wrap gap-3">
                     {paletteSwatches.map((p) => (
                       <button
                         key={p.id}
                         type="button"
-                        className="flex flex-col items-center gap-2 rounded-xl border border-slate-200 p-4 transition-all hover:border-teal-500/50 dark:border-slate-800"
+                        className="glass-inline flex flex-col items-center gap-2 rounded-[var(--radius-md)] p-4 transition-all hover:border-[rgba(11,99,214,0.25)]"
                       >
                         <span
-                          className="h-12 w-12 rounded-full border-2 border-white shadow-md ring-1 ring-slate-200 dark:border-slate-900 dark:ring-slate-700"
+                          className="h-12 w-12 rounded-full border-2 border-white shadow-md ring-1 ring-[rgba(15,17,21,0.08)]"
                           style={{ backgroundColor: p.color }}
                         />
-                        <span className="text-center text-[10px] font-bold uppercase text-slate-500">{p.label}</span>
+                        <span className="text-center text-[10px] font-bold uppercase text-[var(--muted)]">{p.label}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/50">
-                  <span className="mb-3 block text-xs font-bold uppercase text-slate-400">Vista previa</span>
+                <div className="glass-inline rounded-[var(--radius-md)] p-4">
+                  <span className="section-eyebrow mb-3 block">Vista previa</span>
                   <div className="flex flex-wrap items-center gap-3">
-                    <button type="button" className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-bold text-white shadow-md">
+                    <button type="button" className="client-submit min-h-0 px-4 py-2 text-sm">
                       Acción Principal
                     </button>
-                    <button
-                      type="button"
-                      className="rounded-lg bg-teal-100 px-4 py-2 text-sm font-bold text-teal-700 dark:bg-teal-900/30 dark:text-teal-300"
-                    >
+                    <button type="button" className="ghost-button min-h-0 px-4 py-2 text-sm">
                       Secundario
                     </button>
-                    <span className="text-sm font-semibold text-teal-600 dark:text-teal-400">Enlace de ejemplo</span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-xs font-bold text-teal-700 ring-1 ring-teal-200 dark:bg-teal-950/40 dark:text-teal-300 dark:ring-teal-800">
+                    <span className="text-sm font-semibold" style={{ color: 'var(--color-brand)' }}>
+                      Enlace de ejemplo
+                    </span>
+                    <span className="badge tone-neutral inline-flex items-center gap-1">
                       <CheckCircle2 size={12} /> Badge
                     </span>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Pantalla de Acceso / Portal</label>
+                  <label className="field-label">Pantalla de Acceso / Portal</label>
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-6">
                     <div>
-                      <label className="mb-1 block text-xs font-bold text-slate-500 uppercase">Título del Portal</label>
+                      <label className="section-eyebrow mb-1 block">Título del Portal</label>
                       <input type="text" placeholder="Portal clientes" className={`${inputCls()} text-sm`} />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-bold text-slate-500 uppercase">
-                        Imagen de Fondo (Login)
-                      </label>
+                      <label className="section-eyebrow mb-1 block">Imagen de Fondo (Login)</label>
                       <div className="flex items-center gap-2">
-                        <div className="flex flex-1 cursor-pointer items-center gap-2 truncate rounded-lg border border-slate-300 bg-slate-50 px-2 py-2 text-xs dark:border-slate-700 dark:bg-slate-950">
+                        <div className="field-input flex flex-1 cursor-pointer items-center gap-2 truncate text-xs">
                           <Image size={14} /> Sin imagen
                         </div>
-                        <button
-                          type="button"
-                          className="rounded-lg border border-slate-200 bg-slate-100 p-2 dark:border-slate-700 dark:bg-slate-800"
-                        >
+                        <button type="button" className="ghost-button min-h-0 px-3 py-2">
                           <Upload size={16} />
                         </button>
                       </div>
@@ -512,7 +466,7 @@ export default function SettingsShellView({ workshop, isDarkMode: _isDarkMode, s
               <div className="mt-8 flex justify-end">
                 <SaveButton label="Guardar Apariencia" />
               </div>
-            </div>
+            </Panel>
           </div>
         )
 
@@ -522,20 +476,19 @@ export default function SettingsShellView({ workshop, isDarkMode: _isDarkMode, s
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col space-y-6 animate-fade-in-up">
-      <div className="mb-2 shrink-0 flex items-center justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold text-slate-800 dark:text-white sm:text-2xl">
-            <Settings size={24} className="text-slate-400" aria-hidden />
-            Configuración
-          </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Gestiona los parámetros generales de la plataforma (maqueta Hub).
-          </p>
-        </div>
+    <div className="flex h-full min-h-0 flex-col panel-stack animate-fade-in-up">
+      <div className="shrink-0">
+        <p className="section-eyebrow">Ajustes</p>
+        <h1 className="section-title flex items-center gap-2">
+          <Settings size={24} className="text-[var(--muted)]" aria-hidden />
+          Configuración
+        </h1>
+        <p className="section-subtitle mt-1">
+          Gestiona los parámetros generales de la plataforma (maqueta Hub).
+        </p>
       </div>
 
-      <div className="custom-scrollbar-light flex shrink-0 items-center gap-1 overflow-x-auto border-b border-slate-200 pb-2 dark:border-slate-800">
+      <div className="nav-segment custom-scrollbar-light shrink-0 overflow-x-auto">
         {visibleTabs.map((tab) => {
           const Icon = tab.icon
           const active = activeTab === tab.id
@@ -544,11 +497,7 @@ export default function SettingsShellView({ workshop, isDarkMode: _isDarkMode, s
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`flex shrink-0 items-center gap-2 border-b-2 px-4 py-2 text-sm font-bold transition-colors ${
-                active
-                  ? tab.activeClass
-                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-              }`}
+              className={`nav-segment-btn flex shrink-0 items-center gap-2 ${active ? 'is-active' : ''}`}
             >
               <Icon size={16} />
               {tab.label}

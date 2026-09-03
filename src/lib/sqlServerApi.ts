@@ -1,6 +1,6 @@
 /**
  * Cliente HTTP hacia la API Node (SQL Server aviapi).
- * En dev, Vite proxy redirige /api → localhost:3001.
+ * En dev, Vite proxy redirige /api → localhost:3002 (CitaplannerServer).
  */
 
 import type { GestionPatch, PeticionPendiente, PeticionesFilters, TipoPeticionRow } from './peticionesPendientes'
@@ -24,23 +24,40 @@ function url(path: string, params?: Record<string, string | string[] | undefined
   return q ? `${full}?${q}` : full
 }
 
-async function parseJson<T>(res: Response): Promise<T> {
-  let body: { error?: string } & T
+const API_DOWN_MSG =
+  'La API SQL no está en marcha. Abre otra terminal, ve a CitaplannerServer y ejecuta npm run dev (o npm run dev:api desde el frontend).'
+
+async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   try {
-    body = (await res.json()) as { error?: string } & T
+    return await fetch(input, init)
+  } catch {
+    throw new SqlServerApiError(API_DOWN_MSG)
+  }
+}
+
+async function parseJson<T>(res: Response): Promise<T> {
+  let body: { error?: string; ok?: boolean } & T
+  try {
+    body = (await res.json()) as { error?: string; ok?: boolean } & T
   } catch {
     throw new SqlServerApiError(
-      res.status === 502 || res.status === 500
-        ? 'La API SQL no responde. Arranca CitaplannerServer (`npm run dev` en esa carpeta) o `npm run dev:api` desde el frontend.'
-        : `Error API SQL (${res.status})`,
+      res.status === 502 || res.status === 500 || res.status === 503 ? API_DOWN_MSG : `Error API SQL (${res.status})`,
     )
   }
-  if (!res.ok) {
+  if (!res.ok || body.ok === false) {
     const msg = body.error || res.statusText || 'Error API SQL Server'
+    if (/falta mssql_password/i.test(msg)) {
+      throw new SqlServerApiError(
+        'Falta MSSQL_PASSWORD en CitaplannerServer/.env.local. Rellena la contraseña de SQL Server y reinicia la API.',
+      )
+    }
     if (/inicio de sesi/i.test(msg)) {
       throw new SqlServerApiError(
-        'Login SQL Server rechazado para el usuario configurado. Revisa MSSQL_USER y MSSQL_PASSWORD en .env (prueba la conexión en SSMS).',
+        'Login SQL Server rechazado. Revisa MSSQL_USER y MSSQL_PASSWORD en CitaplannerServer/.env.local.',
       )
+    }
+    if (res.status === 502 || res.status === 503) {
+      throw new SqlServerApiError(API_DOWN_MSG)
     }
     throw new SqlServerApiError(msg)
   }
@@ -66,7 +83,7 @@ export class SqlServerApiError extends Error {
 
 export async function sqlHealthCheck(): Promise<{ ok: boolean; error?: string }> {
   try {
-    const data = await parseJson<{ ok: boolean }>(await fetch(url('/api/health')))
+    const data = await parseJson<{ ok: boolean }>(await apiFetch(url('/api/health')))
     return { ok: data.ok === true }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
@@ -91,11 +108,11 @@ export async function sqlResolveTallerIds(input: {
   }
   if (input.nombre?.trim()) params.nombre = input.nombre.trim()
   if (input.expandGrupo) params.expandGrupo = '1'
-  return parseJson<SqlResolveTalleresResult>(await fetch(url('/api/talleres/resolve', params)))
+  return parseJson<SqlResolveTalleresResult>(await apiFetch(url('/api/talleres/resolve', params)))
 }
 
 export async function sqlFetchTiposPeticion(): Promise<TipoPeticionRow[]> {
-  return parseJson<TipoPeticionRow[]>(await fetch(url('/api/tipos-peticion')))
+  return parseJson<TipoPeticionRow[]>(await apiFetch(url('/api/tipos-peticion')))
 }
 
 export async function sqlFetchPendingPeticiones(
@@ -110,12 +127,14 @@ export async function sqlFetchPendingPeticiones(
   if (filters.soloConCita) params.soloConCita = '1'
   if (filters.soloSesionAbierta) params.soloSesionAbierta = '1'
   if (filters.soloNoGestionadas) params.soloNoGestionadas = '1'
-  return parseJson<PeticionPendiente[]>(await fetch(url('/api/peticiones-pendientes', params)))
+  if (filters.from?.trim()) params.from = filters.from.trim()
+  if (filters.to?.trim()) params.to = filters.to.trim()
+  return parseJson<PeticionPendiente[]>(await apiFetch(url('/api/peticiones-pendientes', params)))
 }
 
 export async function sqlUpdatePeticionGestion(idpeticion: string, patch: GestionPatch): Promise<void> {
   await parseJson<{ ok: boolean }>(
-    await fetch(url(`/api/peticiones/${encodeURIComponent(idpeticion)}/gestion`), {
+    await apiFetch(url(`/api/peticiones/${encodeURIComponent(idpeticion)}/gestion`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),

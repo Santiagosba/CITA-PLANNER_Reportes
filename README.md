@@ -25,7 +25,7 @@ npm run dev
 
 Atajo desde aquí: `npm run dev:api` arranca la API en la carpeta hermana.
 
-App: http://localhost:5174 · API: http://localhost:3001/api/health
+App: http://localhost:3001 · API: http://localhost:3002/api/health
 
 ## Variables (.env)
 

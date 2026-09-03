@@ -7,12 +7,14 @@ export default defineConfig(({ mode }) => {
   const raw = (env.VITE_APP_BASE_PATH || '').trim();
   const baseSeg = raw.replace(/^\/+|\/+$/g, '');
   const base = !raw || raw === '/' ? '/' : `/${baseSeg}/`;
-  const apiPort = (env.API_PORT || '3001').trim()
+  const devPort = Number((env.VITE_DEV_PORT || '3001').trim())
+  const apiPort = (env.VITE_API_PORT || env.API_PORT || '3002').trim()
   return {
     base,
     plugins: [react()],
     server: {
-      port: 5174,
+      port: devPort,
+      strictPort: true,
       proxy: {
         '/api': {
           target: `http://localhost:${apiPort}`,

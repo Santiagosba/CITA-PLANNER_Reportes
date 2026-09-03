@@ -4,33 +4,33 @@
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0f766e" />
+    <meta name="theme-color" content="#0b63d6" />
     <title>Plantilla Hub · próxima web</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,400..800;1,400..600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
-    <!-- Paleta por defecto (`--accent-*`); la marca del producto va por `VITE_APP_*` + taller en BD -->
+    <!-- Paleta legacy (`--accent-*`) para compatibilidad con branding dinámico -->
     <style>
       :root {
-        --accent-50: #f0fdfa;
-        --accent-100: #ccfbf1;
-        --accent-200: #99f6e4;
-        --accent-300: #5eead4;
-        --accent-400: #2dd4bf;
-        --accent-500: #14b8a6;
-        --accent-600: #0d9488;
-        --accent-700: #0f766e;
-        --accent-800: #115e59;
-        --accent-900: #134e4a;
-        --accent-950: #042f2e;
-        --brand-primary: #0d9488;
-        --brand-accent: #22d3ee;
+        --accent-50: #eff6ff;
+        --accent-100: #dbeafe;
+        --accent-200: #bfdbfe;
+        --accent-300: #93c5fd;
+        --accent-400: #60a5fa;
+        --accent-500: #3b82f6;
+        --accent-600: #2563eb;
+        --accent-700: #1d4ed8;
+        --accent-800: #1e40af;
+        --accent-900: #1e3a8a;
+        --accent-950: #172554;
+        --brand-primary: #0b63d6;
+        --brand-accent: #60a5fa;
       }
       body {
-        font-family: Inter, system-ui, sans-serif;
+        font-family: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
       }
       .no-scrollbar::-webkit-scrollbar {
         display: none;
@@ -111,12 +111,8 @@
       .animate-fade-in-down {
         animation: fade-in-down 0.4s ease-out;
       }
-      /* Segundo tono del nombre de producto (login / selector) */
       .text-app-accent {
-        color: #1d4ed8;
-      }
-      .dark .text-app-accent {
-        color: #38bdf8;
+        color: var(--color-brand, #0b63d6);
       }
     </style>
   </head>

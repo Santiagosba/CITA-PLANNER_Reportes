@@ -1,0 +1,12 @@
+---
+description: UI minimalista y accesible para usuarios no técnicos
+alwaysApply: true
+---
+
+# UX minimalista (AVI CRM)
+
+- Modo claro por defecto, texto grande (16px+), botones altos (min 48px)
+- Lenguaje llano en español: «Entrar», «Elige tu taller», «Ya está gestionado»
+- Una acción principal por pantalla (`client-submit`); secundarios con `ghost-button`
+- Navegación con 3 pestañas claras: Gestionar citas · Listado completo · Ajustes
+- Usar tokens y clases de `src/styles/avi-crm.css` (`.glass`, `.badge`, `.metric`, `.nav-segment-btn`, `.field-input`) y componentes `src/components/ui/`

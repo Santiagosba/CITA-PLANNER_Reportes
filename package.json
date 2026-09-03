@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "dev:api": "npm run dev --prefix \"../CitaplannerServer\"",
+    "dev:all": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-all.ps1",
+    "stop": "powershell -NoProfile -Command \"$ports=3001,3002; foreach($port in $ports){$p=(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue).OwningProcess | Select-Object -Unique; if($p){$p|ForEach-Object{Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue}; Write-Host \\\"Puerto $port libre.\\\"}}\"",
     "stop:api": "npm run stop --prefix \"../CitaplannerServer\"",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
