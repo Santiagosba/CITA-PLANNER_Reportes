@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f766e" />
+    <title>Plantilla Hub · próxima web</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,400..800;1,400..600&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Paleta por defecto (`--accent-*`); la marca del producto va por `VITE_APP_*` + taller en BD -->
+    <style>
+      :root {
+        --accent-50: #f0fdfa;
+        --accent-100: #ccfbf1;
+        --accent-200: #99f6e4;
+        --accent-300: #5eead4;
+        --accent-400: #2dd4bf;
+        --accent-500: #14b8a6;
+        --accent-600: #0d9488;
+        --accent-700: #0f766e;
+        --accent-800: #115e59;
+        --accent-900: #134e4a;
+        --accent-950: #042f2e;
+        --brand-primary: #0d9488;
+        --brand-accent: #22d3ee;
+      }
+      body {
+        font-family: Inter, system-ui, sans-serif;
+      }
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      .custom-scrollbar-light {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
+      }
+      .custom-scrollbar-light::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      .custom-scrollbar-light::-webkit-scrollbar-thumb {
+        background-color: rgba(100, 116, 139, 0.45);
+        border-radius: 999px;
+      }
+      .custom-scrollbar-light::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      html.dark .custom-scrollbar-light {
+        scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+      }
+      html.dark .custom-scrollbar-light::-webkit-scrollbar-thumb {
+        background-color: rgba(148, 163, 184, 0.35);
+      }
+      @keyframes insight-shine {
+        0%,
+        100% {
+          opacity: 0.12;
+          transform: scale(1) rotate(-6deg);
+        }
+        50% {
+          opacity: 0.22;
+          transform: scale(1.05) rotate(0deg);
+        }
+      }
+      .animate-insight-shine {
+        animation: insight-shine 5s ease-in-out infinite;
+      }
+      @keyframes fade-in {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      @keyframes fade-in-up {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes fade-in-down {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .animate-fade-in {
+        animation: fade-in 0.3s ease-out;
+      }
+      .animate-fade-in-up {
+        animation: fade-in-up 0.4s ease-out;
+      }
+      .animate-fade-in-down {
+        animation: fade-in-down 0.4s ease-out;
+      }
+      /* Segundo tono del nombre de producto (login / selector) */
+      .text-app-accent {
+        color: #1d4ed8;
+      }
+      .dark .text-app-accent {
+        color: #38bdf8;
+      }
+    </style>
+  </head>
+  <body class="m-0 min-h-screen antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

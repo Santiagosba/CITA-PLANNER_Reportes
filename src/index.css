@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html.dark body {
+  background-color: #020617;
+}
+
+html:not(.dark) body {
+  background-color: #f8fafc;
+}
+
+/* Apple-style liquid glass surfaces */
+@layer components {
+  .glass-dark {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.09) 0%,
+      rgba(255, 255, 255, 0.04) 50%,
+      rgba(255, 255, 255, 0.02) 100%
+    );
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+  }
+
+  .glass-light {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.82) 0%,
+      rgba(255, 255, 255, 0.62) 100%
+    );
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    box-shadow:
+      0 8px 32px rgba(15, 23, 42, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  }
+
+  .glass-mesh-bg {
+    background-image:
+      radial-gradient(ellipse 80% 60% at 10% 20%, rgba(45, 212, 191, 0.18), transparent 55%),
+      radial-gradient(ellipse 70% 50% at 90% 10%, rgba(56, 189, 248, 0.12), transparent 50%),
+      radial-gradient(ellipse 60% 40% at 50% 100%, rgba(139, 92, 246, 0.1), transparent 55%);
+  }
+
+  html:not(.dark) .glass-mesh-bg {
+    background-image:
+      radial-gradient(ellipse 80% 60% at 10% 20%, rgba(45, 212, 191, 0.22), transparent 55%),
+      radial-gradient(ellipse 70% 50% at 90% 10%, rgba(56, 189, 248, 0.15), transparent 50%),
+      radial-gradient(ellipse 60% 40% at 50% 100%, rgba(139, 92, 246, 0.08), transparent 55%);
+  }
+}
