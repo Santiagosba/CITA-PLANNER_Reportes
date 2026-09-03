@@ -31,7 +31,7 @@ async function parseJson<T>(res: Response): Promise<T> {
   } catch {
     throw new SqlServerApiError(
       res.status === 502 || res.status === 500
-        ? 'La API SQL no responde. Ejecuta `npm run dev:api` en otra terminal y reinicia Vite.'
+        ? 'La API SQL no responde. Arranca CitaplannerServer (`npm run dev` en esa carpeta) o `npm run dev:api` desde el frontend.'
         : `Error API SQL (${res.status})`,
     )
   }

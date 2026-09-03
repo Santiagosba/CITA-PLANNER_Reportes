@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:api": "npm run dev --prefix server",
-    "stop:api": "powershell -NoProfile -Command \"$p=(Get-NetTCPConnection -LocalPort 3001 -State Listen -ErrorAction SilentlyContinue).OwningProcess | Select-Object -Unique; if($p){$p|ForEach-Object{Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue}; Write-Host 'API detenida (puerto 3001 libre).'}else{Write-Host 'No hay API en el puerto 3001.'}\"",
+    "dev:api": "npm run dev --prefix \"../CitaplannerServer\"",
+    "stop:api": "npm run stop --prefix \"../CitaplannerServer\"",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },
