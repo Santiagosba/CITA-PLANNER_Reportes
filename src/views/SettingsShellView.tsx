@@ -70,18 +70,25 @@ const MOCK_CENTERS = [
 
 const MOCK_TEAM = [
   {
-    display_name: 'Usuario demostración',
-    email: 'demo@ejemplo.es',
-    taller_roles: 'Admin taller',
+    display_name: 'Ana Ruiz',
+    email: 'ana.ruiz@taller.demo',
+    taller_roles: 'Asesora de triage',
     is_banned: false,
-    last_sign_in: '11/05/2026 10:12',
+    last_sign_in: 'Hoy',
   },
   {
-    display_name: 'Asesor comercial',
-    email: 'asesor@ejemplo.es',
-    taller_roles: 'Usuario',
+    display_name: 'Luis Mora',
+    email: 'luis.mora@taller.demo',
+    taller_roles: 'Asesor comercial',
     is_banned: false,
-    last_sign_in: '—',
+    last_sign_in: 'Hoy',
+  },
+  {
+    display_name: 'Carmen Vidal',
+    email: 'carmen.vidal@taller.demo',
+    taller_roles: 'Asesora de peritaje',
+    is_banned: false,
+    last_sign_in: 'Hoy',
   },
 ]
 
@@ -99,7 +106,7 @@ function inputCls(disabled?: boolean): string {
 }
 
 function Panel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <div className={`glass card-pad-md ${className}`.trim()}>{children}</div>
+  return <div className={`glass glass-lite card-pad-md ${className}`.trim()}>{children}</div>
 }
 
 export default function SettingsShellView({ workshop, isDarkMode: _isDarkMode, showBrandingTab = false }: Props) {
@@ -277,7 +284,7 @@ export default function SettingsShellView({ workshop, isDarkMode: _isDarkMode, s
                 {MOCK_CENTERS.map((center) => (
                   <div
                     key={center.id}
-                    className="glass-inline group relative flex h-full flex-col rounded-[var(--radius-md)] p-4 transition-colors hover:border-[rgba(11,99,214,0.25)]"
+                    className="glass-inline glass-lite group relative flex h-full flex-col rounded-[var(--radius-md)] p-4 transition-colors hover:border-[rgba(11,99,214,0.25)]"
                   >
                     <div className="absolute top-4 right-4 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
                       <span className="ghost-action is-neutral p-1.5">
@@ -411,7 +418,7 @@ export default function SettingsShellView({ workshop, isDarkMode: _isDarkMode, s
                       <button
                         key={p.id}
                         type="button"
-                        className="glass-inline flex flex-col items-center gap-2 rounded-[var(--radius-md)] p-4 transition-all hover:border-[rgba(11,99,214,0.25)]"
+                        className="glass-inline glass-lite flex flex-col items-center gap-2 rounded-[var(--radius-md)] p-4 transition-all hover:border-[rgba(11,99,214,0.25)]"
                       >
                         <span
                           className="h-12 w-12 rounded-full border-2 border-white shadow-md ring-1 ring-[rgba(15,17,21,0.08)]"
@@ -423,7 +430,7 @@ export default function SettingsShellView({ workshop, isDarkMode: _isDarkMode, s
                   </div>
                 </div>
 
-                <div className="glass-inline rounded-[var(--radius-md)] p-4">
+                <div className="glass-inline glass-lite rounded-[var(--radius-md)] p-4">
                   <span className="section-eyebrow mb-3 block">Vista previa</span>
                   <div className="flex flex-wrap items-center gap-3">
                     <button type="button" className="client-submit min-h-0 px-4 py-2 text-sm">

@@ -8,6 +8,12 @@ import {
   type PeticionPendiente,
   type TipoPeticionRow,
 } from '../lib/peticionesPendientes'
+import {
+  COPY_FALLBACK_NOTICE,
+  loadPeticionesCopy,
+  savePeticionesCopy,
+  workshopCopyId,
+} from '../lib/workingCopy'
 
 type DateRange = {
   from?: string
@@ -85,8 +91,16 @@ export function useOperationalData(workshop: Workshop, range: DateRange) {
         setItems(data.items)
         setTipos(data.tipos)
         setSourceNotice(getPeticionesSourceNotice())
+        savePeticionesCopy(workshopCopyId(workshop), data.items)
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'No se pudieron cargar los datos')
+        const copy = loadPeticionesCopy(workshopCopyId(workshop))
+        if (copy?.length) {
+          setItems(copy)
+          setError(null)
+          setSourceNotice(COPY_FALLBACK_NOTICE)
+        } else {
+          setError(e instanceof Error ? e.message : 'No se pudieron cargar los datos')
+        }
       } finally {
         inflight.delete(key)
         setLoading(false)

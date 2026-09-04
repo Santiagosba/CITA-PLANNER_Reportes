@@ -33,7 +33,7 @@ export default function ImportantNoticesStub({
     >
       <div className={`flex items-center justify-between px-4 py-3 border-b ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
         <div className="flex items-center gap-2">
-          <Bell size={16} className="text-teal-500 shrink-0" />
+          <Bell size={16} className="text-blue-600 shrink-0" />
           <span className="text-[11px] font-black uppercase tracking-wider">Bandeja</span>
         </div>
         <button
@@ -45,12 +45,12 @@ export default function ImportantNoticesStub({
         </button>
       </div>
       <div className={`p-8 text-center ${isDarkMode ? 'text-slate-500' : 'text-slate-500'}`}>
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-teal-500/10 text-teal-500">
+        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600/10 text-blue-600">
           <Megaphone size={22} />
         </div>
         <p className="text-sm font-semibold">Sin integración de datos</p>
         <p className="mt-2 text-[11px] leading-relaxed">
-          Aquí aparecerían avisos conectados al taller <span className="font-mono text-teal-600 dark:text-teal-400">{workshop.name}</span>.
+          Aquí aparecerían avisos conectados al taller <span className="font-mono text-blue-600 dark:text-blue-400">{workshop.name}</span>.
           En esta plantilla el panel solo conserva la estructura visual.
         </p>
       </div>

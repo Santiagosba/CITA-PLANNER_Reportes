@@ -32,8 +32,8 @@ export type UiBranding = {
 };
 
 export function brandingInlineStyle(b: UiBranding | null | undefined): CSSProperties {
-  const primary = (b?.primaryColorHex ?? '#0d9488').trim();
-  const accent = '#22d3ee';
+  const primary = (b?.primaryColorHex ?? '#0b63d6').trim();
+  const accent = '#60a5fa';
   return {
     '--brand-primary': primary,
     '--brand-accent': accent,

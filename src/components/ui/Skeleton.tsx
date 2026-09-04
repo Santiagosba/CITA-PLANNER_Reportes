@@ -15,7 +15,7 @@ export default function Skeleton({ lines = 3, className = '' }: Props) {
 
 export function TodoSkeleton() {
   return (
-    <div className="todo-item glass skeleton-todo" aria-busy="true" aria-label="Cargando consultas">
+    <div className="todo-item glass glass-lite skeleton-todo" aria-busy="true" aria-label="Cargando consultas">
       <div className="todo-item-main">
         <div className="skeleton-marker" />
         <div className="flex-1 panel-stack">

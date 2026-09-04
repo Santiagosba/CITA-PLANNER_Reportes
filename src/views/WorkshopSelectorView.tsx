@@ -6,9 +6,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { Workshop } from '../types';
 import {
-  Loader2, LogOut, Search as SearchIcon, ArrowRight, ChevronLeft, Building2,
+  LogOut, Search as SearchIcon, ArrowRight, ChevronLeft, Building2,
 } from 'lucide-react';
-import { isGlobalAviAdmin } from '../lib/operationsConnect';
+import { HexLoaderScreen } from '../components/ui/HexLoader';
+import { canBrowseAllWorkshops } from '../lib/operationsConnect';
 import {
   parseConnectSiteIds,
   scopedSitesEmptyDenied,
@@ -146,7 +147,7 @@ const WorkshopSelectorView: React.FC<WorkshopSelectorViewProps> = ({
 
   const [searchQuery, setSearchQuery] = useState('');
 
-  const isSuperUser = useMemo(() => isGlobalAviAdmin({ user }), [user]);
+  const isSuperUser = useMemo(() => canBrowseAllWorkshops({ user }), [user]);
 
   const headerLogoSrc = (licenseBranding?.logo_url ?? '').trim() || (hubWebIconUrl ?? '').trim() || '';
 
@@ -352,8 +353,7 @@ const WorkshopSelectorView: React.FC<WorkshopSelectorViewProps> = ({
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center px-4">
-        <Loader2 size={40} className="mb-4 animate-spin" style={{ color: 'var(--color-brand)' }} />
-        <p className="section-subtitle">Cargando talleres…</p>
+        <HexLoaderScreen label="Cargando talleres…" />
       </div>
     )
   }
@@ -388,7 +388,7 @@ const WorkshopSelectorView: React.FC<WorkshopSelectorViewProps> = ({
 
   return (
     <div className="min-h-screen">
-      <header className="glass" style={{ borderRadius: 0, borderTop: 0, borderLeft: 0, borderRight: 0 }}>
+      <header className="glass glass-lite" style={{ borderRadius: 0, borderTop: 0, borderLeft: 0, borderRight: 0 }}>
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             {headerLogoSrc ? (
@@ -424,8 +424,7 @@ const WorkshopSelectorView: React.FC<WorkshopSelectorViewProps> = ({
 
       {scanning ? (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center" style={{ background: 'rgba(238,241,245,0.92)' }}>
-          <Loader2 size={40} className="mb-4 animate-spin" style={{ color: 'var(--color-brand)' }} />
-          <p className="section-subtitle">Abriendo taller…</p>
+          <HexLoaderScreen label="Abriendo taller…" />
         </div>
       ) : null}
 

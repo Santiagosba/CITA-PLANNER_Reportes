@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchCitasTaller, type CitaTaller } from '../lib/citasTaller'
+import { loadCitasCopy, saveCitasCopy, workshopCopyId } from '../lib/workingCopy'
 import type { Workshop } from '../types'
 
 type Range = { from?: string; to?: string }
@@ -36,8 +37,15 @@ export function useCitasTaller(workshop: Workshop, range: Range) {
         const rows = await request
         cache.set(key, { timestamp: Date.now(), citas: rows })
         setCitas(rows)
+        saveCitasCopy(workshopCopyId(workshop), rows)
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'No se pudieron cargar las citas')
+        const copy = loadCitasCopy(workshopCopyId(workshop))
+        if (copy?.length) {
+          setCitas(copy)
+          setError(null)
+        } else {
+          setError(e instanceof Error ? e.message : 'No se pudieron cargar las citas')
+        }
       } finally {
         inflight.delete(key)
         setLoading(false)

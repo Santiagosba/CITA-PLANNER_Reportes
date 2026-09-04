@@ -48,7 +48,7 @@ export default function PeticionTodoItem({
   }, [expanded, p.idpeticion])
 
   return (
-    <li className={`todo-item glass scroll-reveal ${expanded ? 'is-expanded' : ''}`}>
+    <li className={`todo-item glass glass-lite scroll-reveal ${expanded ? 'is-expanded' : ''}`}>
       <div className="todo-item-main">
         <button
           type="button"
@@ -154,7 +154,7 @@ export default function PeticionTodoItem({
 
           {step === 3 ? (
             <div className="panel-stack scroll-reveal is-visible">
-              <div className="glass-inline card-pad-sm">
+              <div className="glass-inline glass-lite card-pad-sm">
                 <p className="section-eyebrow">Resumen</p>
                 <p className="section-title" style={{ fontSize: 'var(--font-lg)' }}>
                   {titulo}

@@ -9,6 +9,7 @@ export type DashboardShellRoute =
   | 'pending-citas'
   | 'boards'
   | 'reportes'
+  | 'laura'
   | 'configuration'
 
 type Props = {
@@ -44,7 +45,7 @@ function SidebarItem({
         collapsed ? 'justify-center px-0' : 'justify-start px-2'
       } ${
         active
-          ? 'bg-teal-500 text-white shadow-lg shadow-teal-900/20'
+          ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
           : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
       }`}
     >
@@ -157,7 +158,7 @@ export default function Sidebar({
         <div className={`flex items-center overflow-hidden transition-all duration-300 ${!sidebarOpen ? 'justify-center' : 'justify-between'}`}>
           <div className="flex min-w-0 items-center gap-3">
             <div className="relative shrink-0">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full border border-teal-400 bg-teal-600 text-sm font-bold text-white uppercase">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full border border-blue-400 bg-blue-600 text-sm font-bold text-white uppercase">
                 {initials}
               </div>
               <div className="absolute right-0 bottom-0 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 dark:border-slate-900" />
@@ -168,7 +169,7 @@ export default function Sidebar({
                   {displayName}
                 </span>
                 <span className="truncate text-xs text-slate-500 capitalize dark:text-slate-400">{role}</span>
-                <span className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-wide text-teal-600 dark:text-teal-400">
+                <span className="mt-0.5 truncate text-[10px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400">
                   {productName}
                 </span>
                 <span className="truncate text-[10px] text-slate-400 dark:text-slate-500">{workshop.name}</span>

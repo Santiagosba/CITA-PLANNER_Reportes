@@ -1,11 +1,20 @@
 import { Download, RefreshCw } from 'lucide-react'
-import {
-  DATE_PRESET_OPTIONS,
-  type DateRangePreset,
-  type ResolvedDateRange,
-} from '../lib/dateRangePresets'
+import { CALENDAR_SCALE_OPTIONS, type CalendarScale } from '../lib/calendarScale'
+import { type DateRangePreset, type ResolvedDateRange } from '../lib/dateRangePresets'
+import { CHANNEL_OPTIONS } from '../lib/tallerStations'
 import type { PeticionesStats } from '../lib/peticionesPendientes'
 import Button from './ui/Button'
+
+export type EstadoFilter = 'todas' | 'faltan' | 'hechas'
+
+const PERIOD_CHIPS: { id: DateRangePreset; label: string }[] = [
+  { id: 'semana', label: 'Semana' },
+  { id: 'mes', label: 'Mes' },
+  { id: 'trimestre', label: '3 meses' },
+  { id: 'anio', label: 'Año' },
+  { id: 'personalizada', label: 'Entre' },
+  { id: 'todas', label: 'Todas' },
+]
 
 type Props = {
   view: 'kanban' | 'tabla' | 'calendario'
@@ -16,9 +25,18 @@ type Props = {
   stats: PeticionesStats
   loading: boolean
   canExport: boolean
+  channel: string
+  slaOnly: boolean
+  estado: EstadoFilter
   onPresetChange: (preset: DateRangePreset) => void
   onCustomFromChange: (v: string) => void
   onCustomToChange: (v: string) => void
+  onChannelChange: (v: string) => void
+  onSlaOnlyChange: (v: boolean) => void
+  onEstadoChange: (v: EstadoFilter) => void
+  calendarScale: CalendarScale
+  onCalendarScaleChange: (v: CalendarScale) => void
+  onGoToday: () => void
   onRefresh: () => void
   onExport: () => void
 }
@@ -32,28 +50,36 @@ export default function PendingCitasToolbar({
   stats,
   loading,
   canExport,
+  channel,
+  slaOnly,
+  estado,
   onPresetChange,
   onCustomFromChange,
   onCustomToChange,
+  onChannelChange,
+  onSlaOnlyChange,
+  onEstadoChange,
+  calendarScale,
+  onCalendarScaleChange,
+  onGoToday,
   onRefresh,
   onExport,
 }: Props) {
-  const pctDone =
-    !loading && stats.total > 0 ? Math.round((stats.conCita / stats.total) * 100) : null
+  const pctDone = !loading && stats.total > 0 ? Math.round(stats.pctHechas) : null
 
   const title =
     view === 'calendario'
-      ? 'Calendario taller'
+      ? 'Calendario'
       : view === 'tabla'
-        ? 'Vista tabla'
-        : 'Triage operativo'
+        ? 'Listado de consultas'
+        : 'Consultas pendientes'
 
   const subtitle =
     view === 'calendario'
-      ? 'Agenda de elevadores, boxes y carga horaria del taller.'
+      ? 'Agenda del taller por día, semana, mes o año.'
       : view === 'tabla'
         ? 'Todas las consultas del periodo seleccionado.'
-        : 'Consultas del chatbot que aún no tienen cita en calendario.'
+        : 'Llamadas y tareas del chatbot: cuántas están hechas y cuántas faltan.'
 
   return (
     <header className="dashboard-header panel-stack">
@@ -76,75 +102,149 @@ export default function PendingCitasToolbar({
         </div>
       </div>
 
-      {view === 'calendario' ? null : (
-        <div className="bento-grid" aria-label="Resumen del periodo">
-          <div className="bento-cell bento-cell-hero glass metric">
-            <span>Por gestionar</span>
-            <strong style={{ color: stats.pendientes > 0 ? 'var(--color-warning)' : 'var(--color-success)' }}>
-              {loading ? '—' : stats.pendientes}
-            </strong>
-            <small>{loading ? '…' : stats.pendientes === 0 ? 'Cola vacía' : 'Pendientes'}</small>
+      <div className="elevator-filters glass glass-lite">
+        <div className="filter-field">
+          <span className="filter-field-label">Estado</span>
+          <div className="estado-filter" role="group" aria-label="Estado de las consultas">
+            <button
+              type="button"
+              className={`preset-chip ${estado === 'todas' ? 'is-active' : ''}`}
+              onClick={() => onEstadoChange('todas')}
+            >
+              Todas
+            </button>
+            <button
+              type="button"
+              className={`preset-chip ${estado === 'faltan' ? 'is-active' : ''}`}
+              onClick={() => onEstadoChange('faltan')}
+            >
+              Faltan
+            </button>
+            <button
+              type="button"
+              className={`preset-chip ${estado === 'hechas' ? 'is-active' : ''}`}
+              onClick={() => onEstadoChange('hechas')}
+            >
+              Hechas
+            </button>
           </div>
-          <div className="bento-cell glass metric">
-            <span>Con cita</span>
-            <strong style={{ color: 'var(--color-success)' }}>{loading ? '—' : stats.conCita}</strong>
-          </div>
-          <div className="bento-cell glass metric">
-            <span>Total</span>
-            <strong>{loading ? '—' : stats.total}</strong>
-          </div>
-          <div className="bento-cell bento-cell-wide glass card-pad-sm">
-            <p className="field-label mb-2">Periodo · {dateRange.label}</p>
-            <div className="flex flex-wrap gap-2">
-              {DATE_PRESET_OPTIONS.map((opt) => (
+        </div>
+        <label className="filter-field">
+          <span className="filter-field-label">Canal</span>
+          <select className="field-select" value={channel} onChange={(e) => onChannelChange(e.target.value)}>
+            {CHANNEL_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>{option.label}</option>
+            ))}
+          </select>
+        </label>
+        {view === 'calendario' ? (
+          <div className="filter-field">
+            <span className="filter-field-label">Ver agenda</span>
+            <div className="estado-filter" role="group" aria-label="Vista del calendario">
+              {CALENDAR_SCALE_OPTIONS.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
-                  onClick={() => onPresetChange(opt.id)}
-                  className={`preset-chip ${preset === opt.id ? 'is-active' : ''}`}
+                  className={`preset-chip ${calendarScale === opt.id ? 'is-active' : ''}`}
+                  onClick={() => onCalendarScaleChange(opt.id)}
                 >
                   {opt.label}
                 </button>
               ))}
             </div>
-            {preset === 'personalizada' ? (
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <label className="block">
-                  <span className="field-label">Desde</span>
-                  <input
-                    type="date"
-                    value={customFrom}
-                    onChange={(e) => onCustomFromChange(e.target.value)}
-                    className="field-input"
-                  />
-                </label>
-                <label className="block">
-                  <span className="field-label">Hasta</span>
-                  <input
-                    type="date"
-                    value={customTo}
-                    onChange={(e) => onCustomToChange(e.target.value)}
-                    min={customFrom || undefined}
-                    className="field-input"
-                  />
-                </label>
-              </div>
-            ) : null}
-            {pctDone != null ? (
-              <div
-                className="progress-bar mt-3"
-                role="progressbar"
-                aria-valuenow={pctDone}
-                aria-valuemin={0}
-                aria-valuemax={100}
-              >
-                <div className="progress-bar-fill" style={{ width: `${pctDone}%` }} />
-                <span className="progress-bar-label">{pctDone}% con cita</span>
-              </div>
-            ) : null}
           </div>
+        ) : (
+          <div className="filter-field">
+            <span className="filter-field-label">Fechas · {dateRange.label}</span>
+            <div className="estado-filter" role="group" aria-label="Rango de fechas">
+              {PERIOD_CHIPS.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  className={`preset-chip ${preset === opt.id ? 'is-active' : ''}`}
+                  onClick={() => onPresetChange(opt.id)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <label className={`elevator-sla ${slaOnly ? 'is-active' : ''}`}>
+          <input
+            type="checkbox"
+            checked={slaOnly}
+            onChange={(e) => onSlaOnlyChange(e.target.checked)}
+          />
+          SLA Crítico (&lt;15 min)
+        </label>
+        <div className="elevator-day-nav">
+          <button type="button" className="ghost-button" onClick={onGoToday}>
+            Hoy
+          </button>
         </div>
-      )}
+      </div>
+
+      {preset === 'personalizada' ? (
+        <div className="period-custom glass glass-lite">
+          <label className="filter-field">
+            <span className="filter-field-label">Desde</span>
+            <input
+              type="date"
+              value={customFrom}
+              onChange={(e) => onCustomFromChange(e.target.value)}
+              className="field-input"
+            />
+          </label>
+          <label className="filter-field">
+            <span className="filter-field-label">Hasta</span>
+            <input
+              type="date"
+              value={customTo}
+              onChange={(e) => onCustomToChange(e.target.value)}
+              min={customFrom || undefined}
+              className="field-input"
+            />
+          </label>
+        </div>
+      ) : null}
+
+      <div className="bento-grid is-kpis" aria-label="Resumen del periodo">
+        <div className="bento-cell glass glass-lite metric">
+          <span>Faltan</span>
+          <strong style={{ color: stats.porHacer > 0 ? 'var(--color-warning)' : 'var(--color-success)' }}>
+            {loading ? '—' : stats.porHacer}
+          </strong>
+          <small>{loading ? '…' : stats.porHacer === 0 ? 'Todo al día' : 'Por terminar'}</small>
+        </div>
+        <div className="bento-cell glass glass-lite metric">
+          <span>Hechas</span>
+          <strong style={{ color: 'var(--color-success)' }}>{loading ? '—' : stats.hechas}</strong>
+          <small>{loading ? '…' : 'Bien cerradas'}</small>
+        </div>
+        <div className="bento-cell glass glass-lite metric">
+          <span>Total</span>
+          <strong>{loading ? '—' : stats.total}</strong>
+          <small>{loading ? '…' : dateRange.label}</small>
+        </div>
+      </div>
+
+      {pctDone != null ? (
+        <div className="avance-strip glass glass-lite" aria-label="Avance de las consultas">
+          <span className="avance-side is-done">{stats.hechas} hechas</span>
+          <div
+            className="avance-bar"
+            role="progressbar"
+            aria-valuenow={pctDone}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
+            <span className="avance-fill" style={{ width: `${pctDone}%` }} />
+          </div>
+          <strong className="avance-pct">{pctDone}%</strong>
+          <span className="avance-side is-todo">{stats.porHacer} faltan</span>
+        </div>
+      ) : null}
     </header>
   )
 }

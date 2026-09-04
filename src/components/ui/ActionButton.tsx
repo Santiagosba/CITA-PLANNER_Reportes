@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { Check, Loader2 } from 'lucide-react'
+import { Check } from 'lucide-react'
+import HexLoader from './HexLoader'
 
 export type ActionStatus = 'idle' | 'loading' | 'success' | 'error'
 
@@ -41,7 +42,7 @@ export default function ActionButton({
     >
       <span className="action-btn-icon" aria-hidden>
         {status === 'loading' ? (
-          <Loader2 size={20} className="animate-spin" />
+          <HexLoader size="sm" label="Guardando" />
         ) : showSuccess ? (
           <Check size={20} className="action-btn-check" />
         ) : null}

@@ -7,6 +7,8 @@ import type { GestionPatch, PeticionPendiente, PeticionesFilters, TipoPeticionRo
 import type { CitaTaller } from './citasTaller'
 
 function apiBase(): string {
+  const colleague = (import.meta.env.VITE_COLLEAGUE_API_URL as string | undefined)?.trim()
+  if (colleague) return colleague.replace(/\/+$/, '')
   const raw = (import.meta.env.VITE_SQL_API_URL as string | undefined)?.trim()
   return raw?.replace(/\/+$/, '') ?? ''
 }

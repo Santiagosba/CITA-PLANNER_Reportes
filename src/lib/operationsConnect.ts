@@ -4,6 +4,7 @@
 
 import { supabase, supabaseOperations } from './supabase'
 import { isAviAdminProfile } from './aviAdminGate'
+import { isDemoAsesor } from './demoAsesores'
 import { getCrmHubWebIdFromEnv } from './hubWebEnv'
 import { parseConnectSiteIds, sessionAllowsThisHubWeb } from './connectSiteScope'
 import { isContainerActiveForHubWeb } from './tallerWebActivo'
@@ -33,6 +34,12 @@ export function isGlobalAviAdmin(session: { user?: any } | null | undefined): bo
   const role = String(roleRaw).trim().toLowerCase()
   if (role === 'aviadmin' || role === 'admin') return true
   return isAviAdminProfile(user.email ?? null, (um.role as string | undefined) ?? null)
+}
+
+/** Admin real o asesor de prueba: puede listar talleres y ver toda la bandeja. */
+export function canBrowseAllWorkshops(session: { user?: unknown } | null | undefined): boolean {
+  if (isGlobalAviAdmin(session)) return true
+  return isDemoAsesor(session?.user)
 }
 
 export async function fetchRouteBySlug(slug: string): Promise<ConnectRoute | null> {

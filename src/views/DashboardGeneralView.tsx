@@ -1,9 +1,12 @@
-import { ArrowRight, CalendarCheck2, ClipboardList, RefreshCw, Wrench } from 'lucide-react'
+import { useEffect } from 'react'
+import { AlertTriangle, ArrowRight, CalendarCheck2, ClipboardList, RefreshCw, Wrench } from 'lucide-react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
+import { HexLoaderScreen } from '../components/ui/HexLoader'
 import Card from '../components/ui/Card'
 import VehiclePlate from '../components/ui/VehiclePlate'
 import { resolveDateRange } from '../lib/dateRangePresets'
-import { computePeticionesStats, formatFecha, isPeticionPendiente } from '../lib/peticionesPendientes'
+import { computePeticionesStats, formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
+import { isSlaCritico } from '../lib/tallerStations'
 import { useOperationalData } from '../hooks/useOperationalData'
 import type { Workshop } from '../types'
 
@@ -11,15 +14,31 @@ type Props = {
   workshop: Workshop
   onOpenTriage: () => void
   onOpenCalendar: () => void
+  onOpenLead?: (peticion: PeticionPendiente) => void
+  refreshToken?: number
 }
 
-export default function DashboardGeneralView({ workshop, onOpenTriage, onOpenCalendar }: Props) {
+export default function DashboardGeneralView({
+  workshop,
+  onOpenTriage,
+  onOpenCalendar,
+  onOpenLead,
+  refreshToken = 0,
+}: Props) {
   const range = resolveDateRange('mes', '', '')
   const { items, loading, error, sourceNotice, refresh } = useOperationalData(workshop, range)
+
+  useEffect(() => {
+    if (refreshToken > 0) void refresh()
+  }, [refreshToken, refresh])
+
   const stats = computePeticionesStats(items)
-  const porGestionar = items.filter((item) => isPeticionPendiente(item) && !item.gestionado)
-  const enGestion = items.filter((item) => isPeticionPendiente(item) && item.gestionado)
   const citas = items.filter((item) => Boolean(item.cita?.fecha))
+  const slaCriticos = items.filter(
+    (item) =>
+      !item.gestionado && (isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha)),
+  )
+  const slaCount = slaCriticos.length
 
   return (
     <div className="dashboard-page operational-dashboard">
@@ -40,29 +59,50 @@ export default function DashboardGeneralView({ workshop, onOpenTriage, onOpenCal
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
       {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
 
+      {!loading && slaCount > 0 ? (
+        <aside className="ops-sla-alert glass glass-lite" role="alert" aria-live="polite">
+          <div className="ops-sla-alert-icon" aria-hidden>
+            <AlertTriangle size={22} />
+          </div>
+          <div className="ops-sla-alert-copy">
+            <strong>
+              Atención: {slaCount} consulta(s) pendiente(s) con SLA de contacto &lt;15 min
+            </strong>
+            <p>
+              La centralita de voz de Laura ha derivado estos casos que requieren validación presencial o
+              pericial inmediata.
+            </p>
+          </div>
+          <button type="button" className="client-submit ops-sla-alert-action" onClick={onOpenTriage}>
+            Ir al triage
+            <ArrowRight size={16} />
+          </button>
+        </aside>
+      ) : null}
+
       <section className="ops-kpi-grid" aria-label="Indicadores operativos">
         <MetricCard
           icon={ClipboardList}
-          label="Pendientes de triage"
-          value={loading ? '—' : porGestionar.length}
-          helper="Requieren gestión"
+          label="Faltan"
+          value={loading ? '—' : stats.porHacer}
+          helper="Llamadas o tareas por terminar"
           tone="warning"
           onClick={onOpenTriage}
         />
         <MetricCard
           icon={Wrench}
-          label="En gestión"
-          value={loading ? '—' : enGestion.length}
-          helper="Contactadas sin cita"
-          tone="brand"
+          label="Hechas"
+          value={loading ? '—' : stats.hechas}
+          helper="Bien cerradas"
+          tone="positive"
           onClick={onOpenTriage}
         />
         <MetricCard
           icon={CalendarCheck2}
-          label="Citas sincronizadas"
-          value={loading ? '—' : citas.length}
-          helper={`${stats.total} consultas totales`}
-          tone="positive"
+          label="Total del mes"
+          value={loading ? '—' : stats.total}
+          helper={`${citas.length} con cita en calendario`}
+          tone="brand"
           onClick={onOpenCalendar}
         />
       </section>
@@ -80,7 +120,7 @@ export default function DashboardGeneralView({ workshop, onOpenTriage, onOpenCal
           </div>
           <div className="ops-feed-scroll custom-scrollbar-light">
             {loading ? (
-              <p className="section-subtitle ops-empty">Cargando actividad…</p>
+              <HexLoaderScreen size="md" label="Cargando actividad…" />
             ) : items.length === 0 ? (
               <p className="section-subtitle ops-empty">No hay actividad en este periodo.</p>
             ) : (
@@ -91,7 +131,20 @@ export default function DashboardGeneralView({ workshop, onOpenTriage, onOpenCal
                     ? [cita.nombre, cita.apellidos].filter(Boolean).join(' ')
                     : ''
                   return (
-                    <li key={item.idpeticion} className="ops-feed-row">
+                    <li
+                      key={item.idpeticion}
+                      className="ops-feed-row"
+                      role={onOpenLead ? 'button' : undefined}
+                      tabIndex={onOpenLead ? 0 : undefined}
+                      onClick={() => onOpenLead?.(item)}
+                      onKeyDown={(e) => {
+                        if (!onOpenLead) return
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          onOpenLead(item)
+                        }
+                      }}
+                    >
                       <div className="ops-feed-identity">
                         {cita?.matricula ? (
                           <VehiclePlate value={cita.matricula} compact />
@@ -105,8 +158,8 @@ export default function DashboardGeneralView({ workshop, onOpenTriage, onOpenCal
                           <span>{item.tipopeticion || 'Sin tipo'} · {item.caller || 'Sin teléfono'}</span>
                         </div>
                       </div>
-                      <span className={`badge ${isPeticionPendiente(item) ? 'tone-warning' : 'tone-positive'}`}>
-                        {isPeticionPendiente(item) ? 'Pendiente' : 'Con cita'}
+                      <span className={`badge ${item.gestionado ? 'tone-positive' : 'tone-warning'}`}>
+                        {item.gestionado ? 'Hecha' : 'Falta'}
                       </span>
                       <time>{formatFecha(item.fechainicio)}</time>
                     </li>
@@ -121,16 +174,16 @@ export default function DashboardGeneralView({ workshop, onOpenTriage, onOpenCal
           <p className="section-eyebrow">Rendimiento</p>
           <h2 className="ops-card-title">Resolución del periodo</h2>
           <div className="ops-resolution">
-            <strong>{loading ? '—' : `${stats.pctConCita}%`}</strong>
-            <span>con cita vinculada</span>
+            <strong>{loading ? '—' : `${Math.round(stats.pctHechas)}%`}</strong>
+            <span>hechas y terminadas</span>
           </div>
-          <div className="progress-bar" role="progressbar" aria-valuenow={stats.pctConCita} aria-valuemin={0} aria-valuemax={100}>
-            <div className="progress-bar-fill" style={{ width: `${stats.pctConCita}%` }} />
+          <div className="progress-bar" role="progressbar" aria-valuenow={Math.round(stats.pctHechas)} aria-valuemin={0} aria-valuemax={100}>
+            <div className="progress-bar-fill" style={{ width: `${stats.pctHechas}%` }} />
           </div>
           <dl className="ops-summary-list">
             <div><dt>Total recibido</dt><dd>{stats.total}</dd></div>
-            <div><dt>Sin cita</dt><dd>{stats.pendientes}</dd></div>
-            <div><dt>Con cita</dt><dd>{stats.conCita}</dd></div>
+            <div><dt>Faltan</dt><dd>{stats.porHacer}</dd></div>
+            <div><dt>Hechas</dt><dd>{stats.hechas}</dd></div>
           </dl>
           <button type="button" className="client-submit" onClick={onOpenTriage}>
             Abrir cola operativa
@@ -152,7 +205,7 @@ type MetricProps = {
 
 function MetricCard({ icon: Icon, label, value, helper, tone, onClick }: MetricProps) {
   return (
-    <button type="button" className={`ops-kpi glass tone-${tone}`} onClick={onClick}>
+    <button type="button" className={`ops-kpi glass glass-lite tone-${tone}`} onClick={onClick}>
       <span className="ops-kpi-icon"><Icon size={17} /></span>
       <span className="ops-kpi-label">{label}</span>
       <strong>{value}</strong>

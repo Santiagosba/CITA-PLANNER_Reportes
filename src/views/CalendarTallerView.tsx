@@ -1,64 +1,23 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { ChevronLeft, ChevronRight, Clock3, RefreshCw } from 'lucide-react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
+import { HexLoaderScreen } from '../components/ui/HexLoader'
 import VehiclePlate from '../components/ui/VehiclePlate'
 import { toDateInputValue } from '../lib/dateRangePresets'
+import {
+  WEEKDAY_LABELS,
+  calendarPeriod,
+  daysOfWeek,
+  monthCells,
+  shiftCalendarAnchor,
+  startOfCalendarDay,
+  yearMonths,
+  type CalendarScale,
+} from '../lib/calendarScale'
 import { useCitasTaller } from '../hooks/useCitasTaller'
 import type { CitaTaller } from '../lib/citasTaller'
+import { isSlaCritico, matchesChannelText } from '../lib/tallerStations'
 import type { Workshop } from '../types'
-
-type StationId = 'elev1' | 'elev2' | 'elev3' | 'paint' | 'peritaje'
-
-type Station = {
-  id: StationId
-  label: string
-  responsibles: string
-  keywords: string[]
-}
-
-const STATIONS: Station[] = [
-  {
-    id: 'elev1',
-    label: 'Elevador 1 - Mecánica Rápida',
-    responsibles: 'Resp: Manuel Rivas (Oficial 1ª)',
-    keywords: ['mec', 'rápid', 'rapid', 'manten', 'aceite', 'revisi', 'filtro', 'itv'],
-  },
-  {
-    id: 'elev2',
-    label: 'Elevador 2 - Diagnosis / Motor',
-    responsibles: 'Resp: Alberto Cuesta (Master Tech)',
-    keywords: ['diagn', 'motor', 'aver', 'ruido', 'inyec', 'turbo'],
-  },
-  {
-    id: 'elev3',
-    label: 'Elevador 3 - Híbridos / EV',
-    responsibles: 'Resp: Sonia Gil (Certificada Alta Tensión)',
-    keywords: ['híbrid', 'hibrid', 'ev', 'eléct', 'elect', 'bater', 'alta tensión'],
-  },
-  {
-    id: 'paint',
-    label: 'Cabina Pintura 1 & Secado',
-    responsibles: 'Resp: Pedro Navas (Carrocero Pintor)',
-    keywords: ['pint', 'chapa', 'carrocer', 'luna', 'golpe', 'cabina'],
-  },
-  {
-    id: 'peritaje',
-    label: 'Puesto Peritaje Seguros / ADAS',
-    responsibles: 'Resp: Raúl Sanz (Perito Técnico)',
-    keywords: ['perit', 'seguro', 'siniestro', 'adas', 'mapfre', 'mutua', 'allianz'],
-  },
-]
-
-const BRANCH_OPTIONS = [
-  { id: 'all', label: 'Todas las ramas' },
-  ...STATIONS.map((station) => ({ id: station.id, label: station.label })),
-]
-
-const CHANNEL_OPTIONS = [
-  { id: 'voz-wa', label: 'Voz & WhatsApp' },
-  { id: 'voz', label: 'Solo voz' },
-  { id: 'wa', label: 'Solo WhatsApp' },
-]
 
 const SLOT_START = 8 * 60
 const SLOT_END = 19 * 60
@@ -67,6 +26,13 @@ const SLOT_STEP = 30
 type Props = {
   workshop: Workshop
   embedded?: boolean
+  channel: string
+  slaOnly: boolean
+  day: Date
+  onDayChange: (day: Date) => void
+  scale: CalendarScale
+  onScaleChange: (scale: CalendarScale) => void
+  onOpenCita?: (cita: CitaTaller) => void
 }
 
 function minutesOfDay(date: Date): number {
@@ -85,15 +51,6 @@ function buildSlots(): number[] {
   return slots
 }
 
-function assignStation(cita: CitaTaller): StationId {
-  const text = `${cita.asunto || ''} ${cita.observaciones || ''} ${cita.marca || ''} ${cita.modelo || ''} ${cita.motor || ''}`.toLowerCase()
-  const hit = STATIONS.find((station) => station.keywords.some((keyword) => text.includes(keyword)))
-  if (hit) return hit.id
-  // Reparto estable si no hay keyword clara
-  const hash = [...String(cita.idcita)].reduce((acc, ch) => acc + ch.charCodeAt(0), 0)
-  return STATIONS[hash % STATIONS.length].id
-}
-
 function customerLabel(cita: CitaTaller): string {
   const person = [cita.nombre, cita.apellidos].filter(Boolean).join(' ')
   if (person) return person
@@ -107,246 +64,337 @@ function vehicleLabel(cita: CitaTaller): string {
   return parts.join(' ') || 'Vehículo sin detalle'
 }
 
-function matchesChannel(cita: CitaTaller, channel: string): boolean {
-  const text = `${cita.asunto || ''} ${cita.observaciones || ''}`.toLowerCase()
-  if (channel === 'voz') return /voz|llamad|tel[eé]fono|call/.test(text) || !/whats?app|wa\b/.test(text)
-  if (channel === 'wa') return /whats?app|wa\b|mensaje/.test(text)
-  return true
+function citaTime(cita: CitaTaller): string {
+  if (!cita.fecha) return ''
+  const date = new Date(cita.fecha)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
 }
 
-export default function CalendarTallerView({ workshop, embedded = false }: Props) {
-  const [day, setDay] = useState(() => {
-    const now = new Date()
-    now.setHours(0, 0, 0, 0)
-    return now
-  })
-  const [branch, setBranch] = useState('all')
-  const [channel, setChannel] = useState('voz-wa')
-  const [slaOnly, setSlaOnly] = useState(false)
+function slotOf(cita: CitaTaller): number {
+  const date = new Date(cita.fecha!)
+  let slot = Math.floor(minutesOfDay(date) / SLOT_STEP) * SLOT_STEP
+  if (slot < SLOT_START) return SLOT_START
+  if (slot >= SLOT_END) return SLOT_END - SLOT_STEP
+  return slot
+}
 
-  const dayKey = toDateInputValue(day)
-  const range = { from: dayKey, to: dayKey }
-  const { citas, loading, error, refresh } = useCitasTaller(workshop, range)
-  const slots = useMemo(() => buildSlots(), [])
-
-  const visibleStations = useMemo(
-    () => (branch === 'all' ? STATIONS : STATIONS.filter((station) => station.id === branch)),
-    [branch],
+function CitaChip({
+  cita,
+  compact = false,
+  onOpen,
+}: {
+  cita: CitaTaller
+  compact?: boolean
+  onOpen?: (cita: CitaTaller) => void
+}) {
+  const time = citaTime(cita)
+  return (
+    <button
+      type="button"
+      className={`calendar-chip${onOpen ? ' is-clickable' : ''}${compact ? ' is-compact' : ''}`}
+      onClick={(e) => {
+        e.stopPropagation()
+        onOpen?.(cita)
+      }}
+    >
+      {time ? <time>{time}</time> : null}
+      {cita.matricula ? <VehiclePlate value={cita.matricula} compact /> : <strong>{vehicleLabel(cita)}</strong>}
+      {compact ? null : (
+        <>
+          {cita.matricula ? <strong>{vehicleLabel(cita)}</strong> : null}
+          <span>{customerLabel(cita)}</span>
+        </>
+      )}
+    </button>
   )
+}
 
-  const dayCitas = useMemo(() => {
-    const now = Date.now()
+export default function CalendarTallerView({
+  workshop,
+  embedded = false,
+  channel,
+  slaOnly,
+  day,
+  onDayChange,
+  scale,
+  onScaleChange,
+  onOpenCita,
+}: Props) {
+  const period = useMemo(() => calendarPeriod(scale, day), [scale, day])
+  const { citas, loading, error, refresh } = useCitasTaller(workshop, {
+    from: period.from,
+    to: period.to,
+  })
+  const slots = useMemo(() => buildSlots(), [])
+  const todayKey = toDateInputValue(new Date())
+
+  const visibleCitas = useMemo(() => {
     return citas.filter((cita) => {
       if (!cita.fecha) return false
       const date = new Date(cita.fecha)
-      if (Number.isNaN(date.getTime()) || toDateInputValue(date) !== dayKey) return false
-      if (!matchesChannel(cita, channel)) return false
-      if (slaOnly) {
-        const waitMin = Math.abs(now - date.getTime()) / 60000
-        if (waitMin > 15 && date.getTime() >= now) return false
-        if (date.getTime() < now - 15 * 60000) return false
-      }
+      if (Number.isNaN(date.getTime())) return false
+      const key = toDateInputValue(date)
+      if (key < period.from || key > period.to) return false
+      const text = `${cita.asunto || ''} ${cita.observaciones || ''}`
+      if (!matchesChannelText(text, channel)) return false
+      if (slaOnly && !isSlaCritico(cita.fecha)) return false
       return true
     })
-  }, [citas, dayKey, channel, slaOnly])
+  }, [citas, period.from, period.to, channel, slaOnly])
 
-  const occupancy = useMemo(() => {
-    const map: Record<StationId, number> = {
-      elev1: 0,
-      elev2: 0,
-      elev3: 0,
-      paint: 0,
-      peritaje: 0,
+  const byDay = useMemo(() => {
+    const map = new Map<string, CitaTaller[]>()
+    for (const cita of visibleCitas) {
+      const key = toDateInputValue(new Date(cita.fecha!))
+      const list = map.get(key)
+      if (list) list.push(cita)
+      else map.set(key, [cita])
     }
-    for (const cita of dayCitas) map[assignStation(cita)] += 1
-    const maxSlots = slots.length || 1
-    return STATIONS.reduce(
-      (acc, station) => {
-        acc[station.id] = Math.min(98, Math.round((map[station.id] / maxSlots) * 100) || (map[station.id] > 0 ? 35 : 12))
-        // Si hay citas, carga mínima visual; si no, carga base baja
-        if (map[station.id] === 0) acc[station.id] = station.id === 'paint' ? 18 : 12
-        else acc[station.id] = Math.min(95, 40 + map[station.id] * 12)
-        return acc
-      },
-      {} as Record<StationId, number>,
-    )
-  }, [dayCitas, slots.length])
-
-  const grid = useMemo(() => {
-    const cells: Record<string, CitaTaller | null> = {}
-    for (const station of visibleStations) {
-      for (const slot of slots) cells[`${station.id}:${slot}`] = null
+    for (const list of map.values()) {
+      list.sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))
     }
+    return map
+  }, [visibleCitas])
 
-    for (const cita of dayCitas) {
-      const stationId = assignStation(cita)
-      if (branch !== 'all' && stationId !== branch) continue
-      const date = new Date(cita.fecha!)
-      const minutes = minutesOfDay(date)
-      const slot = Math.floor(minutes / SLOT_STEP) * SLOT_STEP
-      if (slot < SLOT_START || slot >= SLOT_END) continue
-      const key = `${stationId}:${slot}`
-      if (!(key in cells)) continue
-      // Si el hueco está ocupado, busca el siguiente libre de esa estación
-      if (!cells[key]) {
-        cells[key] = cita
-        continue
-      }
-      for (let next = slot + SLOT_STEP; next < SLOT_END; next += SLOT_STEP) {
-        const alt = `${stationId}:${next}`
-        if (alt in cells && !cells[alt]) {
-          cells[alt] = cita
-          break
-        }
-      }
+  const gridDays = useMemo(() => (scale === 'semana' ? daysOfWeek(day) : [startOfCalendarDay(day)]), [scale, day])
+
+  const byDaySlot = useMemo(() => {
+    const map = new Map<string, Map<number, CitaTaller[]>>()
+    for (const date of gridDays) {
+      const slotsMap = new Map<number, CitaTaller[]>()
+      for (const slot of slots) slotsMap.set(slot, [])
+      map.set(toDateInputValue(date), slotsMap)
     }
-    return cells
-  }, [dayCitas, visibleStations, slots, branch])
+    for (const cita of visibleCitas) {
+      const key = toDateInputValue(new Date(cita.fecha!))
+      map.get(key)?.get(slotOf(cita))?.push(cita)
+    }
+    return map
+  }, [visibleCitas, gridDays, slots])
 
-  const dayLabel = day.toLocaleDateString('es-ES', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  })
-  const isToday = dayKey === toDateInputValue(new Date())
-
-  const shiftDay = (delta: number) => {
-    setDay((prev) => {
-      const next = new Date(prev)
-      next.setDate(prev.getDate() + delta)
-      return next
-    })
+  const goToday = () => onDayChange(startOfCalendarDay(new Date()))
+  const shift = (delta: number) => onDayChange(shiftCalendarAnchor(scale, day, delta))
+  const openDay = (date: Date) => {
+    onDayChange(startOfCalendarDay(date))
+    onScaleChange('dia')
+  }
+  const openMonth = (date: Date) => {
+    onDayChange(startOfCalendarDay(date))
+    onScaleChange('mes')
   }
 
+  const scaleHint =
+    scale === 'dia' || scale === 'semana'
+      ? '08:00 – 19:00 · cada cita en su hora'
+      : scale === 'mes'
+        ? 'Pulsa un día para ver la agenda por horas'
+        : 'Pulsa un mes para ver el detalle'
+
   return (
-    <div className={embedded ? 'elevator-agenda' : 'dashboard-page elevator-agenda'}>
+    <div className={embedded ? 'calendar-agenda' : 'dashboard-page calendar-agenda'}>
       {!embedded ? (
         <header className="dashboard-header-top">
           <div>
             <p className="section-eyebrow">Agenda del taller</p>
-            <h1 className="section-title">Calendario taller</h1>
+            <h1 className="section-title">Calendario</h1>
           </div>
         </header>
       ) : null}
 
-      <div className="elevator-filters glass glass-lite">
-        <label className="field-label">
-          Rama
-          <select className="field-select" value={branch} onChange={(e) => setBranch(e.target.value)}>
-            {BRANCH_OPTIONS.map((option) => (
-              <option key={option.id} value={option.id}>{option.label}</option>
-            ))}
-          </select>
-        </label>
-        <label className="field-label">
-          Canal
-          <select className="field-select" value={channel} onChange={(e) => setChannel(e.target.value)}>
-            {CHANNEL_OPTIONS.map((option) => (
-              <option key={option.id} value={option.id}>{option.label}</option>
-            ))}
-          </select>
-        </label>
-        <label className={`elevator-sla ${slaOnly ? 'is-active' : ''}`}>
-          <input type="checkbox" checked={slaOnly} onChange={(e) => setSlaOnly(e.target.checked)} />
-          SLA Crítico (&lt;15 min)
-        </label>
-        <div className="elevator-day-nav">
-          <button type="button" className="ghost-button calendar-nav" onClick={() => shiftDay(-1)} aria-label="Día anterior">
-            <ChevronLeft size={17} />
-          </button>
-          <button type="button" className="ghost-button" onClick={() => setDay(new Date(new Date().setHours(0, 0, 0, 0)))}>
-            Hoy
-          </button>
-          <button type="button" className="ghost-button calendar-nav" onClick={() => shiftDay(1)} aria-label="Día siguiente">
-            <ChevronRight size={17} />
-          </button>
-          <button type="button" className="ghost-button" onClick={() => void refresh()} disabled={loading}>
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          </button>
-        </div>
-      </div>
-
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
 
-      <section className="elevator-hero glass glass-lite">
+      <section className="calendar-agenda-head glass glass-lite">
         <div>
-          <p className="section-eyebrow">08:00 - 19:00</p>
-          <h2 className="ops-card-title">Agenda de Taller y Puestos de Elevador</h2>
+          <p className="section-eyebrow">{scaleHint}</p>
+          <h2 className="ops-card-title">Agenda</h2>
           <p className="section-subtitle">
-            Gestión de boxes con asignación de operarios oficiales y control de carga horaria.
+            {loading ? 'Cargando citas…' : `${visibleCitas.length} cita${visibleCitas.length === 1 ? '' : 's'} en este periodo.`}
           </p>
         </div>
-        <div className="elevator-hero-date">
-          <Clock3 size={16} />
-          <strong>{isToday ? 'Hoy, ' : ''}{dayLabel}</strong>
+        <div className="calendar-agenda-actions">
+          <div className="elevator-day-nav">
+            <button type="button" className="ghost-button calendar-nav" onClick={() => shift(-1)} aria-label="Periodo anterior">
+              <ChevronLeft size={17} />
+            </button>
+            <button type="button" className="ghost-button" onClick={goToday}>
+              Hoy
+            </button>
+            <button type="button" className="ghost-button calendar-nav" onClick={() => shift(1)} aria-label="Periodo siguiente">
+              <ChevronRight size={17} />
+            </button>
+            <button type="button" className="ghost-button" onClick={() => void refresh()} disabled={loading}>
+              <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </div>
+          <div className="calendar-day-date">
+            <Clock3 size={16} />
+            <strong>{period.label}</strong>
+          </div>
         </div>
       </section>
 
-      <section className="elevator-load-grid" aria-label="Carga de puestos">
-        {visibleStations.map((station) => {
-          const pct = occupancy[station.id]
-          return (
-            <article key={station.id} className="elevator-load-card glass glass-lite">
-              <div className="elevator-load-top">
-                <strong>{station.label}</strong>
-                <span>{pct}%</span>
-              </div>
-              <div className="elevator-load-bar" aria-hidden>
-                <span style={{ width: `${pct}%` }} />
-              </div>
-              <p>{station.responsibles}</p>
-            </article>
-          )
-        })}
-      </section>
-
-      <div className="elevator-schedule-wrap glass glass-lite custom-scrollbar-light">
-        <table className="elevator-schedule">
-          <thead>
-            <tr>
-              <th className="elevator-schedule-time">Hora</th>
-              {visibleStations.map((station) => (
-                <th key={station.id}>{station.label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={visibleStations.length + 1} className="elevator-schedule-empty">
-                  Cargando agenda del taller…
-                </td>
-              </tr>
-            ) : (
-              slots.map((slot) => (
-                <tr key={slot}>
-                  <th scope="row" className="elevator-schedule-time">{formatSlot(slot)}</th>
-                  {visibleStations.map((station) => {
-                    const cita = grid[`${station.id}:${slot}`]
-                    if (!cita) {
-                      return (
-                        <td key={station.id}>
-                          <div className="elevator-slot is-free">Libre</div>
-                        </td>
-                      )
-                    }
+      {scale === 'dia' || scale === 'semana' ? (
+        <div className="calendar-schedule-wrap glass glass-lite custom-scrollbar-light">
+          {loading ? (
+            <HexLoaderScreen size="md" label="Cargando agenda del taller…" />
+          ) : (
+            <table className={`calendar-schedule${scale === 'semana' ? ' is-week' : ' is-day'}`}>
+              <thead>
+                <tr>
+                  <th className="calendar-schedule-time">Hora</th>
+                  {gridDays.map((date) => {
+                    const key = toDateInputValue(date)
+                    const count = byDay.get(key)?.length ?? 0
                     return (
-                      <td key={station.id}>
-                        <div className="elevator-slot is-busy">
-                          <strong>{vehicleLabel(cita)}</strong>
-                          <span className="elevator-slot-customer">{customerLabel(cita)}</span>
-                          {cita.matricula ? <VehiclePlate value={cita.matricula} compact /> : null}
-                        </div>
-                      </td>
+                      <th key={key} className={key === todayKey ? 'is-today' : undefined}>
+                        {scale === 'semana' ? (
+                          <button type="button" className="calendar-schedule-day" onClick={() => openDay(date)}>
+                            <span>{date.toLocaleDateString('es-ES', { weekday: 'short' })}</span>
+                            <strong>{date.getDate()}</strong>
+                            <small>{count}</small>
+                          </button>
+                        ) : (
+                          <span className="calendar-schedule-day is-static">
+                            <span>{date.toLocaleDateString('es-ES', { weekday: 'long' })}</span>
+                            <strong>{date.getDate()}</strong>
+                          </span>
+                        )}
+                      </th>
                     )
                   })}
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {slots.map((slot) => (
+                  <tr key={slot}>
+                    <th className="calendar-schedule-time">{formatSlot(slot)}</th>
+                    {gridDays.map((date) => {
+                      const key = toDateInputValue(date)
+                      const items = byDaySlot.get(key)?.get(slot) ?? []
+                      return (
+                        <td key={`${key}-${slot}`}>
+                          {items.length === 0 ? (
+                            <div className="calendar-slot is-free">Libre</div>
+                          ) : (
+                            items.map((cita) => (
+                              <button
+                                key={cita.idcita}
+                                type="button"
+                                className={`calendar-slot is-busy${onOpenCita ? ' is-clickable' : ''}`}
+                                onClick={() => onOpenCita?.(cita)}
+                              >
+                                <strong>{vehicleLabel(cita)}</strong>
+                                <span className="calendar-slot-customer">{customerLabel(cita)}</span>
+                                {cita.matricula ? <VehiclePlate value={cita.matricula} compact /> : null}
+                              </button>
+                            ))
+                          )}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      ) : null}
+
+      {scale === 'mes' && loading ? (
+        <div className="calendar-month glass glass-lite">
+          <HexLoaderScreen size="md" label="Cargando agenda del taller…" />
+        </div>
+      ) : null}
+
+      {scale === 'mes' && !loading ? (
+        <div className="calendar-month glass glass-lite">
+          <div className="calendar-month-weekdays">
+            {WEEKDAY_LABELS.map((label) => (
+              <span key={label}>{label}</span>
+            ))}
+          </div>
+          <div className="calendar-month-grid">
+            {monthCells(day).map(({ date, inMonth }) => {
+              const key = toDateInputValue(date)
+              const items = byDay.get(key) ?? []
+              const isToday = key === todayKey
+              return (
+                <article
+                  key={key}
+                  className={`calendar-month-cell${inMonth ? '' : ' is-outside'}${isToday ? ' is-today' : ''}`}
+                >
+                  <button type="button" className="calendar-month-cell-head" onClick={() => openDay(date)}>
+                    <span>{date.getDate()}</span>
+                    {items.length > 0 ? <small>{items.length}</small> : null}
+                  </button>
+                  <div className="calendar-month-events">
+                    {items.slice(0, 3).map((cita) => (
+                      <CitaChip key={cita.idcita} cita={cita} compact onOpen={onOpenCita} />
+                    ))}
+                    {items.length > 3 ? (
+                      <button type="button" className="calendar-more" onClick={() => openDay(date)}>
+                        +{items.length - 3} más
+                      </button>
+                    ) : null}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {scale === 'anio' && loading ? (
+        <div className="calendar-month glass glass-lite">
+          <HexLoaderScreen size="md" label="Cargando agenda del taller…" />
+        </div>
+      ) : null}
+
+      {scale === 'anio' && !loading ? (
+        <div className="calendar-year glass glass-lite">
+          {yearMonths(day).map((monthDate) => {
+            const month = monthDate.getMonth()
+            const count = visibleCitas.filter((cita) => new Date(cita.fecha!).getMonth() === month).length
+            const isCurrent =
+              monthDate.getFullYear() === new Date().getFullYear() && month === new Date().getMonth()
+            return (
+              <section
+                key={month}
+                className={`calendar-year-month${isCurrent ? ' is-today' : ''}`}
+              >
+                <button type="button" className="calendar-year-month-head" onClick={() => openMonth(monthDate)}>
+                  <span>{monthDate.toLocaleDateString('es-ES', { month: 'long' })}</span>
+                  <small>{count} {count === 1 ? 'cita' : 'citas'}</small>
+                </button>
+                <div className="calendar-year-weekdays">
+                  {WEEKDAY_LABELS.map((label) => (
+                    <span key={label}>{label.slice(0, 1)}</span>
+                  ))}
+                </div>
+                <div className="calendar-year-grid">
+                  {monthCells(monthDate).map(({ date, inMonth }) => {
+                    const key = toDateInputValue(date)
+                    const items = byDay.get(key) ?? []
+                    const isToday = key === todayKey
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        className={`calendar-year-day${inMonth ? '' : ' is-outside'}${isToday ? ' is-today' : ''}${items.length ? ' has-citas' : ''}`}
+                        onClick={() => openDay(date)}
+                      >
+                        <span>{date.getDate()}</span>
+                        {inMonth && items.length > 0 ? <small>{items.length}</small> : null}
+                      </button>
+                    )
+                  })}
+                </div>
+              </section>
+            )
+          })}
+        </div>
+      ) : null}
     </div>
   )
 }

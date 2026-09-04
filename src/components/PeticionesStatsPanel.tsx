@@ -20,7 +20,7 @@ export default function PeticionesStatsPanel({ stats, periodLabel, isDarkMode, l
   return (
     <div className={`rounded-xl p-4 sm:p-5 ${surface}`}>
       <div className="mb-3 flex items-center gap-2">
-        <TrendingUp size={16} className="text-teal-500" />
+        <TrendingUp size={16} className="text-blue-600" />
         <span className={`text-xs font-semibold uppercase tracking-wider ${muted}`}>
           Distribución · {periodLabel}
         </span>
@@ -29,20 +29,20 @@ export default function PeticionesStatsPanel({ stats, periodLabel, isDarkMode, l
       <div className="space-y-2">
         <div className="flex justify-between text-[11px] font-medium">
           <span className="text-amber-600 dark:text-amber-400">
-            Pendientes {stats.pendientes} ({stats.pctPendientes}%)
+            Faltan {stats.porHacer} ({stats.pctPendientes > 0 || stats.total > 0 ? Math.round(100 - stats.pctHechas) : 0}%)
           </span>
           <span className="text-emerald-600 dark:text-emerald-400">
-            Con cita {stats.conCita} ({stats.pctConCita}%)
+            Hechas {stats.hechas} ({stats.pctHechas}%)
           </span>
         </div>
         <div className={`relative h-2 overflow-hidden rounded-full ${isDarkMode ? 'bg-white/10' : 'bg-slate-100'}`}>
           <div
             className="absolute inset-y-0 left-0 rounded-full bg-amber-400"
-            style={{ width: `${stats.pctPendientes}%` }}
+            style={{ width: `${Math.max(0, 100 - stats.pctHechas)}%` }}
           />
           <div
             className="absolute inset-y-0 rounded-full bg-emerald-500"
-            style={{ left: `${stats.pctPendientes}%`, width: `${stats.pctConCita}%` }}
+            style={{ left: `${Math.max(0, 100 - stats.pctHechas)}%`, width: `${stats.pctHechas}%` }}
           />
         </div>
       </div>

@@ -48,6 +48,6 @@ export function mapSessionUserToCrmUser(user: unknown): CrmUser {
     lastName,
     displayName,
     email,
-    role: String(md.role ?? 'usuario'),
+    role: String(md.role_label ?? md.role ?? 'Asesor'),
   }
 }

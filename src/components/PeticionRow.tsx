@@ -15,6 +15,7 @@ type Props = {
   onGestionObsChange: (v: string) => void
   onGestionEmailChange: (v: string) => void
   onMarkGestionado: (gestionado: boolean) => void
+  onOpenLead?: () => void
 }
 
 export default function PeticionRow({
@@ -27,6 +28,7 @@ export default function PeticionRow({
   onGestionObsChange,
   onGestionEmailChange,
   onMarkGestionado,
+  onOpenLead,
 }: Props) {
   const pendiente = isPeticionPendiente(p)
   const c = p.cita
@@ -51,15 +53,24 @@ export default function PeticionRow({
   if (c?.email) facts.push({ label: 'Email', value: c.email })
   if (c?.fecha) facts.push({ label: 'Cita', value: formatFecha(c.fecha) })
 
+  const openInWindow = Boolean(onOpenLead)
+  const showBody = expanded && !openInWindow
+
   return (
-    <li className={`prow glass ${expanded ? 'is-expanded' : ''}`}>
+    <li className={`prow glass glass-lite${showBody ? ' is-expanded' : ''}${openInWindow ? ' is-windowed' : ''}`}>
       <div className="prow-head">
         <button
           type="button"
           className="prow-toggle"
-          onClick={onToggle}
-          aria-expanded={expanded}
-          aria-controls={`prow-body-${p.idpeticion}`}
+          onClick={() => {
+            if (onOpenLead) {
+              onOpenLead()
+              return
+            }
+            onToggle()
+          }}
+          aria-expanded={openInWindow ? undefined : expanded}
+          aria-controls={openInWindow ? undefined : `prow-body-${p.idpeticion}`}
         >
           <span className={`prow-marker ${pendiente ? 'is-pending' : 'is-done'}`} aria-hidden />
           <span className="prow-info">
@@ -81,7 +92,11 @@ export default function PeticionRow({
           </span>
           <span className="prow-aside">
             <span className="prow-time">{formatAgendaTime(p.fechainicio)}</span>
-            <ChevronDown size={20} className={`prow-chevron ${expanded ? 'is-open' : ''}`} aria-hidden />
+            {openInWindow ? (
+              <span className="prow-open-hint">Abrir</span>
+            ) : (
+              <ChevronDown size={20} className={`prow-chevron ${expanded ? 'is-open' : ''}`} aria-hidden />
+            )}
           </span>
         </button>
 
@@ -93,7 +108,7 @@ export default function PeticionRow({
         ) : null}
       </div>
 
-      {expanded ? (
+      {showBody ? (
         <div id={`prow-body-${p.idpeticion}`} className="prow-body">
           <dl className="prow-detail-grid">
             <Detail label="Teléfono" value={p.caller} />

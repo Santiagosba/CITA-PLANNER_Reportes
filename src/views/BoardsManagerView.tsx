@@ -10,8 +10,18 @@ import {
   X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState, type DragEvent, type FormEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
+import { HexLoaderScreen } from '../components/ui/HexLoader'
 import VehiclePlate from '../components/ui/VehiclePlate'
 import { resolveDateRange } from '../lib/dateRangePresets'
 import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
@@ -20,6 +30,7 @@ import type { Workshop } from '../types'
 
 type DepartmentId = 'mechanics' | 'bodywork' | 'insurance' | 'parts' | 'sales'
 type PriorityId = 'urgente' | 'alta' | 'media' | 'baja' | 'hecho'
+type OrderMap = Record<string, string[]>
 
 type Department = {
   id: DepartmentId
@@ -51,6 +62,18 @@ type BoardCard =
   | { kind: 'manual'; entry: ManualEntry }
 
 type PriorityMap = Record<string, PriorityId>
+
+type DragLive = {
+  id: string
+  card: BoardCard
+  fromCol: PriorityId
+  height: number
+  width: number
+  grabX: number
+  grabY: number
+}
+
+type HoverSlot = { col: PriorityId; index: number }
 
 const DEPARTMENTS: Department[] = [
   {
@@ -98,6 +121,8 @@ const COLUMNS: PriorityColumn[] = [
   { id: 'hecho', label: 'Hecho', hint: 'Resuelto', tone: 'positive' },
 ]
 
+const LIFT_PX = 6
+
 type Props = {
   workshop: Workshop
 }
@@ -108,6 +133,14 @@ function priorityKey(workshopId: string) {
 
 function manualKey(workshopId: string) {
   return `avi_board_manual_${workshopId}`
+}
+
+function orderKey(workshopId: string) {
+  return `avi_board_order_${workshopId}`
+}
+
+function colOrderKey(dept: DepartmentId, col: PriorityId) {
+  return `${dept}:${col}`
 }
 
 function loadJson<T>(key: string, fallback: T): T {
@@ -164,6 +197,195 @@ function cardId(card: BoardCard): string {
   return card.kind === 'peticion' ? card.item.idpeticion : card.entry.id
 }
 
+function cardTime(card: BoardCard): string {
+  return card.kind === 'peticion' ? card.item.fechainicio ?? '' : card.entry.createdAt
+}
+
+function applyOrder(cards: BoardCard[], order: string[] | undefined): BoardCard[] {
+  if (!cards.length) return []
+  const byId = new Map(cards.map((card) => [cardId(card), card]))
+  const seen = new Set<string>()
+  const next: BoardCard[] = []
+  for (const id of order ?? []) {
+    const card = byId.get(id)
+    if (!card) continue
+    next.push(card)
+    seen.add(id)
+  }
+  const rest = cards.filter((card) => !seen.has(cardId(card)))
+  rest.sort((a, b) => String(cardTime(b)).localeCompare(String(cardTime(a))))
+  return [...next, ...rest]
+}
+
+function insertId(ids: string[], id: string, index: number): string[] {
+  const next = ids.filter((item) => item !== id)
+  next.splice(Math.max(0, Math.min(index, next.length)), 0, id)
+  return next
+}
+
+function liveCards(list: HTMLElement): HTMLElement[] {
+  return [...list.querySelectorAll<HTMLElement>('[data-card-id]:not(.is-dragging-source)')]
+}
+
+function hitHover(clientX: number, clientY: number, current: HoverSlot | null): HoverSlot | null {
+  const columns = document.querySelectorAll<HTMLElement>('[data-kanban-col]')
+  for (const column of columns) {
+    const rect = column.getBoundingClientRect()
+    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+      continue
+    }
+    const list = column.querySelector<HTMLElement>('.kanban-cards')
+    const col = column.dataset.kanbanCol as PriorityId
+    if (!list) return { col, index: 0 }
+
+    const slot = list.querySelector<HTMLElement>('.kanban-card-slot')
+    if (slot) {
+      const slotRect = slot.getBoundingClientRect()
+      if (clientY >= slotRect.top && clientY <= slotRect.bottom) {
+        return current?.col === col ? current : { col, index: current?.index ?? 0 }
+      }
+    }
+
+    const cards = liveCards(list)
+    let index = cards.length
+    for (let i = 0; i < cards.length; i += 1) {
+      const cardRect = cards[i].getBoundingClientRect()
+      if (clientY < cardRect.top + cardRect.height / 2) {
+        index = i
+        break
+      }
+    }
+    return { col, index }
+  }
+  return null
+}
+
+function ensureSlot(height: number): HTMLElement {
+  let slot = document.querySelector<HTMLElement>('.kanban-card-slot.is-live')
+  if (!slot) {
+    slot = document.createElement('div')
+    slot.className = 'kanban-card-slot is-live'
+  }
+  slot.style.height = `${height}px`
+  return slot
+}
+
+function placeSlot(col: PriorityId, index: number, height: number) {
+  const list = document.querySelector<HTMLElement>(`[data-kanban-col="${col}"] .kanban-cards`)
+  if (!list) return
+  const cards = liveCards(list)
+  const slot = ensureSlot(height)
+  const prev = new Map<HTMLElement, DOMRect>()
+  cards.forEach((el) => prev.set(el, el.getBoundingClientRect()))
+
+  const before = cards[index] ?? null
+  if (before) list.insertBefore(slot, before)
+  else list.appendChild(slot)
+
+  cards.forEach((el) => {
+    const beforeRect = prev.get(el)
+    if (!beforeRect) return
+    const after = el.getBoundingClientRect()
+    const dy = beforeRect.top - after.top
+    const dx = beforeRect.left - after.left
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return
+    el.animate(
+      [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
+      { duration: 140, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+    )
+  })
+}
+
+function setDropColumn(col: PriorityId | null) {
+  document.querySelectorAll<HTMLElement>('[data-kanban-col]').forEach((el) => {
+    el.classList.toggle('is-drop-target', el.dataset.kanbanCol === col)
+  })
+}
+
+function clearLiveDragDom() {
+  document.querySelector('.kanban-card-slot.is-live')?.remove()
+  document.querySelectorAll('.is-dragging-source').forEach((el) => el.classList.remove('is-dragging-source'))
+  setDropColumn(null)
+}
+
+function BoardTicket({
+  card,
+  column,
+  ghost,
+  onPointerDown,
+}: {
+  card: BoardCard
+  column: PriorityColumn
+  ghost?: boolean
+  onPointerDown?: (e: ReactPointerEvent<HTMLElement>) => void
+}) {
+  const id = cardId(card)
+  const tone = badgeTone(column.tone)
+
+  if (card.kind === 'manual') {
+    const entry = card.entry
+    return (
+      <article
+        data-card-id={ghost ? undefined : id}
+        className={`kanban-card glass-inline glass-lite${ghost ? ' is-ghost' : ''}`}
+        onPointerDown={onPointerDown}
+      >
+        <div className="kanban-card-top">
+          <span className="kanban-drag-handle" aria-hidden>
+            <GripVertical size={16} />
+          </span>
+          <span className="ops-feed-placeholder">MANUAL</span>
+          <span className={`badge ${tone}`}>{column.label}</span>
+        </div>
+        <strong>{entry.title}</strong>
+        {entry.phone ? <span className="kanban-card-meta">{entry.phone}</span> : null}
+        {entry.note ? <p className="kanban-card-desc">{entry.note}</p> : null}
+        <footer>
+          <time>{formatFecha(entry.createdAt)}</time>
+        </footer>
+      </article>
+    )
+  }
+
+  const item = card.item
+  const cita = item.cita
+  const customer = cita ? [cita.nombre, cita.apellidos].filter(Boolean).join(' ') : ''
+  const title = customer || item.caller || 'Cliente sin identificar'
+  const vehicle = cita ? [cita.marca, cita.modelo].filter(Boolean).join(' ') : ''
+
+  return (
+    <article
+      data-card-id={ghost ? undefined : id}
+      className={`kanban-card glass-inline glass-lite${ghost ? ' is-ghost' : ''}`}
+      onPointerDown={onPointerDown}
+    >
+      <div className="kanban-card-top">
+        <span className="kanban-drag-handle" aria-hidden>
+          <GripVertical size={16} />
+        </span>
+        {cita?.matricula ? (
+          <VehiclePlate value={cita.matricula} compact />
+        ) : (
+          <span className="ops-feed-placeholder">
+            {cita ? 'SIN MATRÍCULA' : 'SIN CITA'}
+          </span>
+        )}
+        <span className={`badge ${tone}`}>{column.label}</span>
+      </div>
+      <strong>{title}</strong>
+      <span className="kanban-card-meta">
+        {item.tipopeticion || 'Sin tipo'}
+        {item.caller ? ` · ${item.caller}` : ''}
+      </span>
+      {vehicle ? <span className="kanban-card-meta">{vehicle}</span> : null}
+      {item.descripcion ? <p className="kanban-card-desc">{item.descripcion}</p> : null}
+      <footer>
+        <time>{formatFecha(item.fechainicio)}</time>
+      </footer>
+    </article>
+  )
+}
+
 export default function BoardsManagerView({ workshop }: Props) {
   const range = resolveDateRange('mes', '', '')
   const { items, loading, error, sourceNotice, refresh } = useOperationalData(workshop, range)
@@ -172,16 +394,44 @@ export default function BoardsManagerView({ workshop }: Props) {
   const [manualEntries, setManualEntries] = useState<ManualEntry[]>(() =>
     loadJson(manualKey(workshop.id), []),
   )
-  const [draggingId, setDraggingId] = useState<string | null>(null)
-  const [dropTarget, setDropTarget] = useState<PriorityId | null>(null)
+  const [orders, setOrders] = useState<OrderMap>(() => loadJson(orderKey(workshop.id), {}))
+  const [drag, setDrag] = useState<DragLive | null>(null)
   const [showNewEntry, setShowNewEntry] = useState(false)
   const [draftTitle, setDraftTitle] = useState('')
   const [draftPhone, setDraftPhone] = useState('')
   const [draftNote, setDraftNote] = useState('')
 
+  const ghostRef = useRef<HTMLDivElement>(null)
+  const lastPtrRef = useRef({ x: 0, y: 0 })
+  const dragRef = useRef<DragLive | null>(null)
+  const hoverRef = useRef<HoverSlot | null>(null)
+  const rafRef = useRef(0)
+  const pendingRef = useRef<{
+    id: string
+    card: BoardCard
+    fromCol: PriorityId
+    startX: number
+    startY: number
+    grabX: number
+    grabY: number
+    width: number
+    height: number
+  } | null>(null)
+  const columnsRef = useRef<Record<PriorityId, BoardCard[]>>({
+    urgente: [],
+    alta: [],
+    media: [],
+    baja: [],
+    hecho: [],
+  })
+  const deptRef = useRef(activeDepartment)
+  const workshopIdRef = useRef(workshop.id)
+
   useEffect(() => {
     setPriorities(loadJson(priorityKey(workshop.id), {}))
     setManualEntries(loadJson(manualKey(workshop.id), []))
+    setOrders(loadJson(orderKey(workshop.id), {}))
+    workshopIdRef.current = workshop.id
   }, [workshop.id])
 
   const grouped = useMemo(() => {
@@ -235,69 +485,180 @@ export default function BoardsManagerView({ workshop }: Props) {
     }
 
     for (const col of COLUMNS) {
-      buckets[col.id].sort((a, b) => {
-        const da = a.kind === 'peticion' ? a.item.fechainicio : a.entry.createdAt
-        const db = b.kind === 'peticion' ? b.item.fechainicio : b.entry.createdAt
-        return String(db || '').localeCompare(String(da || ''))
-      })
+      buckets[col.id] = applyOrder(buckets[col.id], orders[colOrderKey(activeDepartment, col.id)])
     }
 
     return buckets
-  }, [grouped, activeDepartment, priorities, manualEntries])
+  }, [grouped, activeDepartment, priorities, manualEntries, orders])
 
-  const knownIds = useMemo(() => {
-    const set = new Set<string>()
-    for (const item of grouped[activeDepartment]) set.add(item.idpeticion)
-    for (const entry of manualEntries) {
-      if (entry.departmentId === activeDepartment) set.add(entry.id)
+  useEffect(() => {
+    columnsRef.current = columns
+  }, [columns])
+
+  useEffect(() => {
+    deptRef.current = activeDepartment
+  }, [activeDepartment])
+
+  useEffect(() => {
+    dragRef.current = drag
+  }, [drag])
+
+  useLayoutEffect(() => {
+    if (!drag) {
+      clearLiveDragDom()
+      return
     }
-    return set
-  }, [grouped, activeDepartment, manualEntries])
+    const source = document.querySelector<HTMLElement>(`[data-card-id="${drag.id}"]`)
+    source?.classList.add('is-dragging-source')
+    const startIndex = Math.max(
+      0,
+      columnsRef.current[drag.fromCol].findIndex((card) => cardId(card) === drag.id),
+    )
+    hoverRef.current = { col: drag.fromCol, index: startIndex }
+    placeSlot(drag.fromCol, startIndex, drag.height)
+    setDropColumn(drag.fromCol)
+    moveGhost(lastPtrRef.current.x, lastPtrRef.current.y, drag)
+  }, [drag])
 
-  const moveCard = useCallback(
-    (id: string, to: PriorityId) => {
-      if (id.startsWith('manual-')) {
-        setManualEntries((prev) => {
-          const next = prev.map((entry) =>
-            entry.id === id ? { ...entry, priority: to } : entry,
-          )
-          saveJson(manualKey(workshop.id), next)
-          return next
-        })
-        return
-      }
-      setPriorities((prev) => {
-        const next = { ...prev, [id]: to }
-        saveJson(priorityKey(workshop.id), next)
+  const placeCard = useCallback((id: string, to: PriorityId, index: number) => {
+    const dept = deptRef.current
+    const workshopId = workshopIdRef.current
+
+    if (id.startsWith('manual-')) {
+      setManualEntries((prev) => {
+        const next = prev.map((entry) => (entry.id === id ? { ...entry, priority: to } : entry))
+        saveJson(manualKey(workshopId), next)
         return next
       })
-    },
-    [workshop.id],
-  )
+    } else {
+      setPriorities((prev) => {
+        const next = { ...prev, [id]: to }
+        saveJson(priorityKey(workshopId), next)
+        return next
+      })
+    }
 
-  const onDragStart = (e: DragEvent<HTMLElement>, id: string) => {
-    e.dataTransfer.setData('text/peticion-id', id)
-    e.dataTransfer.effectAllowed = 'move'
-    setDraggingId(id)
+    setOrders((prev) => {
+      const next = { ...prev }
+      for (const col of COLUMNS) {
+        const key = colOrderKey(dept, col.id)
+        let ids = columnsRef.current[col.id].map(cardId).filter((item) => item !== id)
+        if (col.id === to) ids = insertId(ids, id, index)
+        next[key] = ids
+      }
+      saveJson(orderKey(workshopId), next)
+      return next
+    })
+  }, [])
+
+  const moveGhost = (clientX: number, clientY: number, live: DragLive) => {
+    const el = ghostRef.current
+    if (!el) return
+    el.style.width = `${live.width}px`
+    el.style.transform = `translate3d(${clientX - live.grabX}px, ${clientY - live.grabY}px, 0)`
   }
 
-  const onDragEnd = () => {
-    setDraggingId(null)
-    setDropTarget(null)
-  }
+  const endDrag = useCallback(() => {
+    const live = dragRef.current
+    const slot = hoverRef.current
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = 0
+    }
+    document.body.style.userSelect = ''
+    document.body.style.cursor = ''
+    pendingRef.current = null
+    if (live && slot) placeCard(live.id, slot.col, slot.index)
+    dragRef.current = null
+    hoverRef.current = null
+    clearLiveDragDom()
+    setDrag(null)
+  }, [placeCard])
 
-  const onDragOverColumn = (e: DragEvent<HTMLElement>, columnId: PriorityId) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDropTarget(columnId)
-  }
+  useEffect(() => {
+    const flushMove = () => {
+      rafRef.current = 0
+      const { x, y } = lastPtrRef.current
+      const live = dragRef.current
+      if (!live) return
+      moveGhost(x, y, live)
+      const next = hitHover(x, y, hoverRef.current)
+      if (!next) return
+      const cur = hoverRef.current
+      if (cur && cur.col === next.col && cur.index === next.index) return
+      hoverRef.current = next
+      placeSlot(next.col, next.index, live.height)
+      setDropColumn(next.col)
+    }
 
-  const onDropColumn = (e: DragEvent<HTMLElement>, columnId: PriorityId) => {
-    e.preventDefault()
-    const id = e.dataTransfer.getData('text/peticion-id') || draggingId
-    if (id && knownIds.has(id)) moveCard(id, columnId)
-    setDraggingId(null)
-    setDropTarget(null)
+    const onMove = (e: PointerEvent) => {
+      lastPtrRef.current = { x: e.clientX, y: e.clientY }
+      const pending = pendingRef.current
+      if (pending && !dragRef.current) {
+        if (Math.hypot(e.clientX - pending.startX, e.clientY - pending.startY) < LIFT_PX) return
+        const live: DragLive = {
+          id: pending.id,
+          card: pending.card,
+          fromCol: pending.fromCol,
+          height: pending.height,
+          width: pending.width,
+          grabX: pending.grabX,
+          grabY: pending.grabY,
+        }
+        pendingRef.current = null
+        dragRef.current = live
+        document.body.style.userSelect = 'none'
+        document.body.style.cursor = 'move'
+        setDrag(live)
+        return
+      }
+
+      if (!dragRef.current) return
+      e.preventDefault()
+      if (!rafRef.current) rafRef.current = requestAnimationFrame(flushMove)
+    }
+
+    const onUp = () => {
+      if (pendingRef.current) {
+        pendingRef.current = null
+        return
+      }
+      if (!dragRef.current) return
+      endDrag()
+    }
+
+    window.addEventListener('pointermove', onMove, { passive: false })
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onUp)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onUp)
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    }
+  }, [endDrag])
+
+  const startCardDrag = (
+    e: ReactPointerEvent<HTMLElement>,
+    card: BoardCard,
+    fromCol: PriorityId,
+  ) => {
+    if (e.button !== 0) return
+    const target = e.target as HTMLElement
+    if (target.closest('button, a, input, textarea, select')) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    lastPtrRef.current = { x: e.clientX, y: e.clientY }
+    pendingRef.current = {
+      id: cardId(card),
+      card,
+      fromCol,
+      startX: e.clientX,
+      startY: e.clientY,
+      grabX: e.clientX - rect.left,
+      grabY: e.clientY - rect.top,
+      width: rect.width,
+      height: rect.height,
+    }
   }
 
   const openNewEntry = () => {
@@ -325,8 +686,16 @@ export default function BoardsManagerView({ workshop }: Props) {
       saveJson(manualKey(workshop.id), next)
       return next
     })
+    setOrders((prev) => {
+      const key = colOrderKey(activeDepartment, 'media')
+      const next = { ...prev, [key]: insertId(prev[key] ?? columns.media.map(cardId), entry.id, 0) }
+      saveJson(orderKey(workshop.id), next)
+      return next
+    })
     setShowNewEntry(false)
   }
+
+  const ghostColumn = COLUMNS.find((col) => col.id === drag?.fromCol) ?? COLUMNS[2]
 
   return (
     <div className="dashboard-page boards-page">
@@ -440,110 +809,54 @@ export default function BoardsManagerView({ workshop }: Props) {
         </form>
       ) : null}
 
-      <div className="kanban-grid custom-scrollbar-light" role="list">
-        {COLUMNS.map((column) => (
-          <section
-            key={column.id}
-            className={`kanban-column glass glass-lite tone-${column.tone} ${dropTarget === column.id ? 'is-drop-target' : ''}`}
-            onDragOver={(e) => onDragOverColumn(e, column.id)}
-            onDragLeave={() => setDropTarget((cur) => (cur === column.id ? null : cur))}
-            onDrop={(e) => onDropColumn(e, column.id)}
-            aria-label={column.label}
-          >
-            <header>
-              <div>
-                <h3>{column.label}</h3>
-                <p className="kanban-column-hint">{column.hint}</p>
+      <div className={`kanban-grid custom-scrollbar-light${drag ? ' is-reordering' : ''}`} role="list">
+        {COLUMNS.map((column) => {
+          const cards = columns[column.id]
+          const showEmpty = !loading && cards.length === 0
+
+          return (
+            <section
+              key={column.id}
+              data-kanban-col={column.id}
+              className={`kanban-column glass glass-lite tone-${column.tone}`}
+              aria-label={column.label}
+            >
+              <header>
+                <div>
+                  <h3>{column.label}</h3>
+                  <p className="kanban-column-hint">{column.hint}</p>
+                </div>
+                <span>{loading ? '—' : cards.length}</span>
+              </header>
+
+              <div className="kanban-cards custom-scrollbar-light">
+                {loading ? (
+                  <HexLoaderScreen size="sm" label="Cargando…" className="kanban-hex-load" />
+                ) : showEmpty ? (
+                  <p className="section-subtitle ops-empty kanban-empty">
+                    Suelta aquí las tarjetas de prioridad {column.label.toLowerCase()}.
+                  </p>
+                ) : (
+                  cards.map((card) => (
+                    <BoardTicket
+                      key={cardId(card)}
+                      card={card}
+                      column={column}
+                      onPointerDown={(e) => startCardDrag(e, card, column.id)}
+                    />
+                  ))
+                )}
               </div>
-              <span>{loading ? '—' : columns[column.id].length}</span>
-            </header>
-
-            <div className="kanban-cards custom-scrollbar-light">
-              {loading ? (
-                <p className="section-subtitle ops-empty">Cargando casos…</p>
-              ) : columns[column.id].length === 0 ? (
-                <p className="section-subtitle ops-empty kanban-empty">
-                  Suelta aquí las tarjetas de prioridad {column.label.toLowerCase()}.
-                </p>
-              ) : (
-                columns[column.id].map((card) => {
-                  const id = cardId(card)
-                  if (card.kind === 'manual') {
-                    const entry = card.entry
-                    return (
-                      <article
-                        key={id}
-                        className={`kanban-card glass-inline glass-lite ${draggingId === id ? 'is-dragging' : ''}`}
-                        draggable
-                        onDragStart={(e) => onDragStart(e, id)}
-                        onDragEnd={onDragEnd}
-                      >
-                        <div className="kanban-card-top">
-                          <span className="kanban-drag-handle" aria-hidden>
-                            <GripVertical size={16} />
-                          </span>
-                          <span className="ops-feed-placeholder">MANUAL</span>
-                          <span className={`badge ${badgeTone(column.tone)}`}>{column.label}</span>
-                        </div>
-                        <strong>{entry.title}</strong>
-                        {entry.phone ? <span className="kanban-card-meta">{entry.phone}</span> : null}
-                        {entry.note ? <p className="kanban-card-desc">{entry.note}</p> : null}
-                        <footer>
-                          <time>{formatFecha(entry.createdAt)}</time>
-                        </footer>
-                      </article>
-                    )
-                  }
-
-                  const item = card.item
-                  const cita = item.cita
-                  const customer = cita
-                    ? [cita.nombre, cita.apellidos].filter(Boolean).join(' ')
-                    : ''
-                  const title = customer || item.caller || 'Cliente sin identificar'
-                  const vehicle = cita
-                    ? [cita.marca, cita.modelo].filter(Boolean).join(' ')
-                    : ''
-
-                  return (
-                    <article
-                      key={id}
-                      className={`kanban-card glass-inline glass-lite ${draggingId === id ? 'is-dragging' : ''}`}
-                      draggable
-                      onDragStart={(e) => onDragStart(e, id)}
-                      onDragEnd={onDragEnd}
-                    >
-                      <div className="kanban-card-top">
-                        <span className="kanban-drag-handle" aria-hidden>
-                          <GripVertical size={16} />
-                        </span>
-                        {cita?.matricula ? (
-                          <VehiclePlate value={cita.matricula} compact />
-                        ) : (
-                          <span className="ops-feed-placeholder">
-                            {cita ? 'SIN MATRÍCULA' : 'SIN CITA'}
-                          </span>
-                        )}
-                        <span className={`badge ${badgeTone(column.tone)}`}>{column.label}</span>
-                      </div>
-                      <strong>{title}</strong>
-                      <span className="kanban-card-meta">
-                        {item.tipopeticion || 'Sin tipo'}
-                        {item.caller ? ` · ${item.caller}` : ''}
-                      </span>
-                      {vehicle ? <span className="kanban-card-meta">{vehicle}</span> : null}
-                      {item.descripcion ? <p className="kanban-card-desc">{item.descripcion}</p> : null}
-                      <footer>
-                        <time>{formatFecha(item.fechainicio)}</time>
-                      </footer>
-                    </article>
-                  )
-                })
-              )}
-            </div>
-          </section>
-        ))}
+            </section>
+          )
+        })}
       </div>
+
+      {drag ? (
+        <div ref={ghostRef} className="kanban-ghost-layer" aria-hidden>
+          <BoardTicket card={drag.card} column={ghostColumn} ghost />
+        </div>
+      ) : null}
     </div>
   )
 }

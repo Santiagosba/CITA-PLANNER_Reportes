@@ -2,15 +2,17 @@ import React, { useEffect, useState } from 'react'
 import { ArrowRight, Eye, EyeOff } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { TallerBranding } from '../lib/tallerBranding'
-import { getAppLoginDefaultSubtitle, getAppProductName } from '../lib/appIdentity'
+import { getAppProductName } from '../lib/appIdentity'
 import ActionButton, { type ActionStatus } from '../components/ui/ActionButton'
 import Card from '../components/ui/Card'
+import { DEMO_ASESORES, type DemoAsesor } from '../lib/demoAsesores'
 
 interface LoginViewProps {
   branding?: TallerBranding | null
   workshopDisplayName?: string | null
   externalNotice?: { kind: 'error' | 'info'; message: string } | null
   onDismissNotice?: () => void
+  onDemoLogin?: (asesor: DemoAsesor) => void
 }
 
 export default function LoginView({
@@ -18,6 +20,7 @@ export default function LoginView({
   workshopDisplayName,
   externalNotice,
   onDismissNotice,
+  onDemoLogin,
 }: LoginViewProps) {
   const [step, setStep] = useState(1)
   const [email, setEmail] = useState('')
@@ -78,10 +81,34 @@ export default function LoginView({
           </div>
 
           <p className="section-eyebrow">{getAppProductName()}</p>
-          <h1 className="section-title mt-1">{workshopDisplayName || 'Acceso'}</h1>
+          <h1 className="section-title mt-1">{workshopDisplayName || 'Entrar'}</h1>
           <p className="section-subtitle mt-2">
-            {step === 1 ? 'Paso 1 de 2 · Tu correo' : 'Paso 2 de 2 · Tu contraseña'}
+            Acceso para asesores del taller. Elige tu cuenta de prueba o entra con tu correo.
           </p>
+
+          {onDemoLogin ? (
+            <div className="login-asesor-list" role="list">
+              <p className="field-label">Asesores de prueba</p>
+              {DEMO_ASESORES.map((asesor) => (
+                <button
+                  key={asesor.id}
+                  type="button"
+                  className="login-asesor-card"
+                  onClick={() => onDemoLogin(asesor)}
+                >
+                  <span className="login-asesor-avatar" aria-hidden>
+                    {asesor.initials}
+                  </span>
+                  <span className="login-asesor-copy">
+                    <strong>
+                      {asesor.firstName} {asesor.lastName}
+                    </strong>
+                    <small>{asesor.roleLabel}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           <nav className="wizard-steps wizard-steps-compact mt-4" aria-label="Pasos de acceso">
             <span className={`wizard-step ${step === 1 ? 'is-current' : 'is-done'}`}>

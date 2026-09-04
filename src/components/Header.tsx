@@ -89,7 +89,7 @@ export default function Header({
         <button
           type="button"
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="shrink-0 rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-teal-500 focus:outline-none dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white sm:p-2"
+          className="shrink-0 rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-blue-600 focus:outline-none dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white sm:p-2"
           aria-label="Menú"
         >
           <Menu size={22} />
@@ -120,7 +120,7 @@ export default function Header({
           <input
             type="text"
             placeholder="Buscar..."
-            className="w-48 rounded-full border-none bg-slate-100 py-2 pl-10 pr-4 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:ring-2 focus:ring-teal-500 dark:bg-slate-800 dark:text-slate-200 lg:w-80"
+            className="w-48 rounded-full border-none bg-slate-100 py-2 pl-10 pr-4 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:ring-2 focus:ring-blue-500 dark:bg-slate-800 dark:text-slate-200 lg:w-80"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -144,7 +144,7 @@ export default function Header({
               onClick={() => setNoticesOpen((o) => !o)}
               className={`relative rounded-full p-2 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 ${
                 noticesOpen
-                  ? 'text-teal-600 dark:text-teal-400'
+                  ? 'text-blue-600 dark:text-blue-400'
                   : 'text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
               title="Notificaciones (maqueta)"
@@ -153,7 +153,7 @@ export default function Header({
             >
               <Bell size={20} />
               <span
-                className="pointer-events-none absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-white bg-teal-500 dark:border-slate-900"
+                className="pointer-events-none absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-white bg-blue-600 dark:border-slate-900"
                 aria-hidden
               />
             </button>

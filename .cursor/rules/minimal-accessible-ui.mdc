@@ -1,12 +1,17 @@
 ---
-description: UI minimalista y accesible para usuarios no técnicos
+description: UI minimalista y accesible según AVI CRM design system
 alwaysApply: true
 ---
 
 # UX minimalista (AVI CRM)
 
-- Modo claro por defecto, texto grande (16px+), botones altos (min 48px)
+Fuente de verdad: `docs/avi-crm-design-system.md` + tokens/clases en `src/styles/avi-crm.css`.
+
+- **Light glass** por defecto: fondo `--page` `#eef1f5`, superficies `.glass`, marca azul `#0b63d6`
+- Tipografía **Inter**, texto base ≥16px, objetivos táctiles ≥48px (`--tap-target`)
 - Lenguaje llano en español: «Entrar», «Elige tu taller», «Ya está gestionado»
-- Una acción principal por pantalla (`client-submit`); secundarios con `ghost-button`
-- Navegación con 3 pestañas claras: Gestionar citas · Listado completo · Ajustes
-- Usar tokens y clases de `src/styles/avi-crm.css` (`.glass`, `.badge`, `.metric`, `.nav-segment-btn`, `.field-input`) y componentes `src/components/ui/`
+- Una acción principal por pantalla (`.client-submit`); secundarios con `.ghost-button`
+- Badges con `.badge.tone-*`; KPIs con `.metric.glass`
+- Radios documentados: sm 12 / md 16 / lg 22 / xl 28 / pill 999
+- Componentes UI en `src/components/ui/`
+- Modo oscuro solo vía tokens (`html.dark` / `.dashboard-shell` sin `.is-light`); no inventar otra paleta de marca

@@ -135,8 +135,13 @@ export type PeticionesStats = {
   pendientes: number
   /** Con IDCita → ya tienen cita, no pendientes */
   conCita: number
+  /** El asesor ya las cerró (gestionado). */
+  hechas: number
+  /** Aún faltan por terminar. */
+  porHacer: number
   pctPendientes: number
   pctConCita: number
+  pctHechas: number
   /** @deprecated usar pendientes */
   sinCita: number
   tipos: Record<string, number>
@@ -370,20 +375,26 @@ async function fetchPendingPeticionesFromSupabase(
 export function computePeticionesStats(items: PeticionPendiente[]): PeticionesStats {
   const tipos: Record<string, number> = {}
   let conCita = 0
+  let hechas = 0
   for (const p of items) {
     const label = p.tipopeticion || 'Sin tipo'
     tipos[label] = (tipos[label] ?? 0) + 1
     if (!isPeticionPendiente(p)) conCita++
+    if (p.gestionado) hechas++
   }
   const total = items.length
   const pendientes = total - conCita
+  const porHacer = total - hechas
   const pct = (n: number) => (total > 0 ? Math.round((n / total) * 1000) / 10 : 0)
   return {
     total,
     pendientes,
     conCita,
+    hechas,
+    porHacer,
     pctPendientes: pct(pendientes),
     pctConCita: pct(conCita),
+    pctHechas: pct(hechas),
     sinCita: pendientes,
     tipos,
   }

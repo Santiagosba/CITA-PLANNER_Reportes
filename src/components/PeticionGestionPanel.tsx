@@ -134,7 +134,7 @@ export default function PeticionGestionPanel({
 
       {step === 3 ? (
         <div className="panel-stack">
-          <div className="glass-inline card-pad-sm">
+          <div className="glass-inline glass-lite card-pad-sm">
             <p className="section-eyebrow">Resumen</p>
             <p className="section-title" style={{ fontSize: 'var(--font-lg)' }}>
               {titulo}

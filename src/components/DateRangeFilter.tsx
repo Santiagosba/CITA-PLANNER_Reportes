@@ -34,7 +34,7 @@ export default function DateRangeFilter({
     <GlassSurface variant="apple" isDarkMode={isDarkMode} className="p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-          <CalendarRange size={18} className="text-teal-400 shrink-0" />
+          <CalendarRange size={18} className="text-blue-400 shrink-0" />
           <div>
             <p className={`text-xs font-semibold uppercase tracking-wider ${textMuted}`}>Periodo</p>
             <p className={`text-sm font-medium ${textMain}`}>{resolved.label}</p>
@@ -65,7 +65,7 @@ export default function DateRangeFilter({
               type="date"
               value={customFrom}
               onChange={(e) => onCustomFromChange(e.target.value)}
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-teal-500/40 dark:text-white"
+              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/40 dark:text-white"
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -75,7 +75,7 @@ export default function DateRangeFilter({
               value={customTo}
               onChange={(e) => onCustomToChange(e.target.value)}
               min={customFrom || undefined}
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-teal-500/40 dark:text-white"
+              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-blue-500/40 dark:text-white"
             />
           </label>
         </div>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
-import { Loader2 } from 'lucide-react'
+import HexLoader from './components/ui/HexLoader'
 import { supabase } from './lib/supabase'
 import { CRM_FAVICON_FALLBACK_HREF, fetchCrmHubWebBranding, type CrmHubWebBranding } from './lib/crmHubWebBranding'
 import { HUB_WEB_PATH_SYNC_EVENT, replaceStateToRoot } from './lib/urlSync'
@@ -15,9 +15,11 @@ import {
   fetchConnectRouteByContainerId,
   fetchSlugForTaller,
   userMayAccessTaller,
+  canBrowseAllWorkshops,
   isGlobalAviAdmin,
   type ConnectRoute,
 } from './lib/operationsConnect'
+import { buildDemoSession, loadDemoSession, saveDemoSession, type DemoAsesor } from './lib/demoAsesores'
 import { parseConnectSiteIds, scopedSitesEmptyDenied } from './lib/connectSiteScope'
 import type { SlugBrandingContext } from './lib/licenseBrandingContext'
 import { buildSlugBrandingContext } from './lib/licenseBrandingContext'
@@ -103,12 +105,11 @@ export default function App() {
   const [licenseLogoUrl, setLicenseLogoUrl] = useState<string | null>(null)
   const [crmHubWebBranding, setCrmHubWebBranding] = useState<CrmHubWebBranding | null>(null)
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    // El dashboard operativo se diseñó en oscuro: sin preferencia guardada
-    // arrancamos ahí y el modo claro queda a un clic en la barra lateral.
+    // AVI CRM: modo claro por defecto (light glass). Solo oscuro si el usuario lo guardó.
     try {
-      return localStorage.getItem(THEME_KEY) !== 'light'
+      return localStorage.getItem(THEME_KEY) === 'dark'
     } catch {
-      return true
+      return false
     }
   })
 
@@ -280,7 +281,7 @@ export default function App() {
         data: { session: s },
       } = await supabase.auth.getSession()
       if (cancelled) return
-      setSession(s)
+      setSession(s ?? loadDemoSession())
       if ((s?.user as any)?.user_metadata?.calendar_theme != null) {
         const theme = (s!.user as any).user_metadata.calendar_theme === 'dark'
         setIsDarkMode(theme)
@@ -296,10 +297,15 @@ export default function App() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession)
-      if (!newSession) {
-        setSelectedWorkshop(null)
-        setPreferredWorkshopIdTaller(null)
+      if (newSession) {
+        setSession(newSession)
+      } else {
+        const demo = loadDemoSession()
+        setSession(demo)
+        if (!demo) {
+          setSelectedWorkshop(null)
+          setPreferredWorkshopIdTaller(null)
+        }
       }
       if (_event === 'SIGNED_OUT') {
         replaceStateToRoot(null)
@@ -325,7 +331,7 @@ export default function App() {
     if (bootLoading || authLoading) return
     if (!(session as any)?.user) return
     if (parseWorkshopSlugFromPathname(urlPathname)) return
-    if (isGlobalAviAdmin(session as any)) return
+    if (canBrowseAllWorkshops(session as any)) return
 
     let cancelled = false
     void (async () => {
@@ -491,7 +497,7 @@ export default function App() {
   }, [bootLoading, authLoading, session, slugBranding, selectedWorkshop, preferredWorkshopIdTaller])
 
   useEffect(() => {
-    if (bootLoading || authLoading || !(session as any)?.user || isGlobalAviAdmin(session as any)) return
+    if (bootLoading || authLoading || !(session as any)?.user || canBrowseAllWorkshops(session as any)) return
 
     let cancelled = false
     const legacyId = (((session as any).user?.user_metadata?.legacy_id as string | undefined) ?? null)
@@ -605,12 +611,19 @@ export default function App() {
     }
   }, [])
 
+  const handleDemoLogin = useCallback((asesor: DemoAsesor) => {
+    const demo = buildDemoSession(asesor)
+    saveDemoSession(demo)
+    setLoginNotice(null)
+    setSession(demo)
+  }, [])
+
   const rootClass = isDarkMode ? 'dark' : ''
 
   if (authLoading || bootLoading) {
     return (
       <div className={`${rootClass} flex h-screen items-center justify-center`}>
-        <Loader2 size={40} className="animate-spin" style={{ color: 'var(--color-brand)' }} />
+        <HexLoader size="lg" label="Cargando la app" />
       </div>
     )
   }
@@ -623,6 +636,7 @@ export default function App() {
           workshopDisplayName={slugBranding?.displayName ?? null}
           externalNotice={loginNotice}
           onDismissNotice={() => setLoginNotice(null)}
+          onDemoLogin={handleDemoLogin}
         />
       </div>
     )
