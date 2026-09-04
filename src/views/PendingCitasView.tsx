@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Loader2, Search } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { CalendarDays, Columns3, Loader2, Search, Table2 } from 'lucide-react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
 import PendingCitasToolbar from '../components/PendingCitasToolbar'
-import PeticionGestionPanel from '../components/PeticionGestionPanel'
-import PeticionQueueRow from '../components/PeticionQueueRow'
+import PeticionRow from '../components/PeticionRow'
 import type { ActionStatus } from '../components/ui/ActionButton'
 import Card from '../components/ui/Card'
 import { TodoSkeleton } from '../components/ui/Skeleton'
+import VehiclePlate from '../components/ui/VehiclePlate'
+import CalendarTallerView from './CalendarTallerView'
 import type { Workshop } from '../types'
 import { groupPeticionesByAgendaDay } from '../lib/agendaGrouping'
 import {
@@ -26,6 +27,7 @@ import {
   resolveAvioldTallerIdsDetailed,
   updatePeticionGestion,
   type PeticionPendiente,
+  type ResolvedTallerIds,
   type TipoPeticionRow,
 } from '../lib/peticionesPendientes'
 
@@ -35,9 +37,9 @@ type Props = {
   initialTab?: TabId
 }
 
-type TabId = 'bandeja' | 'reporte'
+type TabId = 'kanban' | 'tabla' | 'calendario'
 
-export default function PendingCitasView({ workshop, initialTab = 'bandeja' }: Props) {
+export default function PendingCitasView({ workshop, initialTab = 'kanban' }: Props) {
   const [tab, setTab] = useState<TabId>(initialTab)
   const [items, setItems] = useState<PeticionPendiente[]>([])
   const [tipos, setTipos] = useState<TipoPeticionRow[]>([])
@@ -54,23 +56,59 @@ export default function PendingCitasView({ workshop, initialTab = 'bandeja' }: P
   const [datePreset, setDatePreset] = useState<DateRangePreset>('mes')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
+  const [debouncedCaller, setDebouncedCaller] = useState('')
 
   useEffect(() => {
     setTab(initialTab)
   }, [initialTab])
 
-  const effectiveCaller = callerFilter.trim() || undefined
+  // Buscador de teléfono: espera a que el asesor deje de teclear (evita 1 petición por tecla)
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedCaller(callerFilter.trim()), 350)
+    return () => clearTimeout(t)
+  }, [callerFilter])
+
+  const effectiveCaller = debouncedCaller || undefined
   const dateRange = useMemo(
     () => resolveDateRange(datePreset, customFrom, customTo),
     [datePreset, customFrom, customTo],
   )
+
+  // Cache de resolución de taller: se resuelve UNA vez por taller, no en cada filtro/carga
+  const workshopKey = `${String(workshop.originalId || '')}|${String(workshop.containerIdTaller || '')}`
+  const resolvedCacheRef = useRef<{ key: string; value: ResolvedTallerIds } | null>(null)
+
+  const getResolvedTallerIds = useCallback(async (): Promise<ResolvedTallerIds> => {
+    if (resolvedCacheRef.current?.key === workshopKey) {
+      return resolvedCacheRef.current.value
+    }
+    const value = await resolveAvioldTallerIdsDetailed(workshop)
+    resolvedCacheRef.current = { key: workshopKey, value }
+    return value
+  }, [workshop, workshopKey])
+
+  // Tipos de petición: se cargan una sola vez por taller y en paralelo (no bloquean la lista)
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const rows = await fetchTiposPeticion()
+        if (!cancelled) setTipos(rows)
+      } catch {
+        /* el filtro de tipo queda vacío; no bloquea la carga de citas */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [workshopKey])
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     setSourceNotice(null)
     try {
-      const resolved = await resolveAvioldTallerIdsDetailed(workshop)
+      const resolved = await getResolvedTallerIds()
       if (!resolved.ids.length) {
         setError('No encontramos este taller en el sistema. Prueba a elegir otro.')
         setItems([])
@@ -82,9 +120,7 @@ export default function PendingCitasView({ workshop, initialTab = 'bandeja' }: P
         from: dateRange.from,
         to: dateRange.to,
       })
-      const tiposRows = await fetchTiposPeticion()
       setItems(rows)
-      setTipos(tiposRows)
       setSourceNotice(getPeticionesSourceNotice())
       setSelectedId((prev) => {
         const pendientes = rows.filter(isPeticionPendiente)
@@ -97,7 +133,7 @@ export default function PendingCitasView({ workshop, initialTab = 'bandeja' }: P
     } finally {
       setLoading(false)
     }
-  }, [workshop, effectiveCaller, tipoFilter, dateRange.from, dateRange.to])
+  }, [getResolvedTallerIds, effectiveCaller, tipoFilter, dateRange.from, dateRange.to])
 
   useEffect(() => {
     void load()
@@ -185,7 +221,7 @@ export default function PendingCitasView({ workshop, initialTab = 'bandeja' }: P
   return (
     <div className="dashboard-page">
       <PendingCitasToolbar
-        view={tab === 'bandeja' ? 'cola' : 'listado'}
+        view={tab}
         preset={datePreset}
         customFrom={customFrom}
         customTo={customTo}
@@ -200,103 +236,135 @@ export default function PendingCitasView({ workshop, initialTab = 'bandeja' }: P
         onExport={handleExport}
       />
 
-      {error ? <ApiStatusBanner message={error} variant={isApiError ? 'error' : 'warning'} /> : null}
-      {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
+      <div className="triage-view-switch" role="tablist" aria-label="Vista de triage">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'kanban'}
+          className={`triage-view-btn ${tab === 'kanban' ? 'is-active' : ''}`}
+          onClick={() => setTab('kanban')}
+        >
+          <Columns3 size={16} />
+          Vista Kanban
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'tabla'}
+          className={`triage-view-btn ${tab === 'tabla' ? 'is-active' : ''}`}
+          onClick={() => setTab('tabla')}
+        >
+          <Table2 size={16} />
+          Vista Tabla
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'calendario'}
+          className={`triage-view-btn ${tab === 'calendario' ? 'is-active' : ''}`}
+          onClick={() => setTab('calendario')}
+        >
+          <CalendarDays size={16} />
+          Calendario Taller
+        </button>
+      </div>
 
-      {tab === 'bandeja' ? (
-        <div className="dashboard-workspace">
-          <aside className="dashboard-queue-col glass card-pad-sm">
-            <div className="dashboard-queue-filters panel-stack">
-              <label className="block">
-                <span className="field-label">Buscar teléfono</span>
-                <div className="relative">
-                  <Search
-                    size={18}
-                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted)]"
-                  />
-                  <input
-                    type="text"
-                    placeholder="612 345 678"
-                    value={callerFilter}
-                    onChange={(e) => setCallerFilter(e.target.value)}
-                    className="field-input pl-11"
-                  />
-                </div>
-              </label>
-              <label className="block">
-                <span className="field-label">Tipo</span>
-                <select
-                  value={tipoFilter}
-                  onChange={(e) => setTipoFilter(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="field-select"
-                >
-                  <option value="">Todas</option>
-                  {tipos.map((t) => (
-                    <option key={t.idtipopeticion} value={t.idtipopeticion}>
-                      {t.tipopeticion}
-                    </option>
-                  ))}
-                </select>
-              </label>
+      {error && tab !== 'calendario' ? (
+        <ApiStatusBanner message={error} variant={isApiError ? 'error' : 'warning'} />
+      ) : null}
+      {sourceNotice && !error && tab !== 'calendario' ? (
+        <ApiStatusBanner message={sourceNotice} variant="warning" />
+      ) : null}
+
+      {tab === 'calendario' ? (
+        <CalendarTallerView workshop={workshop} embedded />
+      ) : tab === 'kanban' ? (
+        <div className="queue-full">
+          <div className="queue-filterbar glass card-pad-sm">
+            <label className="queue-filter-search">
+              <span className="field-label">Buscar teléfono</span>
+              <div className="relative">
+                <Search
+                  size={18}
+                  className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted)]"
+                />
+                <input
+                  type="text"
+                  placeholder="612 345 678"
+                  value={callerFilter}
+                  onChange={(e) => setCallerFilter(e.target.value)}
+                  className="field-input pl-11"
+                />
+              </div>
+            </label>
+            <label className="queue-filter-tipo">
+              <span className="field-label">Tipo</span>
+              <select
+                value={tipoFilter}
+                onChange={(e) => setTipoFilter(e.target.value === '' ? '' : Number(e.target.value))}
+                className="field-select"
+              >
+                <option value="">Todas</option>
+                {tipos.map((t) => (
+                  <option key={t.idtipopeticion} value={t.idtipopeticion}>
+                    {t.tipopeticion}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {loading ? (
+            <ul className="prow-list" aria-busy="true">
+              <li>
+                <TodoSkeleton />
+              </li>
+              <li>
+                <TodoSkeleton />
+              </li>
+              <li>
+                <TodoSkeleton />
+              </li>
+            </ul>
+          ) : bandejaItems.length === 0 ? (
+            <Card className="glass agenda-empty">
+              <p className="section-title" style={{ fontSize: 'var(--font-lg)' }}>
+                {items.length > 0 ? 'Nada pendiente' : 'Sin consultas en este periodo'}
+              </p>
+              <p className="section-subtitle mt-2">
+                {items.length > 0
+                  ? `Las ${stats.conCita} consultas del periodo ya tienen cita en calendario.`
+                  : 'Prueba «Ver todo» o amplía el rango de fechas.'}
+              </p>
+            </Card>
+          ) : (
+            <div className="panel-stack">
+              {agendaGroups.map((group) => (
+                <section key={group.label} className="agenda-day-group">
+                  <h2 className="agenda-day-label">
+                    {group.label}
+                    <span>· {group.items.length}</span>
+                  </h2>
+                  <ul className="prow-list">
+                    {group.items.map((p) => (
+                      <PeticionRow
+                        key={p.idpeticion}
+                        peticion={p}
+                        expanded={p.idpeticion === selectedId}
+                        saveStatus={p.idpeticion === selectedId ? saveStatus : 'idle'}
+                        gestionObs={p.idpeticion === selectedId ? gestionObs : (p.gestionobservaciones ?? '')}
+                        gestionEmail={p.idpeticion === selectedId ? gestionEmail : (p.gestionemail ?? '')}
+                        onToggle={() => setSelectedId((prev) => (prev === p.idpeticion ? null : p.idpeticion))}
+                        onGestionObsChange={setGestionObs}
+                        onGestionEmailChange={setGestionEmail}
+                        onMarkGestionado={(g) => void handleMarkGestionado(g)}
+                      />
+                    ))}
+                  </ul>
+                </section>
+              ))}
             </div>
-
-            <div className="dashboard-queue-scroll custom-scrollbar-light">
-              {loading ? (
-                <ul className="queue-list" aria-busy="true">
-                  <li>
-                    <TodoSkeleton />
-                  </li>
-                  <li>
-                    <TodoSkeleton />
-                  </li>
-                  <li>
-                    <TodoSkeleton />
-                  </li>
-                </ul>
-              ) : bandejaItems.length === 0 ? (
-                <div className="dashboard-queue-empty">
-                  <p className="section-subtitle">
-                    {items.length > 0
-                      ? 'No quedan citas pendientes en este periodo.'
-                      : 'Sin consultas. Amplía el periodo o pulsa «Ver todo».'}
-                  </p>
-                </div>
-              ) : (
-                <div className="panel-stack">
-                  {agendaGroups.map((group) => (
-                    <section key={group.label} className="agenda-day-group">
-                      <h2 className="agenda-day-label">
-                        {group.label}
-                        <span>· {group.items.length}</span>
-                      </h2>
-                      <ul className="queue-list">
-                        {group.items.map((p) => (
-                          <PeticionQueueRow
-                            key={p.idpeticion}
-                            peticion={p}
-                            active={p.idpeticion === selectedId}
-                            onSelect={() => setSelectedId(p.idpeticion)}
-                          />
-                        ))}
-                      </ul>
-                    </section>
-                  ))}
-                </div>
-              )}
-            </div>
-          </aside>
-
-          <section className="dashboard-detail-col glass card-pad-md" aria-label="Panel de gestión">
-            <PeticionGestionPanel
-              peticion={selected}
-              saveStatus={saveStatus}
-              gestionObs={gestionObs}
-              gestionEmail={gestionEmail}
-              onGestionObsChange={setGestionObs}
-              onGestionEmailChange={setGestionEmail}
-              onMarkGestionado={(g) => void handleMarkGestionado(g)}
-            />
-          </section>
+          )}
         </div>
       ) : (
         <div className="dashboard-report panel-stack">
@@ -327,6 +395,7 @@ export default function PendingCitasView({ workshop, initialTab = 'bandeja' }: P
                 <thead>
                   <tr>
                     <th>Cliente / Teléfono</th>
+                    <th>Matrícula</th>
                     <th>Tipo</th>
                     <th>Consulta</th>
                     <th>Estado</th>
@@ -344,6 +413,7 @@ export default function PendingCitasView({ workshop, initialTab = 'bandeja' }: P
                           <strong>{cliente || p.caller || '—'}</strong>
                           {p.caller && cliente ? <div className="text-[var(--muted)]">{p.caller}</div> : null}
                         </td>
+                        <td>{c?.matricula ? <VehiclePlate value={c.matricula} compact /> : '—'}</td>
                         <td>{p.tipopeticion ?? '—'}</td>
                         <td>{formatFecha(p.fechainicio)}</td>
                         <td>

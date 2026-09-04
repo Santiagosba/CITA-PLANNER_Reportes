@@ -257,7 +257,19 @@ async function fetchCitasByIds(ids: string[]): Promise<Map<string, CitaResumen>>
         return map
       }
       for (const row of (data ?? []) as CitaResumen[]) {
-        map.set(String(row.idcita).toLowerCase(), row)
+        map.set(String(row.idcita).toLowerCase(), {
+          ...row,
+          idcita: String(row.idcita).toLowerCase(),
+          matricula: emptyToNull(row.matricula),
+          nombre: emptyToNull(row.nombre),
+          apellidos: emptyToNull(row.apellidos),
+          telefono: emptyToNull(row.telefono),
+          movil: emptyToNull(row.movil),
+          email: emptyToNull(row.email),
+          marca: emptyToNull(row.marca),
+          modelo: emptyToNull(row.modelo),
+          asunto: emptyToNull(row.asunto),
+        })
       }
     } catch (e) {
       console.warn('[peticionesPendientes] error cargando citas:', e)
@@ -265,6 +277,12 @@ async function fetchCitasByIds(ids: string[]): Promise<Map<string, CitaResumen>>
     }
   }
   return map
+}
+
+function emptyToNull(v: unknown): string | null {
+  if (v == null) return null
+  const s = String(v).trim()
+  return s || null
 }
 
 function mapPeticionRow(

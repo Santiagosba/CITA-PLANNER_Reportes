@@ -4,7 +4,12 @@ import type { LucideIcon } from 'lucide-react'
 import type { CrmUser, Workshop } from '../types'
 import { getAppProductName } from '../lib/appIdentity'
 
-export type DashboardShellRoute = 'pending-citas' | 'reportes' | 'configuration'
+export type DashboardShellRoute =
+  | 'dashboard-general'
+  | 'pending-citas'
+  | 'boards'
+  | 'reportes'
+  | 'configuration'
 
 type Props = {
   workshop: Workshop

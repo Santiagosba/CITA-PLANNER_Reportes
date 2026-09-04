@@ -103,10 +103,12 @@ export default function App() {
   const [licenseLogoUrl, setLicenseLogoUrl] = useState<string | null>(null)
   const [crmHubWebBranding, setCrmHubWebBranding] = useState<CrmHubWebBranding | null>(null)
   const [isDarkMode, setIsDarkMode] = useState(() => {
+    // El dashboard operativo se diseñó en oscuro: sin preferencia guardada
+    // arrancamos ahí y el modo claro queda a un clic en la barra lateral.
     try {
-      return localStorage.getItem(THEME_KEY) === 'dark'
+      return localStorage.getItem(THEME_KEY) !== 'light'
     } catch {
-      return false
+      return true
     }
   })
 
@@ -655,6 +657,8 @@ export default function App() {
         licenseLogoUrl={mergedSidebarLogo}
         onLogout={() => void handleLogout()}
         onClearWorkshop={() => setSelectedWorkshop(null)}
+        isDarkMode={isDarkMode}
+        onToggleTheme={() => setIsDarkMode((prev) => !prev)}
       />
     </div>
   )

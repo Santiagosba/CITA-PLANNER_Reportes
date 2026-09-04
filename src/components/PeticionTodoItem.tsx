@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { ArrowRight, Phone } from 'lucide-react'
 import ActionButton, { type ActionStatus } from './ui/ActionButton'
+import VehiclePlate from './ui/VehiclePlate'
 import { formatAgendaTime } from '../lib/agendaGrouping'
 import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
 
@@ -104,7 +106,9 @@ export default function PeticionTodoItem({
                 <Detail label="Consulta" value={formatFecha(p.fechainicio)} />
                 <Detail label="Tipo" value={p.tipopeticion} />
                 <Detail label="Cita en calendario" value={formatFecha(p.cita?.fecha) || 'Todavía no'} />
-                {p.cita?.matricula ? <Detail label="Matrícula" value={p.cita.matricula} /> : null}
+                {p.cita?.matricula ? (
+                  <Detail label="Matrícula" value={<VehiclePlate value={p.cita.matricula} />} />
+                ) : null}
               </dl>
               {telHref ? (
                 <a href={telHref} className="client-submit todo-call-full">
@@ -194,7 +198,7 @@ export default function PeticionTodoItem({
   )
 }
 
-function Detail({ label, value }: { label: string; value: string | null | undefined }) {
+function Detail({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="todo-detail">
       <dt>{label}</dt>

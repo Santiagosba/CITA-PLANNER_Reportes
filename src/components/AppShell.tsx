@@ -1,11 +1,23 @@
-import { ClipboardList, LogOut, RefreshCw, Settings, Table2 } from 'lucide-react'
+import {
+  ClipboardList,
+  Columns3,
+  LayoutDashboard,
+  LogOut,
+  Moon,
+  RefreshCw,
+  Settings,
+  Sun,
+  Table2,
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { DashboardShellRoute } from './Sidebar'
 
 const NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] = [
-  { id: 'pending-citas', label: 'Cola de citas', icon: ClipboardList },
-  { id: 'reportes', label: 'Listado', icon: Table2 },
+  { id: 'dashboard-general', label: 'Dashboard general', icon: LayoutDashboard },
+  { id: 'pending-citas', label: 'Triage operativo', icon: ClipboardList },
+  { id: 'boards', label: 'Gestor de tableros', icon: Columns3 },
+  { id: 'reportes', label: 'Listado completo', icon: Table2 },
   { id: 'configuration', label: 'Ajustes', icon: Settings },
 ]
 
@@ -17,6 +29,8 @@ type Props = {
   onNavigate: (route: DashboardShellRoute) => void
   onLogout: () => void
   onChangeWorkshop: () => void
+  isDarkMode: boolean
+  onToggleTheme: () => void
   children: ReactNode
 }
 
@@ -28,10 +42,12 @@ export default function AppShell({
   onNavigate,
   onLogout,
   onChangeWorkshop,
+  isDarkMode,
+  onToggleTheme,
   children,
 }: Props) {
   return (
-    <div className="dashboard-shell">
+    <div className={`dashboard-shell ${isDarkMode ? '' : 'is-light'}`.trim()}>
       <a href="#main-content" className="skip-link">
         Ir al contenido
       </a>
@@ -66,7 +82,7 @@ export default function AppShell({
                 className={`dashboard-nav-item ${active ? 'is-active' : ''}`}
                 aria-current={active ? 'page' : undefined}
               >
-                <Icon size={20} aria-hidden />
+                <Icon size={18} aria-hidden />
                 {item.label}
               </button>
             )
@@ -74,6 +90,15 @@ export default function AppShell({
         </nav>
 
         <div className="dashboard-sidebar-footer">
+          <button
+            type="button"
+            className="dashboard-nav-item"
+            onClick={onToggleTheme}
+            aria-pressed={!isDarkMode}
+          >
+            {isDarkMode ? <Sun size={18} aria-hidden /> : <Moon size={18} aria-hidden />}
+            {isDarkMode ? 'Modo claro' : 'Modo oscuro'}
+          </button>
           <button type="button" className="dashboard-nav-item" onClick={onChangeWorkshop}>
             <RefreshCw size={18} aria-hidden />
             Cambiar taller

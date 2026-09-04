@@ -15,9 +15,9 @@ const padClass = {
 }
 
 export default function Card({ children, className = '', padding = 'md', inline = false }: Props) {
+  // El radio lo define `.glass`/`.glass-inline`: si lo forzamos con una utilidad
+  // de Tailwind gana sobre los radios compactos del dashboard y las tarjetas
+  // quedan con esquinas distintas al resto de superficies.
   const surface = inline ? 'glass-inline' : 'glass'
-  const radius = inline ? 'rounded-[var(--radius-md)]' : 'rounded-[var(--radius-lg)]'
-  return (
-    <div className={`${surface} ${radius} ${padClass[padding]} ${className}`.trim()}>{children}</div>
-  )
+  return <div className={`${surface} ${padClass[padding]} ${className}`.trim()}>{children}</div>
 }

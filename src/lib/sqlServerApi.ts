@@ -4,6 +4,7 @@
  */
 
 import type { GestionPatch, PeticionPendiente, PeticionesFilters, TipoPeticionRow } from './peticionesPendientes'
+import type { CitaTaller } from './citasTaller'
 
 function apiBase(): string {
   const raw = (import.meta.env.VITE_SQL_API_URL as string | undefined)?.trim()
@@ -130,6 +131,18 @@ export async function sqlFetchPendingPeticiones(
   if (filters.from?.trim()) params.from = filters.from.trim()
   if (filters.to?.trim()) params.to = filters.to.trim()
   return parseJson<PeticionPendiente[]>(await apiFetch(url('/api/peticiones-pendientes', params)))
+}
+
+export async function sqlFetchCitas(
+  idTallerIds: string[],
+  range: { from?: string; to?: string } = {},
+): Promise<CitaTaller[]> {
+  const params: Record<string, string | string[]> = {
+    idTaller: idTallerIds,
+  }
+  if (range.from?.trim()) params.from = range.from.trim()
+  if (range.to?.trim()) params.to = range.to.trim()
+  return parseJson<CitaTaller[]>(await apiFetch(url('/api/citas', params)))
 }
 
 export async function sqlUpdatePeticionGestion(idpeticion: string, patch: GestionPatch): Promise<void> {
