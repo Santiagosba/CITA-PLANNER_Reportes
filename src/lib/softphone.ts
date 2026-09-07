@@ -82,9 +82,33 @@ export type SoftphoneState = {
   lastCall: FinishedCall | null
   /** Último aviso (p. ej. «Sin micrófono»), se limpia solo. */
   toast: string | null
+  /** Historial local de llamadas hechas/recibidas en este navegador (más reciente primero). */
+  history: FinishedCall[]
 }
 
 const REMOTE_AUDIO_ID = 'avi-softphone-remote-audio'
+const HISTORY_KEY = 'avi-softphone-history'
+const HISTORY_MAX = 200
+
+function loadHistory(): FinishedCall[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as FinishedCall[]
+    return Array.isArray(parsed) ? parsed.filter((c) => c && typeof c.number === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function saveHistory(history: FinishedCall[]) {
+  try {
+    // La transcripción ya viaja a api-crm; en local guardamos solo la constancia.
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history.map((c) => ({ ...c, transcript: [] }))))
+  } catch {
+    /* sin espacio o modo privado: seguimos sin persistir */
+  }
+}
 
 let client: TelnyxRTC | null = null
 let rtcCall: Call | null = null
@@ -95,6 +119,7 @@ let state: SoftphoneState = {
   call: null,
   lastCall: null,
   toast: null,
+  history: typeof window !== 'undefined' ? loadHistory() : [],
 }
 let connectPromise: Promise<void> | null = null
 let toastTimer = 0
@@ -116,10 +141,42 @@ function patchCall(patch: Partial<ActiveCall>) {
   setState({ call: { ...state.call, ...patch } })
 }
 
-function showToast(message: string) {
+function showToast(message: string, ms = 4200) {
   window.clearTimeout(toastTimer)
   setState({ toast: message })
-  toastTimer = window.setTimeout(() => setState({ toast: null }), 4200)
+  toastTimer = window.setTimeout(() => setState({ toast: null }), ms)
+}
+
+/**
+ * Comprueba que hay micrófono utilizable antes de marcar/contestar y traduce
+ * el motivo si no lo hay. Devuelve null si todo va bien.
+ */
+async function microphoneProblem(): Promise<string | null> {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return 'Este navegador no permite usar el micrófono (¿página sin HTTPS?).'
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+    stream.getTracks().forEach((t) => t.stop())
+    return null
+  } catch (e) {
+    const name = e instanceof Error ? e.name : ''
+    switch (name) {
+      case 'NotFoundError':
+      case 'DevicesNotFoundError':
+      case 'OverconstrainedError':
+        return 'No se detecta ningún micrófono. Conecta unos auriculares o un micro y vuelve a intentarlo.'
+      case 'NotAllowedError':
+      case 'PermissionDeniedError':
+      case 'SecurityError':
+        return 'El micrófono está bloqueado. Permítelo en el candado de la barra de direcciones (y en la privacidad de Windows).'
+      case 'NotReadableError':
+      case 'TrackStartError':
+        return 'Otra aplicación está usando el micrófono. Ciérrala y vuelve a intentarlo.'
+      default:
+        return 'No se pudo acceder al micrófono.'
+    }
+  }
 }
 
 /** Normaliza un teléfono español/E.164 para Telnyx. */
@@ -197,20 +254,20 @@ function finishCall(cause?: string) {
     }).catch(() => undefined)
   }
 
-  setState({
-    call: null,
-    lastCall: {
-      logId: current.logId,
-      number: current.number,
-      label: current.label,
-      peticionId: current.peticionId,
-      direction: current.direction,
-      answered: Boolean(answered),
-      durationSec: duration,
-      endedAt,
-      transcript: current.transcript.filter((line) => line.final),
-    },
-  })
+  const finished: FinishedCall = {
+    logId: current.logId,
+    number: current.number,
+    label: current.label,
+    peticionId: current.peticionId,
+    direction: current.direction,
+    answered: Boolean(answered),
+    durationSec: duration,
+    endedAt,
+    transcript: current.transcript.filter((line) => line.final),
+  }
+  const history = [finished, ...state.history].slice(0, HISTORY_MAX)
+  saveHistory(history)
+  setState({ call: null, lastCall: finished, history })
 }
 
 function stateName(call: Call): string {
@@ -306,7 +363,9 @@ function onNotification(n: INotification) {
     return
   }
   if (n.type === 'userMediaError') {
-    showToast('No hay micrófono disponible o el permiso está bloqueado.')
+    void microphoneProblem().then((problem) =>
+      showToast(problem ?? 'No hay micrófono disponible o el permiso está bloqueado.', 7000),
+    )
     if (state.call) finishCall('media_error')
   }
 }
@@ -459,9 +518,9 @@ export const softphone = {
       return true
     }
 
-    const ok = await client.checkPermissions(true, false).catch(() => false)
-    if (!ok) {
-      showToast('Permite el micrófono para poder llamar.')
+    const micProblem = await microphoneProblem()
+    if (micProblem) {
+      showToast(micProblem, 7000)
       return true
     }
 
@@ -510,9 +569,9 @@ export const softphone = {
 
   async answer() {
     if (!rtcCall || state.call?.direction !== 'incoming') return
-    const ok = await client?.checkPermissions(true, false).catch(() => false)
-    if (!ok) {
-      showToast('Permite el micrófono para contestar.')
+    const micProblem = await microphoneProblem()
+    if (micProblem) {
+      showToast(micProblem, 7000)
       return
     }
     await rtcCall.answer({ remoteElement: REMOTE_AUDIO_ID }).catch(() => undefined)
@@ -546,6 +605,11 @@ export const softphone = {
 
   clearLastCall() {
     if (state.lastCall) setState({ lastCall: null })
+  },
+
+  clearHistory() {
+    saveHistory([])
+    setState({ history: [] })
   },
 }
 

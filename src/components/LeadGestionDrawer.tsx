@@ -25,10 +25,13 @@ import { useCustomerCalls } from '../hooks/useCustomerCalls'
 import type { CustomerCallItem } from '../lib/crmApi'
 import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
 import { isSlaCritico } from '../lib/tallerStations'
+import { useLiquidGlass } from '../hooks/useLiquidGlass'
 import {
+  applyDockVars,
   applyScatterVars,
   applyWinRectToElement,
   cursorForSides,
+  pulseAgendaCatch,
   resizeRectFromPointer,
   sidesFromEdge,
   type Edge,
@@ -71,31 +74,6 @@ function reducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-function applyDockVars(el: HTMLElement) {
-  const dock = document.querySelector('.call-agenda-root:not(.is-tucking)') as HTMLElement | null
-  const win = el.getBoundingClientRect()
-  const winCx = win.left + win.width / 2
-  const winCy = win.top + win.height / 2
-  let dockCx = window.innerWidth - 96
-  let dockCy = window.innerHeight - 96
-  if (dock) {
-    const d = dock.getBoundingClientRect()
-    dockCx = d.left + d.width / 2
-    dockCy = d.top + Math.min(36, d.height / 2)
-  }
-  el.style.setProperty('--dock-dx', `${dockCx - winCx}px`)
-  el.style.setProperty('--dock-dy', `${dockCy - winCy}px`)
-}
-
-function pulseAgendaCatch() {
-  const dock = document.querySelector('.call-agenda-root:not(.is-tucked)')
-  if (!dock) return
-  dock.classList.remove('is-catching')
-  void (dock as HTMLElement).offsetWidth
-  dock.classList.add('is-catching')
-  window.setTimeout(() => dock.classList.remove('is-catching'), 700)
-}
-
 function LeadGestionDrawer({
   peticion: p,
   saveStatus,
@@ -121,6 +99,8 @@ function LeadGestionDrawer({
   const [phase, setPhase] = useState<AnimPhase>(() => (reducedMotion() ? 'idle' : 'enter'))
   const [minStyle, setMinStyle] = useState<MinimizeStyle>('dock')
   const rootRef = useRef<HTMLDivElement>(null)
+  const frameRef = useRef<HTMLDivElement>(null)
+  const glassDefs = useLiquidGlass(frameRef)
   const lastMinReqRef = useRef(minimizeRequest)
   const minStyleRef = useRef<MinimizeStyle>('dock')
   const dragRef = useRef<{
@@ -452,9 +432,11 @@ function LeadGestionDrawer({
       onMouseDown={onFocus}
     >
       <div
+        ref={frameRef}
         className="lead-modal lead-os-frame"
         onAnimationEnd={onFrameAnimEnd}
       >
+        {glassDefs}
         <header className="lead-modal-header lead-os-titlebar" onPointerDown={startMove}>
           <div className="lead-window-controls" role="toolbar" aria-label="Controles de ventana">
             <button type="button" className="lead-traffic close" title="Cerrar" aria-label="Cerrar" onClick={requestClose} />

@@ -5,11 +5,17 @@ import {
   useRef,
   useState,
   type AnimationEvent as ReactAnimationEvent,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { GripVertical, ListTodo, Phone, PhoneCall, X } from 'lucide-react'
+import { GripVertical, ListTodo, Phone, PhoneCall, Wrench, X } from 'lucide-react'
 import type { PeticionPendiente } from '../lib/peticionesPendientes'
 import { formatFecha } from '../lib/peticionesPendientes'
+import { useSoftphone } from '../lib/softphone'
+import { APP_META, apps, useApps, useTaskbarPinned, type AppId } from '../lib/apps'
+import { AppIcon } from './AppWindows'
+import { useLiquidGlass } from '../hooks/useLiquidGlass'
 import {
   applyScatterVars,
   applyWinRectToElement,
@@ -24,6 +30,11 @@ const SIZE_KEY = 'avi-call-agenda-size'
 const MIN_W = 280
 const MIN_H = 120
 const MAX_TASKS = 20
+
+type TaskbarSection = 'tasks' | 'tools'
+
+/** Apps que se lanzan desde «Herramientas»; cada una abre su propia ventana. */
+const TOOLS: AppId[] = ['phone', 'notes', 'contacts', 'guide']
 const RESIZE_EDGES: Edge[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
 
 export type AgendaSessionItem = {
@@ -39,11 +50,24 @@ type Size = { w: number; h: number }
 type Props = {
   sessions: AgendaSessionItem[]
   tucked?: boolean
+  /** Orden de apilado compartido con las fichas: al pulsar la agenda sube al frente. */
+  zIndex?: number
+  onFocus?: () => void
   onUntuck?: () => void
+  /** Botón «minimizar» de la agenda: la recoge en la píldora «Agenda». */
+  onTuck?: () => void
   onOpen: (id: string) => void
   onMinimize: (id: string) => void
   onClose: (id: string) => void
   onCloseAll: () => void
+}
+
+/** Tamaño «agrandado»: alto casi completo, centrado, sin tapar toda la pantalla. */
+function maximizedRect(): { x: number; y: number; w: number; h: number } {
+  const margin = 24
+  const w = Math.min(760, Math.max(MIN_W, window.innerWidth - margin * 2))
+  const h = Math.max(MIN_H, window.innerHeight - margin * 2)
+  return { x: Math.round((window.innerWidth - w) / 2), y: margin, w, h }
 }
 
 function loadJson<T>(key: string): T | null {
@@ -104,12 +128,24 @@ function reducedMotion(): boolean {
 export default function GestionBubbleDock({
   sessions,
   tucked = false,
+  zIndex,
+  onFocus,
   onUntuck,
+  onTuck,
   onOpen,
   onMinimize,
   onClose,
   onCloseAll,
 }: Props) {
+  const [maximized, setMaximized] = useState(false)
+  const preMaxRef = useRef<{ pos: Pos; size: Size } | null>(null)
+  const [section, setSection] = useState<TaskbarSection>('tasks')
+  const { call: liveCall, status: phoneStatus } = useSoftphone()
+  const appWindows = useApps()
+  const pinned = useTaskbarPinned()
+  // La barra existe si hay tareas o si está fijada (botón de cabecera / app minimizada).
+  const present = sessions.length > 0 || pinned
+  const minimizedApps = appWindows.filter((w) => w.minimized).length
   const [size, setSize] = useState<Size>(() => {
     const saved = loadJson<Size>(SIZE_KEY)
     if (saved?.w && saved?.h) return { w: Math.max(MIN_W, saved.w), h: Math.max(MIN_H, saved.h) }
@@ -121,12 +157,12 @@ export default function GestionBubbleDock({
     const s = loadJson<Size>(SIZE_KEY) ?? { w: 320, h: 280 }
     return saved ? clampPos(saved.x, saved.y, s.w, s.h) : defaultPos(s.w, s.h)
   })
-  const [mounted, setMounted] = useState(() => sessions.length > 0)
+  const [mounted, setMounted] = useState(() => present)
   const [phase, setPhase] = useState<'enter' | 'idle' | 'exiting'>(() =>
-    sessions.length > 0 && !reducedMotion() ? 'enter' : 'idle',
+    present && !reducedMotion() ? 'enter' : 'idle',
   )
   const [deskVisual, setDeskVisual] = useState<'panel' | 'tucking' | 'peek'>('panel')
-  const prevCountRef = useRef(sessions.length)
+  const prevPresentRef = useRef(present)
 
   const dragRef = useRef<{
     mode: 'move' | 'resize'
@@ -139,6 +175,8 @@ export default function GestionBubbleDock({
     sh: number
   } | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const glassDefs = useLiquidGlass(panelRef)
   const posRef = useRef(pos)
   const sizeRef = useRef(size)
   const liveRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null)
@@ -155,10 +193,55 @@ export default function GestionBubbleDock({
     sizeRef.current = size
   }, [size])
 
+  const maximizedRef = useRef(maximized)
   useEffect(() => {
-    const onResize = () => setPos((prev) => clampPos(prev.x, prev.y, sizeRef.current.w, sizeRef.current.h))
+    maximizedRef.current = maximized
+  }, [maximized])
+
+  useEffect(() => {
+    const onResize = () => {
+      if (maximizedRef.current) {
+        const r = maximizedRect()
+        setPos({ x: r.x, y: r.y })
+        setSize({ w: r.w, h: r.h })
+        return
+      }
+      // Pantalla más pequeña que la barra: encoge la barra antes de recolocarla.
+      const w = Math.max(MIN_W, Math.min(sizeRef.current.w, window.innerWidth - 16))
+      const h = Math.max(MIN_H, Math.min(sizeRef.current.h, window.innerHeight - 16))
+      if (w !== sizeRef.current.w || h !== sizeRef.current.h) setSize({ w, h })
+      setPos((prev) => clampPos(prev.x, prev.y, w, h))
+    }
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  const toggleMaximize = useCallback(() => {
+    if (maximizedRef.current) {
+      const prev = preMaxRef.current
+      preMaxRef.current = null
+      setMaximized(false)
+      if (prev) {
+        const nextPos = clampPos(prev.pos.x, prev.pos.y, prev.size.w, prev.size.h)
+        setPos(nextPos)
+        setSize(prev.size)
+        persistLayout(nextPos, prev.size)
+      }
+      return
+    }
+    preMaxRef.current = { pos: posRef.current, size: sizeRef.current }
+    const r = maximizedRect()
+    setMaximized(true)
+    setPos({ x: r.x, y: r.y })
+    setSize({ w: r.w, h: r.h })
+  }, [])
+
+  /** Arrastrar o redimensionar a mano deshace el modo agrandado (como una ventana). */
+  const leaveMaximized = useCallback(() => {
+    if (!maximizedRef.current) return
+    maximizedRef.current = false
+    preMaxRef.current = null
+    setMaximized(false)
   }, [])
 
   const applyLive = useCallback((next: { x: number; y: number; w: number; h: number }) => {
@@ -262,16 +345,16 @@ export default function GestionBubbleDock({
   }, [phase])
 
   useEffect(() => {
-    const prev = prevCountRef.current
-    prevCountRef.current = sessions.length
-    if (sessions.length > 0) {
+    const prev = prevPresentRef.current
+    prevPresentRef.current = present
+    if (present) {
       if (!mounted || phaseRef.current === 'exiting') {
         setMounted(true)
         setPhase(reducedMotion() ? 'idle' : 'enter')
       }
       return
     }
-    if (mounted && prev > 0) {
+    if (mounted && prev) {
       if (reducedMotion()) {
         setMounted(false)
         setPhase('idle')
@@ -279,7 +362,7 @@ export default function GestionBubbleDock({
         setPhase('exiting')
       }
     }
-  }, [sessions.length, mounted])
+  }, [present, mounted])
 
   const onPanelAnimEnd = useCallback((e: ReactAnimationEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget) return
@@ -309,7 +392,7 @@ export default function GestionBubbleDock({
   }, [phase])
 
   useEffect(() => {
-    if (tucked && sessions.length > 0) {
+    if (tucked && present) {
       if (deskVisual === 'peek') return
       if (reducedMotion()) {
         setDeskVisual('peek')
@@ -326,7 +409,7 @@ export default function GestionBubbleDock({
       setMounted(true)
       setPhase(reducedMotion() ? 'idle' : 'enter')
     }
-  }, [tucked, sessions.length, deskVisual])
+  }, [tucked, present, deskVisual])
 
   useEffect(() => {
     if (deskVisual !== 'tucking') return
@@ -340,6 +423,7 @@ export default function GestionBubbleDock({
       const target = e.target as HTMLElement
       if (target.closest('button, a, .call-agenda-list')) return
       e.preventDefault()
+      leaveMaximized()
       const p = posRef.current
       const s = sizeRef.current
       dragRef.current = {
@@ -355,7 +439,7 @@ export default function GestionBubbleDock({
       beginGesture()
       document.body.style.cursor = 'move'
     },
-    [beginGesture],
+    [beginGesture, leaveMaximized],
   )
 
   const startResize = useCallback(
@@ -363,6 +447,8 @@ export default function GestionBubbleDock({
       if (e.button !== 0) return
       e.stopPropagation()
       e.preventDefault()
+      onFocus?.()
+      leaveMaximized()
       const p = posRef.current
       const s = sizeRef.current
       const origin = { x: p.x, y: p.y, w: s.w, h: s.h }
@@ -380,28 +466,38 @@ export default function GestionBubbleDock({
       beginGesture()
       document.body.style.cursor = cursorForSides(sidesFromEdge(edge))
     },
-    [beginGesture],
+    [beginGesture, leaveMaximized, onFocus],
   )
 
-  if (deskVisual === 'peek' && sessions.length > 0) {
+  const onHeadDoubleClick = useCallback(
+    (e: ReactMouseEvent) => {
+      if ((e.target as HTMLElement).closest('button, a')) return
+      toggleMaximize()
+    },
+    [toggleMaximize],
+  )
+
+  if (deskVisual === 'peek' && present) {
     return (
       <button
         type="button"
         className="agenda-peek"
         onClick={onUntuck}
-        title="Mostrar agenda de tareas"
+        title="Mostrar barra de tareas"
       >
         <ListTodo size={16} />
-        <span>Agenda</span>
-        <em>{sessions.length}</em>
+        <span>Tareas</span>
+        <em>{sessions.length + minimizedApps}</em>
       </button>
     )
   }
 
-  if (!mounted && sessions.length === 0) return null
   if (!mounted) return null
 
   const openCount = sessions.filter((s) => !s.minimized).length
+  // Sin tareas, el botón rojo cierra la barra (la desfija); con tareas, las vacía.
+  const closeAction = sessions.length > 0 ? onCloseAll : () => apps.unpinTaskbar()
+  const closeLabel = sessions.length > 0 ? 'Vaciar tareas' : 'Cerrar barra'
   const phaseClass =
     deskVisual === 'tucking'
       ? ' is-tucking'
@@ -411,38 +507,127 @@ export default function GestionBubbleDock({
           ? ' is-exiting'
           : ''
 
+  const busy = phase === 'exiting' || deskVisual === 'tucking'
+  const rootStyle: CSSProperties = { left: pos.x, top: pos.y, width: size.w, height: size.h }
+  if (zIndex != null) rootStyle.zIndex = zIndex
+
   return (
     <div
       ref={rootRef}
-      className={`call-agenda-root is-panel${phaseClass}`}
-      style={{ left: pos.x, top: pos.y, width: size.w, height: size.h }}
+      className={`call-agenda-root is-panel${phaseClass}${maximized ? ' is-maximized' : ''}`}
+      style={rootStyle}
+      onPointerDown={onFocus}
     >
-      <div className="call-agenda-panel" onAnimationEnd={onPanelAnimEnd}>
-        <header className="call-agenda-panel-head" onPointerDown={startMove}>
+      <div ref={panelRef} className="call-agenda-panel" onAnimationEnd={onPanelAnimEnd}>
+        {glassDefs}
+        <header className="call-agenda-panel-head" onPointerDown={startMove} onDoubleClick={onHeadDoubleClick}>
           <div className="call-agenda-spine" aria-hidden>
             <GripVertical size={14} />
+          </div>
+          <div className="lead-window-controls call-agenda-controls" role="toolbar" aria-label="Controles de la barra">
+            <button
+              type="button"
+              className="lead-traffic close call-agenda-clear"
+              title={closeLabel}
+              aria-label={closeLabel}
+              onClick={closeAction}
+              disabled={busy}
+            />
+            <button
+              type="button"
+              className="lead-traffic minimize"
+              title="Minimizar barra"
+              aria-label="Minimizar barra"
+              onClick={onTuck}
+              disabled={busy || !onTuck}
+            />
+            <button
+              type="button"
+              className="lead-traffic zoom"
+              title={maximized ? 'Restaurar tamaño' : 'Agrandar barra'}
+              aria-label={maximized ? 'Restaurar tamaño' : 'Agrandar barra'}
+              onClick={toggleMaximize}
+              disabled={busy}
+            />
           </div>
           <div className="call-agenda-panel-title">
             <span className="call-agenda-eyebrow">
               <ListTodo size={12} />
-              Agenda de tareas
+              Barra de tareas
             </span>
             <strong>
-              {sessions.length}/{MAX_TASKS} tareas
-              {openCount > 0 ? ` · ${openCount} abiertas` : ''}
+              {section === 'tools'
+                ? `Herramientas${appWindows.length > 0 ? ` · ${appWindows.length} ${appWindows.length === 1 ? 'abierta' : 'abiertas'}` : ''}`
+                : `${sessions.length}/${MAX_TASKS} tareas${openCount > 0 ? ` · ${openCount} abiertas` : ''}`}
             </strong>
           </div>
-          <button
-            type="button"
-            className="ghost-button lead-icon-btn call-agenda-clear"
-            title="Vaciar agenda"
-            onClick={onCloseAll}
-            disabled={sessions.length === 0 || phase === 'exiting' || deskVisual === 'tucking'}
-          >
-            <X size={15} />
-          </button>
         </header>
 
+        <div className="taskbar-tabs" role="tablist" aria-label="Secciones de la barra">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={section === 'tasks'}
+            className={`taskbar-tab${section === 'tasks' ? ' is-active' : ''}`}
+            onClick={() => setSection('tasks')}
+          >
+            <ListTodo size={13} aria-hidden />
+            Tareas
+            <em>{sessions.length}</em>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={section === 'tools'}
+            className={`taskbar-tab${section === 'tools' ? ' is-active' : ''}`}
+            onClick={() => setSection('tools')}
+          >
+            <Wrench size={13} aria-hidden />
+            Herramientas
+            {liveCall ? <span className="taskbar-tab-dot" aria-label="Llamada en curso" /> : null}
+          </button>
+        </div>
+
+        {section === 'tools' ? (
+          <div className="taskbar-tools">
+            {TOOLS.map((id) => {
+              const meta = APP_META[id]
+              const win = appWindows.find((w) => w.id === id)
+              const state = win ? (win.minimized ? 'Minimizada · pulsa para restaurar' : 'Abierta · pulsa para traer al frente') : null
+              const phoneHint = liveCall
+                ? 'Llamada en curso'
+                : phoneStatus === 'ready'
+                  ? meta.hint
+                  : phoneStatus === 'connecting'
+                    ? 'Conectando…'
+                    : phoneStatus === 'off'
+                      ? 'Sin configurar'
+                      : 'Sin conexión'
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className={`taskbar-tool-tile lg-surface${win ? (win.minimized ? ' is-minimized' : ' is-open') : ''}`}
+                  onClick={() => apps.open(id)}
+                  title={win ? (win.minimized ? `Restaurar ${meta.label}` : `Traer ${meta.label} al frente`) : `Abrir ${meta.label}`}
+                >
+                  <span className={`taskbar-tool-icon is-${id}`} aria-hidden>
+                    <AppIcon id={id} size={20} />
+                  </span>
+                  <strong>{meta.label}</strong>
+                  <span>{state ?? (id === 'phone' ? phoneHint : meta.hint)}</span>
+                  {win ? <i className="taskbar-tool-running" aria-hidden /> : null}
+                </button>
+              )
+            })}
+          </div>
+        ) : sessions.length === 0 ? (
+          <div className="taskbar-empty">
+            <ListTodo size={22} aria-hidden />
+            <strong>Sin tareas abiertas</strong>
+            <span>Abre un cliente desde el tablero o la lista y aparecerá aquí.</span>
+          </div>
+        ) : (
         <ul className="call-agenda-list custom-scrollbar-light">
           {sessions.map((session) => {
             const { name, phone, detail } = sessionLabel(session.peticion)
@@ -494,6 +679,25 @@ export default function GestionBubbleDock({
             )
           })}
         </ul>
+        )}
+
+        {appWindows.length > 0 ? (
+          <div className="taskbar-dock" role="toolbar" aria-label="Apps abiertas">
+            {appWindows.map((w) => (
+              <button
+                key={w.id}
+                type="button"
+                className={`taskbar-dock-app is-${w.id}${w.minimized ? ' is-minimized' : ''}`}
+                onClick={() => apps.open(w.id)}
+                title={w.minimized ? `Restaurar ${APP_META[w.id].label}` : `Traer ${APP_META[w.id].label} al frente`}
+                aria-label={`${APP_META[w.id].label}${w.minimized ? ' (minimizada)' : ''}`}
+              >
+                <AppIcon id={w.id} size={15} />
+                <i aria-hidden />
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {RESIZE_EDGES.map((edge) => (

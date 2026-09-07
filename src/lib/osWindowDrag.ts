@@ -74,6 +74,33 @@ export function applyWinRectToElement(el: HTMLElement, rect: WinRect): void {
   el.style.height = `${rect.h}px`
 }
 
+/** Vector hacia la barra de tareas para el minimizado «dock» (la ventana vuela hacia ella). */
+export function applyDockVars(el: HTMLElement): void {
+  const dock = document.querySelector('.call-agenda-root:not(.is-tucking)') as HTMLElement | null
+  const win = el.getBoundingClientRect()
+  const winCx = win.left + win.width / 2
+  const winCy = win.top + win.height / 2
+  let dockCx = window.innerWidth - 96
+  let dockCy = window.innerHeight - 96
+  if (dock) {
+    const d = dock.getBoundingClientRect()
+    dockCx = d.left + d.width / 2
+    dockCy = d.top + Math.min(36, d.height / 2)
+  }
+  el.style.setProperty('--dock-dx', `${dockCx - winCx}px`)
+  el.style.setProperty('--dock-dy', `${dockCy - winCy}px`)
+}
+
+/** Pequeño «rebote» de la barra de tareas al recoger una ventana minimizada. */
+export function pulseAgendaCatch(): void {
+  const dock = document.querySelector('.call-agenda-root:not(.is-tucked)')
+  if (!dock) return
+  dock.classList.remove('is-catching')
+  void (dock as HTMLElement).offsetWidth
+  dock.classList.add('is-catching')
+  window.setTimeout(() => dock.classList.remove('is-catching'), 700)
+}
+
 /** Dirección aleatoria fuera de pantalla para el minimizado “scatter”. */
 export function applyScatterVars(el: HTMLElement, staggerMs = 0): void {
   const angle = Math.random() * Math.PI * 2

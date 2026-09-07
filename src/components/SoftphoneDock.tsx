@@ -14,14 +14,8 @@ import {
   RefreshCw,
   X,
 } from 'lucide-react'
-import {
-  softphone,
-  toDialNumber,
-  useSoftphone,
-  type ActiveCall,
-  type FinishedCall,
-  type TranscriptLine,
-} from '../lib/softphone'
+import { softphone, useSoftphone, type ActiveCall, type FinishedCall, type TranscriptLine } from '../lib/softphone'
+import { apps, useApps } from '../lib/apps'
 
 const AFTER_CALL_MS = 9000
 
@@ -138,86 +132,10 @@ function AfterCallCard({ call, onClose }: { call: FinishedCall; onClose: () => v
   )
 }
 
-/** Marcador manual: cualquier número, p. ej. para llamarte a ti mismo y probar el softphone. */
-function SoftphoneDialer({ callerId, onClose }: { callerId: string | null; onClose: () => void }) {
-  const [value, setValue] = useState('')
-  const [busy, setBusy] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
-  const rootRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    inputRef.current?.focus()
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    document.addEventListener('mousedown', onDown)
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.removeEventListener('mousedown', onDown)
-    }
-  }, [onClose])
-
-  const number = toDialNumber(value)
-  const valid = /^\+\d{9,15}$/.test(number)
-
-  const dial = async () => {
-    if (!valid || busy) return
-    setBusy(true)
-    const ok = await softphone.call(number, { label: number })
-    setBusy(false)
-    if (ok) onClose()
-  }
-
-  return (
-    <div className="softphone-dialer glass" ref={rootRef} role="dialog" aria-label="Marcar número">
-      <p className="section-eyebrow">Marcar número</p>
-      <form
-        className="softphone-dialer-row"
-        onSubmit={(e) => {
-          e.preventDefault()
-          void dial()
-        }}
-      >
-        <input
-          ref={inputRef}
-          className="softphone-dialer-input font-mono"
-          type="tel"
-          inputMode="tel"
-          autoComplete="off"
-          placeholder="+34 600 000 000"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          aria-label="Número a marcar"
-        />
-        <button type="submit" className="client-submit softphone-dialer-call" disabled={!valid || busy}>
-          <Phone size={16} aria-hidden />
-          Llamar
-        </button>
-      </form>
-      <p className="softphone-dialer-hint">
-        {callerId ? (
-          <>
-            El cliente verá <strong className="font-mono">{callerId}</strong>
-          </>
-        ) : (
-          'Sin número de salida asignado: la llamada puede fallar.'
-        )}
-      </p>
-    </div>
-  )
-}
-
 /** Estado del teléfono para el sidebar: listo / conectando / sin conexión. Oculto si no está configurado. */
 export function SoftphoneStatusChip() {
   const { status, callerId, call } = useSoftphone()
-  const [dialer, setDialer] = useState(false)
-  useEffect(() => {
-    if (call || status !== 'ready') setDialer(false)
-  }, [call, status])
+  const phoneOpen = useApps().some((w) => w.id === 'phone' && !w.minimized)
   if (status === 'off') return null
   const label =
     call
@@ -229,19 +147,19 @@ export function SoftphoneStatusChip() {
         : status === 'connecting'
           ? 'Conectando teléfono…'
           : 'Teléfono sin conexión'
-  const interactive = status === 'error' || (status === 'ready' && !call)
+  // En llamada también se abre: el teclado envía tonos (DTMF).
+  const interactive = status === 'error' || status === 'ready'
   return (
     <div className="softphone-chip-wrap">
-      {dialer ? <SoftphoneDialer callerId={callerId} onClose={() => setDialer(false)} /> : null}
       <button
         type="button"
-        className={`softphone-chip is-${call ? 'call' : status} ${interactive ? 'is-interactive' : ''}`}
+        className={`softphone-chip is-${call ? 'call' : status} ${interactive ? 'is-interactive' : ''}${phoneOpen ? ' is-open' : ''}`}
         onClick={() => {
           if (status === 'error') void softphone.connect()
-          else if (interactive) setDialer((v) => !v)
+          else if (interactive) apps.open('phone')
         }}
-        title={status === 'error' ? 'Reintentar conexión' : status === 'ready' && !call ? 'Marcar un número' : label}
-        aria-expanded={status === 'ready' ? dialer : undefined}
+        title={status === 'error' ? 'Reintentar conexión' : status === 'ready' ? 'Abrir teléfono' : label}
+        aria-pressed={status === 'ready' ? phoneOpen : undefined}
         disabled={!interactive}
       >
         <span className="softphone-chip-dot" aria-hidden />

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { Bell, Moon, Search, Server, Sparkles, Sun } from 'lucide-react'
+import { Bell, LayoutGrid, Moon, Search, Server, Sparkles, Sun } from 'lucide-react'
+import { OPEN_TASKBAR_EVENT, useTaskbarVisible } from '../lib/apps'
 import { headerNoticeItems, searchPeticionesAi } from '../lib/aiHeaderSearch'
 import { resolveDateRange } from '../lib/dateRangePresets'
 import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
@@ -109,6 +110,7 @@ export default function ViewPageHeader({
   const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [noticesOpen, setNoticesOpen] = useState(false)
+  const taskbarVisible = useTaskbarVisible()
   const [syncing, setSyncing] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
   const noticesRef = useRef<HTMLDivElement>(null)
@@ -243,6 +245,17 @@ export default function ViewPageHeader({
         >
           {isDarkMode ? <Sun size={16} aria-hidden /> : <Moon size={16} aria-hidden />}
           {isDarkMode ? 'Claro' : 'Oscuro'}
+        </button>
+
+        <button
+          type="button"
+          className={`view-page-bell-btn view-page-taskbar-btn${taskbarVisible ? ' is-open' : ''}`}
+          onClick={() => window.dispatchEvent(new CustomEvent(OPEN_TASKBAR_EVENT))}
+          title={taskbarVisible ? 'Minimizar barra de tareas' : 'Abrir barra de tareas'}
+          aria-label={taskbarVisible ? 'Minimizar barra de tareas' : 'Abrir barra de tareas'}
+          aria-pressed={taskbarVisible}
+        >
+          <LayoutGrid size={18} aria-hidden />
         </button>
 
         <div className="view-page-bell" ref={noticesRef}>

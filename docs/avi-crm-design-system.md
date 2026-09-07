@@ -163,6 +163,36 @@ lleva sombra propia y usa fondos semitransparentes blancos (`rgba(255,255,255,0.
 > Nota: `backdrop-filter` necesita algo detrás para difuminar. Usa siempre un
 > `--page` claro de fondo. En navegadores sin soporte, degrada al gradiente blanco.
 
+### 4.1 Liquid glass (ventanas del escritorio)
+
+Las fichas, apps y la barra de tareas (`.lead-os-frame`, `.call-agenda-panel`) no
+son un `glass` plano: el marco es transparente y el vidrio son dos capas físicas.
+
+Tokens propios con prefijo `--lgw-*` (no reutilizar `--glass-*`, que ya son los
+tokens de la superficie `.glass`: `--glass-blur` es una longitud y `--glass-sheen`
+un número; mezclarlos invalida las declaraciones).
+
+- `::before` cuerpo esmerilado — `blur(64px) saturate(1.4)`, tinte `--lgw-bg`
+  (86 % blanco / 86 % gris-azul en oscuro: vidrio translúcido, el fondo se ve
+  como una mancha borrosa de color; el contenido siempre se lee), reflejo diagonal
+  `--lgw-sheen` y una luz `--lg-light` que sigue al puntero (`--lg-mx / --lg-my`).
+  Es una capa más pequeña (`inset: var(--lg-rim)`) que tapa el centro del anillo;
+  no se usan máscaras (backdrop-filter + mask es frágil entre navegadores).
+- `::after` anillo refractivo de `--lg-rim` (16 px) — muestra el fondo **sin blur**
+  pero desplazado hacia dentro con `feDisplacementMap` (lente biconvexa: centro
+  plano, canto curvo), con aberración cromática (R/G/B se desvían ±9 %), brillo y
+  saturación (`--lg-rim-fx`) y Fresnel: resplandor que nace en el filo, línea
+  especular arriba y arista en sombra abajo/derecha (`--lg-rim-shadow`).
+- El mapa de desplazamiento lo genera `useLiquidGlass(frameRef)` a la medida de
+  cada ventana a partir de la SDF del rectángulo redondeado (esquinas correctas,
+  canvas a 1/4 de resolución) y lo inyecta como `<svg class="lg-defs">` dentro del
+  marco; el CSS lo recibe en `--lg-filter`. Se rehace al redimensionar.
+- Fallbacks: Safari ignora `backdrop-filter: url()` → anillo con tinte y brillo pero
+  sin refracción; sin `backdrop-filter` → superficies casi opacas;
+  `prefers-reduced-transparency` → menos blur y tinte al 92 %.
+- No anidar más `backdrop-filter` dentro de una ventana (teclas, tiles, tarjetas):
+  ya están sobre vidrio y solo cuesta GPU.
+
 ---
 
 ## 5. Botones (patrones)

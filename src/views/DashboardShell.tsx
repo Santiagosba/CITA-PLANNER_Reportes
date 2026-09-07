@@ -4,6 +4,8 @@ import AppShell from '../components/AppShell'
 import ViewPageHeader from '../components/ViewPageHeader'
 import GestionBubbleDock, { MAX_TASKS, type AgendaSessionItem } from '../components/GestionBubbleDock'
 import SoftphoneDock from '../components/SoftphoneDock'
+import AppWindows from '../components/AppWindows'
+import { OPEN_TASKBAR_EVENT, apps, setAppZProvider, useTaskbarPinned } from '../lib/apps'
 import LeadGestionDrawer, { type WinRect } from '../components/LeadGestionDrawer'
 import NewInboundDrawer from '../components/NewInboundDrawer'
 import type { ActionStatus } from '../components/ui/ActionButton'
@@ -161,6 +163,9 @@ export default function DashboardShell({
   const [agendaTucked, setAgendaTucked] = useState(false)
   const [sideMinWave, setSideMinWave] = useState(0)
   const zRef = useRef(100)
+  // La agenda comparte el orden de apilado con las fichas: nace por debajo de la
+  // primera ficha y sube al frente cuando se pulsa.
+  const [agendaZ, setAgendaZ] = useState(99)
   const canEditHubBranding = isGlobalAviAdmin({ user: sessionUser })
 
   useEffect(() => {
@@ -173,6 +178,11 @@ export default function DashboardShell({
     zRef.current += 1
     return zRef.current
   }, [])
+
+  // Las apps (teléfono, notas) se apilan con las fichas y la barra.
+  useEffect(() => {
+    setAppZProvider(bumpZ)
+  }, [bumpZ])
 
   const openLead = useCallback(
     (peticion: PeticionPendiente) => {
@@ -265,6 +275,7 @@ export default function DashboardShell({
 
   const restoreDesk = useCallback(() => {
     setAgendaTucked(false)
+    apps.restoreAll()
     setSessions((prev) => {
       const hidden = prev.filter((s) => s.minimized)
       if (hidden.length === 0) return prev
@@ -280,9 +291,44 @@ export default function DashboardShell({
     })
   }, [])
 
+  const focusAgenda = useCallback(() => {
+    setAgendaZ(bumpZ())
+  }, [bumpZ])
+
   const untuckAgenda = useCallback(() => {
     setAgendaTucked(false)
+    setAgendaZ(bumpZ())
+  }, [bumpZ])
+
+  const tuckAgenda = useCallback(() => {
+    setAgendaTucked(true)
   }, [])
+
+  // Botón de la cabecera (junto a la campana): alterna la barra. Si está
+  // desplegada la recoge; si está recogida o no existe, la fija y la trae al frente.
+  const taskbarPinned = useTaskbarPinned()
+  const taskbarPresent = sessions.length > 0 || taskbarPinned
+  const taskbarVisible = taskbarPresent && !agendaTucked
+  useEffect(() => {
+    apps.setTaskbarVisible(taskbarVisible)
+  }, [taskbarVisible])
+  const taskbarVisibleRef = useRef(taskbarVisible)
+  useEffect(() => {
+    taskbarVisibleRef.current = taskbarVisible
+  }, [taskbarVisible])
+
+  useEffect(() => {
+    const toggle = () => {
+      if (taskbarVisibleRef.current) {
+        tuckAgenda()
+        return
+      }
+      apps.pinTaskbar()
+      untuckAgenda()
+    }
+    window.addEventListener(OPEN_TASKBAR_EVENT, toggle)
+    return () => window.removeEventListener(OPEN_TASKBAR_EVENT, toggle)
+  }, [tuckAgenda, untuckAgenda])
 
   const openWindows = useMemo(() => sessions.filter((s) => !s.minimized), [sessions])
   const openWindowsRef = useRef(openWindows)
@@ -330,14 +376,24 @@ export default function DashboardShell({
   }, [lastCall, operationalItems, openLead])
 
   useEffect(() => {
+    const appWindows = () => apps.getState().windows
+    const openAppCount = () => appWindows().filter((w) => !w.minimized).length
+    const hasOpenWindows = () => openWindowsRef.current.length > 0 || openAppCount() > 0
+
+    const taskbarPresent = () => sessionsRef.current.length > 0 || apps.getState().taskbarPinned
+
     const hasMinimizedDesk = () => {
       const sessions = sessionsRef.current
-      return sessions.some((s) => s.minimized) || (sessions.length > 0 && agendaTuckedRef.current)
+      return (
+        sessions.some((s) => s.minimized) ||
+        appWindows().some((w) => w.minimized) ||
+        (taskbarPresent() && agendaTuckedRef.current)
+      )
     }
 
     const tuckDesk = () => {
-      const hasWindows = openWindowsRef.current.length > 0
-      const hasAgenda = sessionsRef.current.length > 0 && !agendaTuckedRef.current
+      const hasWindows = hasOpenWindows()
+      const hasAgenda = taskbarPresent() && !agendaTuckedRef.current
       if (!hasWindows && !hasAgenda) return
       if (hasWindows) minimizeAllToSides()
       if (hasAgenda) setAgendaTucked(true)
@@ -347,17 +403,32 @@ export default function DashboardShell({
       if (e.button !== 0) return
       const t = e.target as HTMLElement | null
       if (!t) return
-      if (t.closest('.lead-os-window')) return
-      if (t.closest('.inbound-modal-root, .gestion-capacity-toast, .agenda-peek, .softphone-dock, .softphone-toast')) return
+
+      // Escritorio: una ficha o la agenda traen su propia ventana al frente
+      // (lo hacen ellas mismas con onFocus); nunca minimizan el resto.
+      if (t.closest('.lead-os-window, .call-agenda-root')) return
+      if (
+        t.closest(
+          '.inbound-modal-root, .gestion-capacity-toast, .agenda-peek, .softphone-dock, .softphone-toast, .view-page-search',
+        )
+      ) {
+        return
+      }
+
+      // El chip del teléfono abre su app: no toca el escritorio.
+      if (t.closest('.softphone-chip')) return
 
       // Sidebar (Dashboard, triage, etc.): primer clic guarda, segundo restaura
       if (t.closest('.dashboard-sidebar')) {
-        if (openWindowsRef.current.length > 0) tuckDesk()
+        if (hasOpenWindows()) tuckDesk()
         else if (hasMinimizedDesk()) restoreDesk()
         return
       }
 
-      // Clicks en tareas/controles del CRM: abrir o navegar, no minimizar el escritorio
+      // Apartados «importantes»: controles y elementos que abren o navegan
+      // (tarjetas kanban, filas, eventos, botones…). Se dejan pasar sin tocar
+      // el escritorio. Los contenedores (cabecera, paneles, fondo) no cuentan:
+      // pulsar en su superficie libre minimiza todo, como en un escritorio.
       if (
         t.closest(
           [
@@ -375,6 +446,7 @@ export default function DashboardShell({
             '[role="option"]',
             '[role="checkbox"]',
             '[role="switch"]',
+            '[contenteditable]',
             '.ops-feed-row',
             '.report-row-clickable',
             '.prow',
@@ -392,37 +464,13 @@ export default function DashboardShell({
             '.is-clickable',
             '.kanban-card',
             '.kanban-card-slot',
-            '.queue-full',
-            '.queue-filterbar',
-            '.elevator-filters',
-            '.avance-strip',
-            '.bento-grid',
-            '.period-custom',
-            '.dashboard-header',
-            '.triage-view-switch',
-            '.agenda-day-group',
-            '.report-table',
-            '.calendar-agenda',
-            '.ops-kpi',
-            '.ops-feed-row',
           ].join(', '),
         )
       ) {
         return
       }
 
-      const onAgenda = t.closest('.call-agenda-root')
-      if (onAgenda) {
-        if (t.closest('.call-agenda-item-main, .call-agenda-item-actions, .call-agenda-clear')) return
-        if (openWindowsRef.current.length > 0) {
-          minimizeAllToSides()
-          return
-        }
-        if (hasMinimizedDesk()) restoreDesk()
-        return
-      }
-
-      if (openWindowsRef.current.length === 0 && hasMinimizedDesk()) {
+      if (!hasOpenWindows() && hasMinimizedDesk()) {
         restoreDesk()
         return
       }
@@ -627,10 +675,15 @@ export default function DashboardShell({
                 />
               ))}
 
+              <AppWindows minimizeRequest={sideMinWave} staggerOffset={openWindows.length} />
+
               <GestionBubbleDock
                 sessions={agendaSessions}
                 tucked={agendaTucked}
+                zIndex={agendaZ}
+                onFocus={focusAgenda}
                 onUntuck={untuckAgenda}
+                onTuck={tuckAgenda}
                 onOpen={focusSession}
                 onMinimize={minimizeSession}
                 onClose={closeSession}

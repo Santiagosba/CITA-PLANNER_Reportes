@@ -7252,9 +7252,20 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   text-transform: uppercase;
 }
 
-.call-agenda-clear {
+/* Semáforo cerrar / minimizar / agrandar, como en las fichas. */
+.call-agenda-controls {
   align-self: center;
-  margin-right: 8px;
+  padding: 0 4px 0 10px;
+}
+
+.call-agenda-controls .lead-traffic:disabled {
+  cursor: default;
+  filter: grayscale(0.7);
+  opacity: 0.55;
+}
+
+.call-agenda-root.is-maximized .call-agenda-panel {
+  box-shadow: 0 28px 64px rgba(15, 23, 42, 0.28);
 }
 
 .call-agenda-list {
@@ -8196,82 +8207,1701 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   position: relative;
 }
 
-/* Marcador manual: se despliega sobre el chip del sidebar. */
-.softphone-dialer {
+/* El chip marca cuándo la app Teléfono está abierta en el escritorio. */
+.softphone-chip.is-open {
+  border-color: rgba(11, 99, 214, 0.35);
+  box-shadow: 0 0 0 3px rgba(11, 99, 214, 0.1);
+}
+
+/* ══ Ventanas de app (teléfono, notas): misma mecánica que las fichas ══ */
+.lead-os-window.tool-window {
+  min-width: var(--tool-min-w, 320px);
+  min-height: var(--tool-min-h, 320px);
+}
+
+.tool-window-frame {
+  display: flex;
+  flex-direction: column;
+}
+
+.lead-os-window.is-gesturing .tool-window-body {
+  pointer-events: none;
+}
+
+.tool-window-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  min-height: 46px;
+  padding: 8px 14px 8px 12px;
+  border-bottom: 1px solid rgba(15, 17, 21, 0.08);
+  background: rgba(246, 248, 251, 0.96);
+}
+
+.dashboard-shell:not(.is-light) .tool-window-titlebar {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+  background: rgba(22, 26, 32, 0.98);
+}
+
+.tool-window-titlebar .lead-window-controls {
+  padding: 0;
+}
+
+.tool-window-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fog-strong);
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+}
+
+.tool-window-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 3px 8px rgba(15, 23, 42, 0.16);
+}
+
+.tool-window.app-phone .tool-window-icon {
+  background: linear-gradient(180deg, #34d058, #16a34a);
+}
+
+.tool-window.app-notes .tool-window-icon {
+  background: linear-gradient(180deg, #fbbf24, #d97706);
+}
+
+.tool-window.app-contacts .tool-window-icon {
+  background: linear-gradient(180deg, #60a5fa, #1d4ed8);
+}
+
+.tool-window.app-guide .tool-window-icon {
+  background: linear-gradient(180deg, #c084fc, #7e22ce);
+}
+
+.tool-window.app-contacts .contacts-app,
+.tool-window.app-guide .guide-app {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Botón «Barra de tareas» en la cabecera, a la izquierda de la campana */
+.view-page-taskbar-btn {
+  margin-right: -2px;
+}
+
+/* ══ Barra de tareas: estado vacío y dock de apps ══ */
+.taskbar-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 18px 16px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.taskbar-empty strong {
+  color: var(--fog-strong);
+  font-size: 13px;
+}
+
+.taskbar-empty span {
+  font-size: 12px;
+  line-height: 1.4;
+  max-width: 240px;
+}
+
+.dashboard-shell:not(.is-light) .taskbar-empty strong {
+  color: #f4f6fa;
+}
+
+.taskbar-dock {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 8px 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(15, 17, 21, 0.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.dashboard-shell:not(.is-light) .taskbar-dock {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: none;
+}
+
+.taskbar-dock-app {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 10px rgba(15, 23, 42, 0.14);
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1), filter 160ms ease;
+}
+
+.taskbar-dock-app:hover {
+  transform: translateY(-3px) scale(1.06);
+}
+
+.taskbar-dock-app.is-minimized {
+  filter: saturate(0.5) brightness(0.92);
+}
+
+.taskbar-dock-app i {
   position: absolute;
-  left: 4px;
-  right: 4px;
-  bottom: calc(100% + 8px);
-  z-index: 60;
+  left: 50%;
+  bottom: -6px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--fog-strong);
+  transform: translateX(-50%);
+  opacity: 0.7;
+}
+
+.taskbar-dock-app.is-minimized i {
+  opacity: 0.35;
+}
+
+.dashboard-shell:not(.is-light) .taskbar-dock-app i {
+  background: #f4f6fa;
+}
+
+.taskbar-dock-app.is-phone,
+.taskbar-tool-icon.is-phone {
+  background: linear-gradient(180deg, #34d058, #16a34a);
+}
+
+.taskbar-dock-app.is-notes,
+.taskbar-tool-icon.is-notes {
+  background: linear-gradient(180deg, #fbbf24, #d97706);
+}
+
+.taskbar-dock-app.is-contacts,
+.taskbar-tool-icon.is-contacts {
+  background: linear-gradient(180deg, #60a5fa, #1d4ed8);
+}
+
+.taskbar-dock-app.is-guide,
+.taskbar-tool-icon.is-guide {
+  background: linear-gradient(180deg, #c084fc, #7e22ce);
+}
+
+/* ══ Contactos importantes ══ */
+.contacts-app {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 14px;
-  border-radius: var(--radius-lg);
-  border: 1px solid rgba(15, 17, 21, 0.1);
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow:
-    inset 0 1px 0 #fff,
-    0 18px 40px rgba(15, 23, 42, 0.18);
-  animation: softphone-dialer-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@keyframes softphone-dialer-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.softphone-dialer-row {
+.contacts-bar {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
 }
 
-.softphone-dialer-input {
+.contacts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.contacts-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+}
+
+.contacts-avatar {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 5px 12px rgba(15, 23, 42, 0.14);
+  background: linear-gradient(180deg, #94a3b8, #475569);
+}
+
+.contacts-card.kind-admin .contacts-avatar {
+  background: linear-gradient(180deg, #60a5fa, #1d4ed8);
+}
+
+.contacts-card.kind-it .contacts-avatar {
+  background: linear-gradient(180deg, #a78bfa, #6d28d9);
+}
+
+.contacts-card.kind-calls .contacts-avatar {
+  background: linear-gradient(180deg, #34d058, #16a34a);
+}
+
+.contacts-main {
   flex: 1 1 auto;
   min-width: 0;
-  min-height: var(--tap-target);
-  padding: 0 12px;
-  border-radius: var(--radius-md);
-  border: 1px solid rgba(15, 17, 21, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.contacts-kind {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.contacts-main strong {
+  font-size: 14px;
+  font-weight: 750;
+  color: var(--fog-strong);
+}
+
+.contacts-role {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.contacts-lines {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--fog-strong);
+}
+
+.contacts-hours {
+  color: var(--muted);
+}
+
+.contacts-missing {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-brand);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
+.contacts-actions {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.contacts-call {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: linear-gradient(180deg, #34d058, #16a34a);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 6px 14px rgba(22, 163, 74, 0.28);
+  transition: transform 140ms ease;
+}
+
+.contacts-call:hover {
+  transform: translateY(-1px) scale(1.04);
+}
+
+.contacts-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+  padding: 12px;
+}
+
+.contacts-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.contacts-field span {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.contacts-field input,
+.contacts-field select {
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 17, 21, 0.12);
   background: #fff;
   color: var(--fog-strong);
-  font-size: 16px;
-  letter-spacing: 0.02em;
+  font: inherit;
+  font-size: 13px;
 }
 
-.softphone-dialer-input:focus {
+.contacts-field input:focus,
+.contacts-field select:focus {
   outline: none;
   border-color: var(--color-brand);
-  box-shadow: 0 0 0 3px rgba(11, 99, 214, 0.15);
+  box-shadow: 0 0 0 3px rgba(11, 99, 214, 0.14);
 }
 
-.softphone-dialer-call {
-  flex: 0 0 auto;
-  min-height: var(--tap-target);
+.contacts-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.contacts-form-actions .client-submit {
+  min-height: 36px;
   padding: 0 14px;
+  font-size: 12px;
+  gap: 4px;
 }
 
-.softphone-dialer-hint {
+.dashboard-shell:not(.is-light) .contacts-main strong,
+.dashboard-shell:not(.is-light) .contacts-lines {
+  color: #f4f6fa;
+}
+
+.dashboard-shell:not(.is-light) .contacts-field input,
+.dashboard-shell:not(.is-light) .contacts-field select {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f4f6fa;
+}
+
+/* ══ Guía: consejos y guion ══ */
+.guide-app {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guide-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.guide-section {
+  padding: 0;
+}
+
+.guide-section summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: inherit;
+  color: var(--fog-strong);
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.guide-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.guide-section summary::after {
+  content: '';
+  margin-left: auto;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform 160ms ease;
+}
+
+.guide-section[open] summary::after {
+  transform: rotate(45deg);
+}
+
+.guide-section ul {
+  margin: 0;
+  padding: 0 14px 14px 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--fog-strong);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.guide-section li::marker {
+  color: var(--color-brand);
+}
+
+.dashboard-shell:not(.is-light) .guide-section summary,
+.dashboard-shell:not(.is-light) .guide-section ul {
+  color: #f4f6fa;
+}
+
+.tool-window-meta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tool-window-meta .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tool-window-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px 16px;
+  overflow-y: auto;
+}
+
+.dashboard-shell:not(.is-light) .tool-window-title {
+  color: #f4f6fa;
+}
+
+/* Fondo suave tipo escritorio detrás del teclado */
+.tool-window.app-phone .tool-window-body {
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(11, 99, 214, 0.08), rgba(11, 99, 214, 0) 60%),
+    linear-gradient(180deg, rgba(246, 248, 251, 0.9), rgba(238, 241, 245, 0.9));
+}
+
+.dashboard-shell:not(.is-light) .tool-window.app-phone .tool-window-body {
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(93, 160, 255, 0.12), rgba(93, 160, 255, 0) 60%),
+    linear-gradient(180deg, rgba(20, 23, 30, 0.9), rgba(16, 18, 24, 0.9));
+}
+
+/* En la app el teléfono respira: teclas más altas y display grande. */
+.tool-window.app-phone .phone-pad {
+  flex: 1;
+  gap: 14px;
+}
+
+.tool-window.app-phone .phone-keypad {
+  gap: 14px 26px;
+}
+
+.tool-window.app-phone .lg-key {
+  width: 76px;
+  height: 76px;
+}
+
+.tool-window.app-phone .lg-key-digit {
+  font-size: 30px;
+}
+
+.tool-window.app-phone .lg-key-sub {
+  font-size: 10px;
+}
+
+.tool-window.app-phone .lg-call {
+  width: 76px;
+  height: 76px;
+  min-height: 76px;
+}
+
+.tool-window.app-phone .lg-call svg {
+  width: 30px;
+  height: 30px;
+}
+
+.tool-window.app-phone .phone-pad-display {
+  min-height: 64px;
+}
+
+.tool-window.app-phone .phone-pad-input {
+  font-size: 26px;
+}
+
+.tool-window.app-phone .phone-history {
+  flex: 1;
+  min-height: 0;
+}
+
+.tool-window.app-phone .phone-history-list {
+  flex: 1;
+  max-height: none;
+}
+
+.tool-window.app-notes .quick-notes {
+  flex: 1;
+}
+
+.tool-window.app-notes .quick-notes-editor {
+  min-height: 0;
+}
+
+/* ══ Responsive: el teléfono se adapta al ancho/alto de su ventana ══ */
+.tool-window-body {
+  container-type: size;
+  container-name: toolbody;
+}
+
+/* Las teclas escalan con el ancho de la ventana (3 columnas + huecos) y con el alto. */
+.tool-window.app-phone .lg-key,
+.tool-window.app-phone .lg-call {
+  width: clamp(52px, min(19cqw, 11.5cqh), 76px);
+  height: clamp(52px, min(19cqw, 11.5cqh), 76px);
+  min-height: 0;
+}
+
+.tool-window.app-phone .lg-key-digit {
+  font-size: clamp(20px, 7.5cqw, 30px);
+}
+
+.tool-window.app-phone .lg-key-sub {
+  font-size: clamp(8px, 2.6cqw, 10px);
+}
+
+.tool-window.app-phone .phone-keypad {
+  gap: clamp(8px, 2.4cqh, 14px) clamp(12px, 6cqw, 26px);
+}
+
+.tool-window.app-phone .phone-pad {
+  gap: clamp(8px, 2cqh, 14px);
+}
+
+.tool-window.app-phone .phone-pad-display {
+  min-height: clamp(48px, 9cqh, 64px);
+}
+
+.tool-window.app-phone .phone-pad-input {
+  font-size: clamp(20px, 7cqw, 26px);
+}
+
+/* Ventana baja: las letras bajo el dígito y la pista de abajo sobran */
+@container toolbody (max-height: 520px) {
+  .lg-key-sub {
+    display: none;
+  }
+  .phone-pad-hint {
+    display: none;
+  }
+}
+
+/* ══ Responsive: pantallas estrechas (tablet vertical / móvil) ══ */
+@media (max-width: 720px) {
+  /* Apps a pantalla completa, sin arrastre ni redimensión */
+  .lead-os-window.tool-window {
+    left: 8px !important;
+    top: 8px !important;
+    width: calc(100vw - 16px) !important;
+    height: calc(100vh - 16px) !important;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .lead-os-window.tool-window .os-resize-handle {
+    display: none;
+  }
+
+  .lead-os-window.tool-window .lead-traffic.zoom {
+    display: none;
+  }
+
+  /* La barra de tareas pasa a hoja inferior a todo el ancho */
+  .call-agenda-root.is-panel {
+    left: 8px !important;
+    right: 8px;
+    top: auto !important;
+    bottom: 8px;
+    width: auto !important;
+    height: min(58vh, 480px) !important;
+  }
+
+  .call-agenda-root.is-panel .os-resize-handle {
+    display: none;
+  }
+
+  .call-agenda-root.is-panel .call-agenda-controls .lead-traffic.zoom {
+    display: none;
+  }
+
+  .taskbar-tools {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .taskbar-tab {
+    padding: 0 9px;
+    font-size: 11px;
+  }
+
+  .taskbar-tool-tile {
+    min-height: 92px;
+    padding: 10px;
+  }
+}
+
+/* Cabecera de la barra: el título nunca desborda */
+.call-agenda-panel-title {
+  min-width: 0;
+}
+
+.call-agenda-panel-title strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskbar-tabs {
+  flex-wrap: wrap;
+}
+
+.taskbar-tools {
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+}
+
+.taskbar-tool-tile strong,
+.taskbar-tool-tile span:last-child {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* ══ Liquid glass: superficies y teclas ══ */
+.lg-surface {
+  position: relative;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.45)),
+    rgba(240, 244, 250, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.05),
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 8px 20px rgba(15, 23, 42, 0.06);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+}
+
+.dashboard-shell:not(.is-light) .lg-surface {
+  border-color: rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03)),
+    rgba(20, 23, 30, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Teclas circulares, como el marcador del iPhone */
+.lg-key {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: 68px;
+  height: 68px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.35) 60%, rgba(255, 255, 255, 0.15)),
+    rgba(226, 232, 242, 0.55);
+  color: var(--fog-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    inset 0 -2px 4px rgba(15, 23, 42, 0.06),
+    0 2px 4px rgba(15, 23, 42, 0.06),
+    0 10px 22px rgba(15, 23, 42, 0.08);
+  -webkit-backdrop-filter: blur(14px) saturate(1.5);
+  backdrop-filter: blur(14px) saturate(1.5);
+  cursor: pointer;
+  overflow: hidden;
+  transform: translateZ(0);
+  transition:
+    transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 140ms ease,
+    background 140ms ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lg-key-digit {
+  font-size: 26px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.lg-key-sub {
+  min-height: 10px;
+  margin-top: 1px;
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+}
+
+/* Reflejo especular que se desplaza al pulsar */
+.lg-key-shine {
+  position: absolute;
+  inset: -30% 12% auto 12%;
+  height: 55%;
+  border-radius: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0));
+  opacity: 0.75;
+  pointer-events: none;
+  transform: translateY(0);
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+
+@media (hover: hover) {
+  .lg-key:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 1),
+      inset 0 -2px 4px rgba(15, 23, 42, 0.05),
+      0 4px 8px rgba(15, 23, 42, 0.08),
+      0 14px 28px rgba(15, 23, 42, 0.1);
+  }
+}
+
+.lg-key:active,
+.lg-key.is-pressed {
+  transform: translateY(1px) scale(0.965);
+  background:
+    radial-gradient(120% 90% at 50% 100%, rgba(11, 99, 214, 0.22), rgba(255, 255, 255, 0.3) 60%, rgba(255, 255, 255, 0.5)),
+    rgba(214, 226, 246, 0.8);
+  box-shadow:
+    inset 0 2px 6px rgba(15, 23, 42, 0.12),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.8),
+    0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.lg-key:active .lg-key-shine,
+.lg-key.is-pressed .lg-key-shine {
+  transform: translateY(40%);
+  opacity: 0.35;
+}
+
+.lg-key:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(11, 99, 214, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+.dashboard-shell:not(.is-light) .lg-key {
+  border-color: rgba(255, 255, 255, 0.14);
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.06) 60%, rgba(255, 255, 255, 0.02)),
+    rgba(40, 45, 56, 0.55);
+  color: #f4f6fa;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.25),
+    0 10px 22px rgba(0, 0, 0, 0.3);
+}
+
+.dashboard-shell:not(.is-light) .lg-key-sub {
+  color: rgba(244, 246, 250, 0.55);
+}
+
+.dashboard-shell:not(.is-light) .lg-key-shine {
+  opacity: 0.35;
+}
+
+.dashboard-shell:not(.is-light) .lg-key:active,
+.dashboard-shell:not(.is-light) .lg-key.is-pressed {
+  background:
+    radial-gradient(120% 90% at 50% 100%, rgba(93, 160, 255, 0.35), rgba(255, 255, 255, 0.06) 60%),
+    rgba(30, 34, 44, 0.8);
+}
+
+.lg-call {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 68px;
+  height: 68px;
+  min-height: 68px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background:
+    radial-gradient(120% 100% at 50% 0%, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(180deg, #34d058, #16a34a);
+  color: #fff;
+  line-height: 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 2px 4px rgba(22, 163, 74, 0.25),
+    0 12px 26px rgba(22, 163, 74, 0.28);
+  cursor: pointer;
+  transition:
+    transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 140ms ease,
+    filter 140ms ease;
+}
+
+.lg-call:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+
+.lg-call:active:not(:disabled) {
+  transform: translateY(1px) scale(0.98);
+}
+
+.lg-call:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.55);
+  opacity: 0.6;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.lg-call.is-hangup {
+  background:
+    radial-gradient(120% 100% at 50% 0%, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(180deg, #ff5f57, #dc2626);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 2px 4px rgba(220, 38, 38, 0.25),
+    0 12px 26px rgba(220, 38, 38, 0.28);
+}
+
+/* ══ Teléfono: teclado + historial ══ */
+.phone-pad {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.phone-pad-tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(15, 17, 21, 0.06);
+}
+
+.dashboard-shell:not(.is-light) .phone-pad-tabs {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.phone-pad-tab {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.phone-pad-tab em {
+  font-style: normal;
+  font-size: 10px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(15, 17, 21, 0.08);
+}
+
+.phone-pad-tab.is-active {
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--fog-strong);
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 2px 6px rgba(15, 23, 42, 0.1);
+}
+
+.dashboard-shell:not(.is-light) .phone-pad-tab.is-active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f4f6fa;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.phone-pad-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 56px;
+  padding: 0 8px 0 20px;
+  border-radius: 999px;
+}
+
+.phone-pad-display.is-dtmf {
+  justify-content: center;
+}
+
+.phone-pad-display-hint {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.phone-pad-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--fog-strong);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.phone-pad-input::placeholder {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+.phone-pad-input:focus {
+  outline: none;
+}
+
+.dashboard-shell:not(.is-light) .phone-pad-input {
+  color: #f4f6fa;
+}
+
+.phone-pad-backspace {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.phone-pad-backspace:hover:not(:disabled) {
+  background: rgba(15, 17, 21, 0.06);
+  color: var(--fog-strong);
+}
+
+.phone-pad-backspace:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.phone-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  justify-content: center;
+  gap: 12px 22px;
+}
+
+.phone-pad-actions {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+.lg-call svg {
+  display: block;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  /* El telefonillo de Lucide queda ópticamente un poco alto/izquierda: lo centramos. */
+  transform: translate(1px, 0.5px);
+}
+
+.lg-call.is-hangup svg {
+  transform: none;
+}
+
+.phone-pad-hint {
   margin: 0;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.4;
+  text-align: center;
 }
 
-.dashboard-shell:not(.is-light) .softphone-dialer {
+.phone-pad-main {
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+}
+
+.phone-pad-dial {
+  display: flex;
+  flex-direction: column;
+  gap: inherit;
+  min-width: 0;
+}
+
+/* En ventana normal las sugerencias no caben; aparecen al agrandar o ensanchar. */
+.phone-suggest {
+  display: none;
+}
+
+.phone-pad.is-roomy {
+  flex: 1;
+  min-height: 0;
+}
+
+.phone-pad.is-roomy .phone-pad-main {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(220px, 300px);
+  align-items: stretch;
+  gap: 16px 20px;
+  flex: 1;
+  min-height: 0;
+}
+
+.phone-pad.is-roomy .phone-suggest {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 12px;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.4)),
+    rgba(240, 244, 250, 0.65);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 8px 20px rgba(15, 23, 42, 0.06);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+}
+
+.dashboard-shell:not(.is-light) .phone-pad.is-roomy .phone-suggest {
   border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(24, 27, 34, 0.98);
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    rgba(20, 23, 30, 0.55);
 }
 
-.dashboard-shell:not(.is-light) .softphone-dialer-input {
-  border-color: rgba(255, 255, 255, 0.14);
+.phone-suggest-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--fog-strong);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dashboard-shell:not(.is-light) .phone-suggest-title {
+  color: #f4f6fa;
+}
+
+.phone-suggest-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.phone-suggest-list li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 18px;
+}
+
+.phone-suggest-list li:hover {
+  background: rgba(15, 17, 21, 0.04);
+}
+
+.dashboard-shell:not(.is-light) .phone-suggest-list li:hover {
   background: rgba(255, 255, 255, 0.06);
+}
+
+.phone-suggest-row {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px 8px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.phone-suggest-avatar {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  background: linear-gradient(180deg, #60a5fa, #1d4ed8);
+}
+
+.phone-suggest-avatar.is-recent {
+  background: linear-gradient(180deg, #94a3b8, #475569);
+}
+
+.phone-suggest-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.phone-suggest-meta strong {
+  font-size: 13px;
+  font-weight: 750;
+  color: var(--fog-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phone-suggest-meta span {
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-shell:not(.is-light) .phone-suggest-meta strong {
+  color: #f4f6fa;
+}
+
+.phone-suggest-call {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-right: 4px;
+  border-radius: 50%;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  cursor: pointer;
+}
+
+.phone-suggest-call:hover:not(:disabled) {
+  background: rgba(16, 185, 129, 0.22);
+}
+
+.phone-suggest-call:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@container toolbody (min-width: 640px) {
+  .phone-pad:not(.is-roomy) .phone-pad-main {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) minmax(220px, 280px);
+    align-items: stretch;
+    gap: 16px 18px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .phone-pad:not(.is-roomy) .phone-suggest {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+    padding: 12px;
+    border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    background:
+      linear-gradient(160deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.4)),
+      rgba(240, 244, 250, 0.65);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      0 8px 20px rgba(15, 23, 42, 0.06);
+  }
+}
+
+.phone-history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.phone-history-empty {
+  padding: 18px 8px;
+}
+
+.phone-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.phone-history-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.phone-history-row:hover {
+  background: rgba(15, 17, 21, 0.04);
+}
+
+.dashboard-shell:not(.is-light) .phone-history-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.phone-history-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px 8px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.phone-history-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.phone-history-row.is-missed .phone-history-icon {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+.phone-history-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.phone-history-meta strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fog-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phone-history-meta span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.phone-history-row.is-missed .phone-history-meta span {
+  color: #dc2626;
+}
+
+.phone-history-when {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.phone-history-call {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-right: 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  cursor: pointer;
+  transition: background var(--transition-fast), transform 120ms ease;
+}
+
+.phone-history-call:hover {
+  background: rgba(16, 185, 129, 0.2);
+  transform: scale(1.05);
+}
+
+.phone-history-clear {
+  align-self: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.dashboard-shell:not(.is-light) .phone-history-meta strong {
+  color: #f4f6fa;
+}
+
+/* ══ Barra de tareas: secciones y herramientas ══ */
+.taskbar-tabs {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 8px 8px 0;
+}
+
+.taskbar-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.taskbar-tab em {
+  font-style: normal;
+  font-size: 10px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(15, 17, 21, 0.08);
+}
+
+.taskbar-tab:hover {
+  background: rgba(15, 17, 21, 0.05);
+  color: var(--fog-strong);
+}
+
+.taskbar-tab.is-active {
+  background: rgba(11, 99, 214, 0.1);
+  border-color: rgba(11, 99, 214, 0.2);
+  color: var(--color-brand);
+}
+
+.taskbar-tab.is-active em {
+  background: rgba(11, 99, 214, 0.16);
+}
+
+.taskbar-tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #10b981;
+  animation: softphone-blink 1.2s ease-in-out infinite;
+}
+
+.dashboard-shell:not(.is-light) .taskbar-tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f4f6fa;
+}
+
+.dashboard-shell:not(.is-light) .taskbar-tab.is-active {
+  background: rgba(93, 160, 255, 0.14);
+  border-color: rgba(93, 160, 255, 0.25);
+  color: #9cc4ff;
+}
+
+.taskbar-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  padding: 10px 8px 8px;
+  overflow-y: auto;
+}
+
+.taskbar-tool-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 108px;
+  padding: 12px;
+  color: var(--fog-strong);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 160ms ease;
+}
+
+.taskbar-tool-tile:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 6px 10px rgba(15, 23, 42, 0.06),
+    0 16px 30px rgba(15, 23, 42, 0.1);
+}
+
+.taskbar-tool-tile:active {
+  transform: translateY(0) scale(0.985);
+}
+
+.taskbar-tool-tile strong {
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.taskbar-tool-tile span:last-child {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.taskbar-tool-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 6px 14px rgba(15, 23, 42, 0.14);
+}
+
+.taskbar-tool-icon.is-phone {
+  background: linear-gradient(180deg, #34d058, #16a34a);
+}
+
+.taskbar-tool-icon.is-notes {
+  background: linear-gradient(180deg, #fbbf24, #d97706);
+}
+
+.dashboard-shell:not(.is-light) .taskbar-tool-tile {
+  color: #f4f6fa;
+}
+
+/* Punto «en ejecución» bajo el tile, como en un dock */
+.taskbar-tool-tile {
+  position: relative;
+}
+
+.taskbar-tool-running {
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-brand);
+  transform: translateX(-50%);
+  box-shadow: 0 0 0 3px rgba(11, 99, 214, 0.14);
+}
+
+.taskbar-tool-tile.is-minimized .taskbar-tool-running {
+  background: var(--muted);
+  box-shadow: none;
+}
+
+.taskbar-tool-tile.is-open {
+  border-color: rgba(11, 99, 214, 0.3);
+}
+
+/* ══ Notas rápidas ══ */
+.quick-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+}
+
+.quick-notes-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.quick-notes-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.quick-notes-new {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 12px;
+  gap: 4px;
+}
+
+.quick-notes-back {
+  gap: 4px;
+  font-size: 12px;
+}
+
+.quick-notes-when {
+  flex: 1;
+  text-align: right;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.quick-notes-empty {
+  padding: 16px 8px;
+}
+
+.quick-notes-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.quick-notes-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 12px;
+  color: var(--fog-strong);
+  text-align: left;
+  cursor: pointer;
+}
+
+.quick-notes-item strong {
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.quick-notes-item span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.quick-notes-editor {
+  flex: 1;
+  min-height: 200px;
+  padding: 12px 14px;
+  resize: none;
+  color: var(--fog-strong);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.quick-notes-editor:focus {
+  outline: none;
+  border-color: rgba(11, 99, 214, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 0 0 3px rgba(11, 99, 214, 0.14);
+}
+
+.dashboard-shell:not(.is-light) .quick-notes-item,
+.dashboard-shell:not(.is-light) .quick-notes-editor {
   color: #f4f6fa;
 }
 
@@ -10417,5 +12047,335 @@ body > .os-desk-layer.dashboard-shell {
 
   .bot-id-active {
     width: 100%;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Liquid glass del sistema de ventanas
+   Fichas de gestión, apps, barra de tareas, píldora y softphone son vidrio:
+   se ve el escritorio detrás, desenfocado y con más saturación, con un
+   reflejo superior y borde luminoso. Todo lo interior es translúcido para
+   no tapar el efecto.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root {
+  /* Cuerpo: esmerilado denso. El fondo se intuye (formas y color), pero el
+     contenido de la ventana manda. La transparencia «de cristal» vive en el anillo. */
+  --lgw-blur: blur(64px) saturate(1.4);
+  --lgw-bg: rgba(255, 255, 255, 0.86);
+  --lgw-bg-soft: rgba(255, 255, 255, 0.5);
+  --lgw-bg-card: rgba(255, 255, 255, 0.72);
+  --lgw-border: rgba(255, 255, 255, 0.78);
+  --lgw-edge: rgba(15, 23, 42, 0.12);
+  --lgw-sheen: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.38) 0%,
+    rgba(255, 255, 255, 0.12) 28%,
+    rgba(255, 255, 255, 0) 52%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  --lgw-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.35),
+    0 1px 2px rgba(15, 23, 42, 0.06),
+    0 24px 60px rgba(15, 23, 42, 0.18);
+}
+
+.dashboard-shell:not(.is-light) {
+  --lgw-bg: rgba(18, 21, 28, 0.86);
+  --lgw-bg-soft: rgba(255, 255, 255, 0.07);
+  --lgw-bg-card: rgba(255, 255, 255, 0.09);
+  --lgw-border: rgba(255, 255, 255, 0.16);
+  --lgw-edge: rgba(0, 0, 0, 0.45);
+  --lgw-sheen: linear-gradient(
+    165deg,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.05) 28%,
+    rgba(255, 255, 255, 0) 52%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  --lgw-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 24px 60px rgba(0, 0, 0, 0.55);
+}
+
+/* ── Marco de las ventanas (fichas + apps) y barra de tareas ──
+   El marco es transparente; el vidrio son dos capas físicas:
+   ::before  cuerpo esmerilado (blur + tinte + reflejo + luz que sigue al puntero)
+   ::after   anillo refractivo: el borde muestra el fondo SIN blur pero desplazado
+             hacia dentro con un mapa de desplazamiento SVG (feDisplacementMap),
+             igual que el canto de una lente. El mapa lo genera useLiquidGlass()
+             a la medida de cada ventana y llega por --lg-filter.               */
+:root {
+  --lg-rim: 16px;
+  --lg-rim-tint: rgba(255, 255, 255, 0.18);
+  --lg-rim-fx: saturate(1.7) brightness(1.1) contrast(1.06);
+  /* Fresnel: brillo que nace en el filo y se apaga hacia dentro + línea especular
+     arriba + arista más oscura abajo/derecha (lado en sombra). */
+  --lg-rim-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 1px 0 0 rgba(255, 255, 255, 0.6),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4),
+    inset 0 0 9px rgba(255, 255, 255, 0.55),
+    inset -1px -1px 0 rgba(15, 23, 42, 0.1);
+  --lg-light: rgba(255, 255, 255, 0.38);
+}
+
+.dashboard-shell:not(.is-light) {
+  --lg-rim-tint: rgba(255, 255, 255, 0.05);
+  --lg-rim-fx: saturate(1.6) brightness(0.95) contrast(1.06);
+  --lg-rim-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.26),
+    inset 1px 0 0 rgba(255, 255, 255, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+    inset 0 0 9px rgba(255, 255, 255, 0.16),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.4);
+  --lg-light: rgba(255, 255, 255, 0.13);
+}
+
+.lead-modal.lead-os-frame,
+.dashboard-shell:not(.is-light) .lead-modal.lead-os-frame,
+.call-agenda-panel,
+.dashboard-shell:not(.is-light) .call-agenda-panel {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid var(--lgw-border) !important;
+  background: transparent !important;
+  box-shadow:
+    0 1px 2px var(--lgw-edge),
+    0 28px 70px rgba(15, 23, 42, 0.22),
+    0 0 0 1px var(--lgw-edge) !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.dashboard-shell:not(.is-light) .lead-modal.lead-os-frame,
+.dashboard-shell:not(.is-light) .call-agenda-panel {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 28px 70px rgba(0, 0, 0, 0.6),
+    0 0 0 1px var(--lgw-edge) !important;
+}
+
+/* Sin máscaras (backdrop-filter + mask es frágil entre navegadores): el anillo
+   es una capa completa por debajo y el cuerpo, una capa más pequeña encima que
+   tapa el centro. En el centro el mapa es neutro, así que el cuerpo desenfoca
+   el fondo real sin doble desvío. */
+.lead-os-frame::before,
+.lead-os-frame::after,
+.call-agenda-panel::before,
+.call-agenda-panel::after {
+  content: '';
+  display: block !important;
+  position: absolute;
+  pointer-events: none;
+}
+
+/* Anillo refractivo (capa inferior, ocupa todo): fondo nítido desplazado hacia dentro */
+.lead-os-frame::after,
+.call-agenda-panel::after {
+  inset: 0;
+  z-index: -2;
+  border-radius: inherit;
+  background: var(--lg-rim-tint);
+  box-shadow: var(--lg-rim-shadow);
+  -webkit-backdrop-filter: var(--lg-filter, blur(0px)) var(--lg-rim-fx);
+  backdrop-filter: var(--lg-filter, blur(0px)) var(--lg-rim-fx);
+}
+
+/* Cuerpo esmerilado (capa superior, dentro del anillo) */
+.lead-os-frame::before,
+.call-agenda-panel::before {
+  inset: var(--lg-rim);
+  z-index: -1;
+  border-radius: calc(var(--lg-outer-radius) - var(--lg-rim));
+  background:
+    radial-gradient(
+      42% 34% at var(--lg-mx, 30%) var(--lg-my, -8%),
+      var(--lg-light),
+      rgba(255, 255, 255, 0) 72%
+    ),
+    var(--lgw-sheen),
+    var(--lgw-bg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  -webkit-backdrop-filter: var(--lgw-blur);
+  backdrop-filter: var(--lgw-blur);
+}
+
+.dashboard-shell:not(.is-light) .lead-os-frame::before,
+.dashboard-shell:not(.is-light) .call-agenda-panel::before {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.lead-os-frame {
+  --lg-outer-radius: var(--radius-lg);
+}
+
+.call-agenda-panel {
+  --lg-outer-radius: 18px;
+}
+
+/* El SVG con los filtros de cada ventana no ocupa sitio */
+.lg-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Softphone flotante: cristal sencillo con reflejo */
+.softphone-dock {
+  isolation: isolate;
+}
+
+.softphone-dock::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--lgw-sheen);
+  pointer-events: none;
+}
+
+/* Cabecera, pestañas, pie y cliente: velos ligeros, no bloques opacos */
+.lead-os-frame .lead-modal-header,
+.lead-os-frame .lead-modal-tabs,
+.lead-os-frame .lead-modal-footer,
+.dashboard-shell:not(.is-light) .lead-os-frame .lead-modal-header,
+.dashboard-shell:not(.is-light) .lead-os-frame .lead-modal-tabs,
+.dashboard-shell:not(.is-light) .lead-os-frame .lead-modal-footer {
+  background: var(--lgw-bg-soft);
+}
+
+.lead-os-frame .lead-modal-client,
+.dashboard-shell:not(.is-light) .lead-os-frame .lead-modal-client {
+  background: transparent;
+}
+
+/* Tarjetas interiores: cristal más denso para que el texto respire */
+.lead-os-frame .lead-info-card,
+.lead-os-frame .lead-voice-card,
+.lead-os-frame .lead-calls-card,
+.dashboard-shell:not(.is-light) .lead-os-frame .lead-info-card,
+.dashboard-shell:not(.is-light) .lead-os-frame .lead-voice-card,
+.dashboard-shell:not(.is-light) .lead-os-frame .lead-calls-card {
+  background: var(--lgw-bg-card);
+  border-color: var(--lgw-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.dashboard-shell:not(.is-light) .lead-os-frame .lead-info-card,
+.dashboard-shell:not(.is-light) .lead-os-frame .lead-voice-card,
+.dashboard-shell:not(.is-light) .lead-os-frame .lead-calls-card {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* ── Apps: barra de título y cuerpo ── */
+.tool-window-titlebar,
+.dashboard-shell:not(.is-light) .tool-window-titlebar {
+  background: var(--lgw-bg-soft);
+  border-bottom-color: var(--lgw-border);
+}
+
+.tool-window.app-phone .tool-window-body,
+.dashboard-shell:not(.is-light) .tool-window.app-phone .tool-window-body {
+  background: radial-gradient(120% 70% at 50% 0%, rgba(11, 99, 214, 0.08), rgba(11, 99, 214, 0) 60%);
+}
+
+.dashboard-shell:not(.is-light) .tool-window.app-phone .tool-window-body {
+  background: radial-gradient(120% 70% at 50% 0%, rgba(93, 160, 255, 0.12), rgba(93, 160, 255, 0) 60%);
+}
+
+/* ── Barra de tareas ── */
+.call-agenda-panel-head,
+.dashboard-shell:not(.is-light) .call-agenda-panel-head {
+  background: var(--lgw-bg-soft);
+  border-bottom-color: var(--lgw-border);
+}
+
+.taskbar-tool-tile.lg-surface,
+.quick-notes-item.lg-surface,
+.contacts-card.lg-surface,
+.contacts-form.lg-surface,
+.guide-section.lg-surface,
+.phone-pad-display.lg-surface,
+.quick-notes-editor.lg-surface,
+.tool-window .lg-key {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none; /* ya están sobre vidrio: un segundo blur solo cuesta GPU */
+}
+
+/* ── Píldora «Tareas» y softphone flotante ── */
+.agenda-peek,
+.dashboard-shell:not(.is-light) .agenda-peek,
+.softphone-dock,
+.dashboard-shell:not(.is-light) .softphone-dock {
+  border-color: var(--lgw-border);
+  background: var(--lgw-bg);
+  box-shadow: var(--lgw-shadow), 0 0 0 1px var(--lgw-edge);
+  -webkit-backdrop-filter: var(--lgw-blur);
+  backdrop-filter: var(--lgw-blur);
+}
+
+/* ── Arrastre: sombra más liviana; el blur se mantiene para no «parpadear» ── */
+.lead-os-window.is-moving .lead-os-frame,
+.lead-os-window.is-resizing .lead-os-frame,
+.dashboard-shell:not(.is-light) .lead-os-window.is-moving .lead-os-frame,
+.dashboard-shell:not(.is-light) .lead-os-window.is-resizing .lead-os-frame {
+  box-shadow:
+    0 12px 32px rgba(15, 23, 42, 0.16),
+    0 0 0 1px var(--lgw-edge) !important;
+}
+
+.lead-os-window.is-gesturing .lead-os-frame,
+.call-agenda-root.is-gesturing .call-agenda-panel {
+  will-change: transform;
+}
+
+/* Sin soporte de backdrop-filter (raro hoy): vuelve a superficies casi opacas */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lead-os-frame::before,
+  .call-agenda-panel::before {
+    inset: 0;
+    border-radius: inherit;
+  }
+
+  .lead-os-frame::before,
+  .call-agenda-panel::before,
+  .agenda-peek,
+  .softphone-dock {
+    background: rgba(255, 255, 255, 0.96) !important;
+  }
+
+  .lead-os-frame::after,
+  .call-agenda-panel::after {
+    display: none !important;
+  }
+
+  .dashboard-shell:not(.is-light) .lead-os-frame::before,
+  .dashboard-shell:not(.is-light) .call-agenda-panel::before,
+  .dashboard-shell:not(.is-light) .agenda-peek,
+  .dashboard-shell:not(.is-light) .softphone-dock {
+    background: rgba(22, 26, 32, 0.96) !important;
+  }
+}
+
+/* Menos transparencia si el usuario lo pide en el sistema */
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  .dashboard-shell:not(.is-light) {
+    --lgw-bg: rgba(255, 255, 255, 0.92);
+    --lgw-blur: blur(8px);
+  }
+
+  .dashboard-shell:not(.is-light) {
+    --lgw-bg: rgba(18, 21, 28, 0.92);
   }
 }
