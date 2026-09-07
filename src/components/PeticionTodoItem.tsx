@@ -77,7 +77,12 @@ export default function PeticionTodoItem({
         </button>
 
         {!expanded && telHref ? (
-          <a href={telHref} className="todo-item-call confirm-action">
+          <a
+            href={telHref}
+            className="todo-item-call confirm-action"
+            data-call-label={titulo}
+            data-call-peticion={p.idpeticion}
+          >
             <Phone size={16} />
             Llamar
           </a>
@@ -111,7 +116,12 @@ export default function PeticionTodoItem({
                 ) : null}
               </dl>
               {telHref ? (
-                <a href={telHref} className="client-submit todo-call-full">
+                <a
+                  href={telHref}
+                  className="client-submit todo-call-full"
+                  data-call-label={titulo}
+                  data-call-peticion={p.idpeticion}
+                >
                   <Phone size={20} />
                   Llamar a {p.caller}
                 </a>

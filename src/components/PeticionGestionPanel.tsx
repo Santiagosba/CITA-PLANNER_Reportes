@@ -91,7 +91,12 @@ export default function PeticionGestionPanel({
             ) : null}
           </dl>
           {telHref ? (
-            <a href={telHref} className="client-submit todo-call-full">
+            <a
+              href={telHref}
+              className="client-submit todo-call-full"
+              data-call-label={titulo}
+              data-call-peticion={p.idpeticion}
+            >
               <Phone size={20} />
               Llamar a {p.caller}
             </a>

@@ -12,16 +12,17 @@ import {
   FileText,
   MessageSquare,
   PhoneCall,
-  Play,
   Printer,
   Server,
   Sparkles,
   TriangleAlert,
   User,
-  Volume2,
 } from 'lucide-react'
 import ActionButton, { type ActionStatus } from './ui/ActionButton'
 import VehiclePlate from './ui/VehiclePlate'
+import { LeadCallHistory, LeadCallTranscript } from './LeadCallHistory'
+import { useCustomerCalls } from '../hooks/useCustomerCalls'
+import type { CustomerCallItem } from '../lib/crmApi'
 import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
 import { isSlaCritico } from '../lib/tallerStations'
 import {
@@ -65,7 +66,6 @@ type Props = {
 const MIN_W = 420
 const MIN_H = 420
 const RESIZE_EDGES: Edge[] = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
-const WAVE_HEIGHTS = [25, 40, 60, 30, 80, 50, 90, 75, 40, 65, 85, 30, 70, 95, 80, 55, 35, 75, 90, 60, 45, 85, 40, 30, 65, 80, 50, 35]
 
 function reducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -116,7 +116,8 @@ function LeadGestionDrawer({
   onToggleMaximize,
 }: Props) {
   const [tab, setTab] = useState<TabId>('resumen')
-  const [playing, setPlaying] = useState(false)
+  const [selectedCall, setSelectedCall] = useState<CustomerCallItem | null>(null)
+  const calls = useCustomerCalls(p.caller)
   const [phase, setPhase] = useState<AnimPhase>(() => (reducedMotion() ? 'idle' : 'enter'))
   const [minStyle, setMinStyle] = useState<MinimizeStyle>('dock')
   const rootRef = useRef<HTMLDivElement>(null)
@@ -187,7 +188,7 @@ function LeadGestionDrawer({
 
   useEffect(() => {
     setTab('resumen')
-    setPlaying(false)
+    setSelectedCall(null)
   }, [p.idpeticion])
 
   useLayoutEffect(() => {
@@ -507,7 +508,13 @@ function LeadGestionDrawer({
           </div>
           <div className="lead-modal-contact">
             {telHref ? (
-              <a href={telHref} className="confirm-action lead-contact-btn">
+              <a
+                href={telHref}
+                className="confirm-action lead-contact-btn"
+                data-call-label={cliente || p.caller || undefined}
+                data-call-peticion={p.idpeticion}
+                title="Llamar por Telnyx desde el CRM"
+              >
                 <PhoneCall size={14} />
                 Llamar
               </a>
@@ -521,45 +528,15 @@ function LeadGestionDrawer({
           </div>
         </div>
 
-        <div className="lead-voice-card">
-          <div className="lead-voice-meta">
-            <div className="lead-voice-label">
-              <span className={`lead-voice-dot ${playing ? 'is-live' : ''}`} />
-              <span>
-                Grabación de voz Laura · {formatFecha(p.fechainicio)}
-                {sla ? ' · SLA crítico' : ''}
-              </span>
-            </div>
-            <span className="font-mono lead-voice-time">{playing ? '00:12' : '00:00'} / 02:48</span>
-          </div>
-          <div className="lead-voice-wave" aria-hidden>
-            {WAVE_HEIGHTS.map((h, i) => (
-              <span
-                key={i}
-                className={`lead-voice-bar ${playing && i < 4 ? 'is-active' : ''}`}
-                style={{ height: `${h}%` }}
-              />
-            ))}
-          </div>
-          <div className="lead-voice-controls">
-            <div className="lead-voice-controls-left">
-              <button
-                type="button"
-                className="lead-play-btn"
-                onClick={() => setPlaying((v) => !v)}
-                aria-label={playing ? 'Pausar' : 'Reproducir'}
-              >
-                <Play size={16} fill="currentColor" />
-              </button>
-              <Volume2 size={16} aria-hidden className="lead-voice-vol" />
-              <span className="badge tone-muted">1x</span>
-            </div>
-            <p className="lead-voice-hint">
-              <Sparkles size={12} />
-              Voz transcrita por Laura (Whisper ASR)
-            </p>
-          </div>
-        </div>
+        <LeadCallHistory
+          phone={telRaw}
+          calls={calls}
+          selectedId={selectedCall?.id ?? null}
+          onSelect={(item) => {
+            setSelectedCall(item)
+            setTab('transcripcion')
+          }}
+        />
 
         <div className="lead-modal-tabs" role="tablist">
           <button
@@ -669,20 +646,7 @@ function LeadGestionDrawer({
 
           {tab === 'transcripcion' ? (
             <div className="lead-drawer-stack">
-              <section className="lead-info-card">
-                <p className="lead-info-eyebrow">Turno a turno</p>
-                <div className="lead-transcript">
-                  <p>
-                    <strong>Laura:</strong> Hola, soy Laura del taller. ¿En qué puedo ayudarte?
-                  </p>
-                  <p>
-                    <strong>Cliente:</strong> {p.descripcion?.trim() || 'Consulta recibida sin texto detallado.'}
-                  </p>
-                  <p>
-                    <strong>Laura:</strong> Perfecto, derivo el caso a un asesor para validación presencial o pericial.
-                  </p>
-                </div>
-              </section>
+              <LeadCallTranscript phone={telRaw} selected={selectedCall} />
             </div>
           ) : null}
 

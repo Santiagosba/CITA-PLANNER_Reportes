@@ -101,7 +101,13 @@ function PeticionRow({
         </button>
 
         {telHref ? (
-          <a href={telHref} className="prow-call confirm-action" aria-label={`Llamar a ${p.caller}`}>
+          <a
+            href={telHref}
+            className="prow-call confirm-action"
+            aria-label={`Llamar a ${p.caller}`}
+            data-call-label={titulo}
+            data-call-peticion={p.idpeticion}
+          >
             <Phone size={16} />
             Llamar
           </a>

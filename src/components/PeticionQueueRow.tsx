@@ -38,6 +38,8 @@ export default function PeticionQueueRow({ peticion: p, active, onSelect }: Prop
             className="queue-row-call confirm-action"
             onClick={(e) => e.stopPropagation()}
             aria-label={`Llamar a ${p.caller}`}
+            data-call-label={titulo}
+            data-call-peticion={p.idpeticion}
           >
             <Phone size={16} />
           </a>

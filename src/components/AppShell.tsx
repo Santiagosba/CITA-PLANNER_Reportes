@@ -15,6 +15,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { DashboardShellRoute } from './Sidebar'
+import { SoftphoneStatusChip } from './SoftphoneDock'
 import { BOT_CONFIG_EVENT, loadActiveBotProfile } from '../lib/botProfiles'
 
 const NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] = [
@@ -64,8 +65,41 @@ function ExtrudedPiece({
 /* Icono oficial AVIBOT (imagen real) que se extruye en capas para el efecto 3D */
 const AVIBOT_ICON = <img src="/avibot-logo.png" alt="" draggable={false} />
 
+/** Iniciales del centro para cuando el dealer no tiene logo cargado. */
+function dealerInitials(name: string): string {
+  const words = name
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+  if (words.length === 0) return 'AV'
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
+  return (words[0][0] + words[1][0]).toUpperCase()
+}
+
+/** Marca del centro del dealer: su logo o, si no hay, las iniciales. */
+function DealerMark({ name, logoUrl }: { name: string; logoUrl?: string | null }) {
+  const [broken, setBroken] = useState(false)
+  const src = (logoUrl ?? '').trim()
+  useEffect(() => setBroken(false), [src])
+  if (src && !broken) {
+    return (
+      <span className="dealer-mark has-logo" aria-hidden>
+        <img src={src} alt="" draggable={false} referrerPolicy="no-referrer" onError={() => setBroken(true)} />
+      </span>
+    )
+  }
+  return (
+    <span className="dealer-mark" aria-hidden>
+      {dealerInitials(name)}
+    </span>
+  )
+}
+
 type Props = {
   workshopName: string
+  /** Logo propio del taller (`licencia_module_talleres.logo`). */
+  workshopLogoUrl?: string | null
+  /** Logo de la licencia (`crm_config.ui_branding.logo_url`), respaldo del anterior. */
   licenseLogoUrl?: string | null
   productName: string
   activeRoute: DashboardShellRoute
@@ -82,6 +116,8 @@ type Props = {
 
 export default function AppShell({
   workshopName,
+  workshopLogoUrl,
+  licenseLogoUrl,
   productName,
   activeRoute,
   onNavigate,
@@ -158,19 +194,13 @@ export default function AppShell({
 
       <aside className="dashboard-sidebar glass glass-lite" aria-label="Navegación principal">
         <div className="dashboard-sidebar-brand">
-          <div className="logo-slot logo-slot-sm">
-            <div className="logo-cube" ref={cubeRef} aria-label="AVIBOT">
-              <span className="logo-cube-core">
-                <ExtrudedPiece className="a3d-icon" z={0} layers={12} spacing={0.75}>
-                  {AVIBOT_ICON}
-                </ExtrudedPiece>
-              </span>
-              {/* Recubrimiento liquid glass con reflejos RTX sobre el icono */}
-              <span className="logo-glass" aria-hidden />
+          <div className="dashboard-sidebar-dealer">
+            <DealerMark name={workshopName} logoUrl={workshopLogoUrl || licenseLogoUrl} />
+            <div className="dashboard-sidebar-dealer-copy">
+              <p className="section-eyebrow">Centro</p>
+              <p className="dashboard-sidebar-workshop">{workshopName}</p>
             </div>
           </div>
-          <p className="section-eyebrow">{productName}</p>
-          <p className="dashboard-sidebar-workshop">{workshopName}</p>
           {asesorName ? (
             <p className="dashboard-sidebar-asesor">
               <strong>{asesorName}</strong>
@@ -209,6 +239,7 @@ export default function AppShell({
         </nav>
 
         <div className="dashboard-sidebar-footer">
+          <SoftphoneStatusChip />
           <button
             type="button"
             className={`dashboard-nav-item ${activeRoute === 'configuration' ? 'is-active' : ''}`}
@@ -235,6 +266,24 @@ export default function AppShell({
             <LogOut size={18} aria-hidden />
             Salir
           </button>
+
+          <div className="dashboard-sidebar-avibot">
+            <div className="logo-slot logo-slot-sm">
+              <div className="logo-cube" ref={cubeRef} aria-label="AVIBOT">
+                <span className="logo-cube-core">
+                  <ExtrudedPiece className="a3d-icon" z={0} layers={12} spacing={0.75}>
+                    {AVIBOT_ICON}
+                  </ExtrudedPiece>
+                </span>
+                {/* Recubrimiento liquid glass con reflejos RTX sobre el icono */}
+                <span className="logo-glass" aria-hidden />
+              </div>
+            </div>
+            <div className="dashboard-sidebar-avibot-copy">
+              <p className="section-eyebrow">{productName}</p>
+              <span>Powered by AVIBOT</span>
+            </div>
+          </div>
         </div>
       </aside>
 

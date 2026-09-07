@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import AppShell from '../components/AppShell'
 import ViewPageHeader from '../components/ViewPageHeader'
 import GestionBubbleDock, { MAX_TASKS, type AgendaSessionItem } from '../components/GestionBubbleDock'
+import SoftphoneDock from '../components/SoftphoneDock'
 import LeadGestionDrawer, { type WinRect } from '../components/LeadGestionDrawer'
 import NewInboundDrawer from '../components/NewInboundDrawer'
 import type { ActionStatus } from '../components/ui/ActionButton'
@@ -21,6 +22,9 @@ import {
   updatePeticionGestion,
   type PeticionPendiente,
 } from '../lib/peticionesPendientes'
+import { resolveDateRange } from '../lib/dateRangePresets'
+import { callNoteLine, useSoftphone } from '../lib/softphone'
+import { useOperationalData } from '../hooks/useOperationalData'
 
 type Props = {
   workshop: Workshop
@@ -297,6 +301,34 @@ export default function DashboardShell({
     agendaTuckedRef.current = agendaTucked
   }, [agendaTucked])
 
+  // Al colgar una llamada hecha desde una petición, dejamos constancia en sus
+  // notas de gestión (y abrimos la ficha si no estaba abierta) para que el
+  // asesor solo tenga que completar y guardar.
+  const { lastCall } = useSoftphone()
+  const callNoteRange = useMemo(() => resolveDateRange('mes', '', ''), [])
+  const { items: operationalItems } = useOperationalData(workshop, callNoteRange)
+  const notedCallRef = useRef(0)
+  useEffect(() => {
+    if (!lastCall?.peticionId || lastCall.endedAt === notedCallRef.current) return
+    notedCallRef.current = lastCall.endedAt
+    const pid = lastCall.peticionId
+    const line = callNoteLine(lastCall)
+    const open = sessionsRef.current.some((s) => s.id === pid)
+    if (!open) {
+      const peticion = operationalItems.find((item) => item.idpeticion === pid)
+      if (!peticion) return
+      openLead(peticion)
+    }
+    setSessions((prev) =>
+      prev.map((s) => {
+        if (s.id !== pid) return s
+        const current = s.gestionObs.trimEnd()
+        if (current.includes(line)) return s
+        return { ...s, gestionObs: current ? `${current}\n${line}` : line }
+      }),
+    )
+  }, [lastCall, operationalItems, openLead])
+
   useEffect(() => {
     const hasMinimizedDesk = () => {
       const sessions = sessionsRef.current
@@ -316,7 +348,7 @@ export default function DashboardShell({
       const t = e.target as HTMLElement | null
       if (!t) return
       if (t.closest('.lead-os-window')) return
-      if (t.closest('.inbound-modal-root, .gestion-capacity-toast, .agenda-peek')) return
+      if (t.closest('.inbound-modal-root, .gestion-capacity-toast, .agenda-peek, .softphone-dock, .softphone-toast')) return
 
       // Sidebar (Dashboard, triage, etc.): primer clic guarda, segundo restaura
       if (t.closest('.dashboard-sidebar')) {
@@ -495,6 +527,7 @@ export default function DashboardShell({
   return (
     <AppShell
       workshopName={workshop.name}
+      workshopLogoUrl={workshop.logo}
       licenseLogoUrl={licenseLogoUrl}
       productName={getAppProductName()}
       activeRoute={shellRoute}
@@ -603,6 +636,8 @@ export default function DashboardShell({
                 onClose={closeSession}
                 onCloseAll={closeAll}
               />
+
+              <SoftphoneDock />
 
               {inboundOpen ? (
                 <NewInboundDrawer
