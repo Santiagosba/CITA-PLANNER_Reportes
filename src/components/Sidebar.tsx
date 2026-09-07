@@ -10,6 +10,7 @@ export type DashboardShellRoute =
   | 'boards'
   | 'reportes'
   | 'laura'
+  | 'bot-identity'
   | 'configuration'
 
 type Props = {

@@ -9,6 +9,7 @@ import { HexLoaderScreen } from '../components/ui/HexLoader'
 import VehiclePlate from '../components/ui/VehiclePlate'
 import CalendarTallerView from './CalendarTallerView'
 import type { CalendarScale } from '../lib/calendarScale'
+import type { CitaTaller } from '../lib/citasTaller'
 import type { Workshop } from '../types'
 import { groupPeticionesByAgendaDay } from '../lib/agendaGrouping'
 import {
@@ -45,6 +46,7 @@ type Props = {
   workshop: Workshop
   isDarkMode?: boolean
   initialTab?: TabId
+  initialSlaOnly?: boolean
   onOpenLead?: (peticion: PeticionPendiente) => void
   refreshToken?: number
 }
@@ -54,6 +56,7 @@ type TabId = 'kanban' | 'tabla' | 'calendario'
 export default function PendingCitasView({
   workshop,
   initialTab = 'kanban',
+  initialSlaOnly = false,
   onOpenLead,
   refreshToken = 0,
 }: Props) {
@@ -75,7 +78,7 @@ export default function PendingCitasView({
   const [customTo, setCustomTo] = useState('')
   const [debouncedCaller, setDebouncedCaller] = useState('')
   const [channel, setChannel] = useState('voz-wa')
-  const [slaOnly, setSlaOnly] = useState(false)
+  const [slaOnly, setSlaOnly] = useState(initialSlaOnly)
   const [estado, setEstado] = useState<EstadoFilter>('faltan')
   const [agendaDay, setAgendaDay] = useState(() => {
     const now = new Date()
@@ -87,6 +90,10 @@ export default function PendingCitasView({
   useEffect(() => {
     setTab(initialTab)
   }, [initialTab])
+
+  useEffect(() => {
+    setSlaOnly(initialSlaOnly)
+  }, [initialSlaOnly])
 
   // Buscador de teléfono: espera a que el asesor deje de teclear (evita 1 petición por tecla)
   useEffect(() => {
@@ -248,23 +255,70 @@ export default function PendingCitasView({
     [faltanItems],
   )
 
-  const handleMarkGestionado = async (gestionado: boolean) => {
-    if (!selected) return
-    const currentId = selected.idpeticion
+  const handleToggleRow = useCallback((id: string) => {
+    setSelectedId((prev) => (prev === id ? null : id))
+  }, [])
+
+  const handleOpenCita = useCallback(
+    (cita: CitaTaller) => {
+      if (!onOpenLead) return
+      onOpenLead({
+        idpeticion: `cita-${cita.idcita}`,
+        idtaller: cita.idtaller,
+        descripcion: cita.asunto || cita.observaciones,
+        idtipopeticion: null,
+        tipopeticion: 'Cita taller',
+        fechainicio: cita.fecha,
+        fechafin: null,
+        fechacreacion: cita.fecha,
+        caller: cita.movil || cita.telefono,
+        gestionado: true,
+        gestionemail: cita.email,
+        gestionfecha: null,
+        gestionobservaciones: cita.observaciones,
+        idcita: cita.idcita,
+        cita: {
+          idcita: cita.idcita,
+          fecha: cita.fecha,
+          nombre: cita.nombre,
+          apellidos: cita.apellidos,
+          matricula: cita.matricula,
+          marca: cita.marca,
+          modelo: cita.modelo,
+          email: cita.email,
+          telefono: cita.telefono,
+          movil: cita.movil,
+          asunto: cita.asunto,
+        },
+      })
+    },
+    [onOpenLead],
+  )
+
+  const selectedRef = useRef(selected)
+  selectedRef.current = selected
+  const draftRef = useRef({ gestionObs, gestionEmail })
+  draftRef.current = { gestionObs, gestionEmail }
+
+  const handleMarkGestionado = useCallback(async (gestionado: boolean) => {
+    const current = selectedRef.current
+    if (!current) return
+    const currentId = current.idpeticion
+    const { gestionObs: obs, gestionEmail: email } = draftRef.current
     setSaveStatus('loading')
     setError(null)
     try {
       await updatePeticionGestion(currentId, {
         gestionado,
-        gestionobservaciones: gestionObs,
-        gestionemail: gestionEmail,
+        gestionobservaciones: obs,
+        gestionemail: email,
       })
       setSaveStatus('success')
       await new Promise((r) => setTimeout(r, 650))
       const nextPatch = {
         gestionado,
-        gestionobservaciones: gestionObs,
-        gestionemail: gestionEmail,
+        gestionobservaciones: obs,
+        gestionemail: email,
       }
       setItems((prev) =>
         prev.map((p) => (p.idpeticion === currentId ? { ...p, ...nextPatch } : p)),
@@ -280,7 +334,7 @@ export default function PendingCitasView({
       setError(e instanceof Error ? e.message : 'No se pudo guardar')
       setTimeout(() => setSaveStatus('idle'), 1800)
     }
-  }
+  }, [workshop, estado, advanceToNextPending])
 
   const handleExport = () => {
     const csv = buildPeticionesCsv(reportItems, workshop.name)
@@ -363,41 +417,7 @@ export default function PendingCitasView({
           onDayChange={setAgendaDay}
           scale={calendarScale}
           onScaleChange={setCalendarScale}
-          onOpenCita={
-            onOpenLead
-              ? (cita) => {
-                  onOpenLead({
-                    idpeticion: `cita-${cita.idcita}`,
-                    idtaller: cita.idtaller,
-                    descripcion: cita.asunto || cita.observaciones,
-                    idtipopeticion: null,
-                    tipopeticion: 'Cita taller',
-                    fechainicio: cita.fecha,
-                    fechafin: null,
-                    fechacreacion: cita.fecha,
-                    caller: cita.movil || cita.telefono,
-                    gestionado: true,
-                    gestionemail: cita.email,
-                    gestionfecha: null,
-                    gestionobservaciones: cita.observaciones,
-                    idcita: cita.idcita,
-                    cita: {
-                      idcita: cita.idcita,
-                      fecha: cita.fecha,
-                      nombre: cita.nombre,
-                      apellidos: cita.apellidos,
-                      matricula: cita.matricula,
-                      marca: cita.marca,
-                      modelo: cita.modelo,
-                      email: cita.email,
-                      telefono: cita.telefono,
-                      movil: cita.movil,
-                      asunto: cita.asunto,
-                    },
-                  })
-                }
-              : undefined
-          }
+          onOpenCita={onOpenLead ? handleOpenCita : undefined}
         />
       ) : tab === 'kanban' ? (
         <div className="queue-full">
@@ -468,11 +488,11 @@ export default function PendingCitasView({
                         saveStatus={p.idpeticion === selectedId ? saveStatus : 'idle'}
                         gestionObs={p.idpeticion === selectedId ? gestionObs : (p.gestionobservaciones ?? '')}
                         gestionEmail={p.idpeticion === selectedId ? gestionEmail : (p.gestionemail ?? '')}
-                        onToggle={() => setSelectedId((prev) => (prev === p.idpeticion ? null : p.idpeticion))}
+                        onToggle={handleToggleRow}
                         onGestionObsChange={setGestionObs}
                         onGestionEmailChange={setGestionEmail}
-                        onMarkGestionado={(g) => void handleMarkGestionado(g)}
-                        onOpenLead={onOpenLead ? () => onOpenLead(p) : undefined}
+                        onMarkGestionado={handleMarkGestionado}
+                        onOpenLead={onOpenLead}
                       />
                     ))}
                   </ul>

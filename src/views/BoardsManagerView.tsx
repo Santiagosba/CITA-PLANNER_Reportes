@@ -3,7 +3,6 @@ import {
   GripVertical,
   Package,
   Plus,
-  RefreshCw,
   ShieldCheck,
   ShoppingBag,
   Wrench,
@@ -11,9 +10,9 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import {
+  memo,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -125,6 +124,8 @@ const LIFT_PX = 6
 
 type Props = {
   workshop: Workshop
+  onOpenLead?: (peticion: PeticionPendiente) => void
+  refreshToken?: number
 }
 
 function priorityKey(workshopId: string) {
@@ -223,92 +224,202 @@ function insertId(ids: string[], id: string, index: number): string[] {
   return next
 }
 
-function liveCards(list: HTMLElement): HTMLElement[] {
-  return [...list.querySelectorAll<HTMLElement>('[data-card-id]:not(.is-dragging-source)')]
+const CARD_GAP = 10
+const SLOT_STICK = 8
+
+type CardGeom = {
+  el: HTMLElement
+  height: number
 }
 
-function hitHover(clientX: number, clientY: number, current: HoverSlot | null): HoverSlot | null {
-  const columns = document.querySelectorAll<HTMLElement>('[data-kanban-col]')
-  for (const column of columns) {
+type ColGeom = {
+  id: PriorityId
+  el: HTMLElement
+  list: HTMLElement
+  left: number
+  right: number
+  top: number
+  bottom: number
+  listLeft: number
+  stackTop: number
+  cards: CardGeom[]
+  slotIndex: number | null
+}
+
+type BoardDrag = {
+  geoms: ColGeom[]
+  slot: HTMLElement
+  slotH: number
+  dropCol: PriorityId | null
+}
+
+type FlipMove = { el: HTMLElement; dx: number; dy: number }
+
+function measureBoard(root: HTMLElement, skipId?: string): ColGeom[] {
+  const next: ColGeom[] = []
+  root.querySelectorAll<HTMLElement>('[data-kanban-col]').forEach((column) => {
+    const id = column.dataset.kanbanCol as PriorityId | undefined
+    const list = column.querySelector<HTMLElement>('.kanban-cards')
+    if (!id || !list) return
     const rect = column.getBoundingClientRect()
-    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+    const listRect = list.getBoundingClientRect()
+    const cards: CardGeom[] = []
+    for (const node of list.children) {
+      if (!(node instanceof HTMLElement) || !node.dataset.cardId) continue
+      if (skipId && node.dataset.cardId === skipId) continue
+      if (node.classList.contains('is-dragging-source')) continue
+      cards.push({ el: node, height: node.offsetHeight })
+    }
+    next.push({
+      id,
+      el: column,
+      list,
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      bottom: rect.bottom,
+      listLeft: listRect.left,
+      stackTop: listRect.top + 2,
+      cards,
+      slotIndex: null,
+    })
+  })
+  return next
+}
+
+function slotTop(col: ColGeom, slotIndex: number, slotH: number) {
+  let y = col.stackTop
+  for (let i = 0; i < slotIndex; i += 1) y += col.cards[i].height + CARD_GAP
+  return y
+}
+
+function indexAtY(col: ColGeom, clientY: number, slotH: number, slotIndex: number | null): number {
+  let y = col.stackTop
+  for (let i = 0; i < col.cards.length; i += 1) {
+    if (slotIndex === i) {
+      if (clientY < y + slotH) return i
+      y += slotH + CARD_GAP
+    }
+    if (clientY < y + col.cards[i].height / 2) return i
+    y += col.cards[i].height + CARD_GAP
+  }
+  return col.cards.length
+}
+
+function hitHover(clientX: number, clientY: number, board: BoardDrag, current: HoverSlot | null): HoverSlot | null {
+  for (const col of board.geoms) {
+    if (clientX < col.left || clientX > col.right || clientY < col.top || clientY > col.bottom) {
       continue
     }
-    const list = column.querySelector<HTMLElement>('.kanban-cards')
-    const col = column.dataset.kanbanCol as PriorityId
-    if (!list) return { col, index: 0 }
-
-    const slot = list.querySelector<HTMLElement>('.kanban-card-slot')
-    if (slot) {
-      const slotRect = slot.getBoundingClientRect()
-      if (clientY >= slotRect.top && clientY <= slotRect.bottom) {
-        return current?.col === col ? current : { col, index: current?.index ?? 0 }
+    if (current?.col === col.id && col.slotIndex !== null) {
+      const hole = slotTop(col, col.slotIndex, board.slotH)
+      if (clientY >= hole - SLOT_STICK && clientY <= hole + board.slotH + SLOT_STICK) {
+        return current
       }
     }
-
-    const cards = liveCards(list)
-    let index = cards.length
-    for (let i = 0; i < cards.length; i += 1) {
-      const cardRect = cards[i].getBoundingClientRect()
-      if (clientY < cardRect.top + cardRect.height / 2) {
-        index = i
-        break
-      }
-    }
-    return { col, index }
+    const index = indexAtY(col, clientY, board.slotH, col.slotIndex)
+    if (current?.col === col.id && current.index === index) return current
+    return { col: col.id, index }
   }
   return null
 }
 
-function ensureSlot(height: number): HTMLElement {
-  let slot = document.querySelector<HTMLElement>('.kanban-card-slot.is-live')
-  if (!slot) {
-    slot = document.createElement('div')
-    slot.className = 'kanban-card-slot is-live'
+function playFlip(movers: FlipMove[]) {
+  if (!movers.length) return
+  for (const move of movers) {
+    move.el.style.transition = 'none'
+    move.el.style.transform = `translate3d(${move.dx}px, ${move.dy}px, 0)`
   }
-  slot.style.height = `${height}px`
-  return slot
-}
-
-function placeSlot(col: PriorityId, index: number, height: number) {
-  const list = document.querySelector<HTMLElement>(`[data-kanban-col="${col}"] .kanban-cards`)
-  if (!list) return
-  const cards = liveCards(list)
-  const slot = ensureSlot(height)
-  const prev = new Map<HTMLElement, DOMRect>()
-  cards.forEach((el) => prev.set(el, el.getBoundingClientRect()))
-
-  const before = cards[index] ?? null
-  if (before) list.insertBefore(slot, before)
-  else list.appendChild(slot)
-
-  cards.forEach((el) => {
-    const beforeRect = prev.get(el)
-    if (!beforeRect) return
-    const after = el.getBoundingClientRect()
-    const dy = beforeRect.top - after.top
-    const dx = beforeRect.left - after.left
-    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return
-    el.animate(
-      [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
-      { duration: 140, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
-    )
+  requestAnimationFrame(() => {
+    for (const move of movers) {
+      move.el.style.transition = ''
+      move.el.style.transform = ''
+    }
   })
 }
 
-function setDropColumn(col: PriorityId | null) {
-  document.querySelectorAll<HTMLElement>('[data-kanban-col]').forEach((el) => {
-    el.classList.toggle('is-drop-target', el.dataset.kanbanCol === col)
-  })
+function placeSlot(board: BoardDrag, col: PriorityId, index: number) {
+  const dest = board.geoms.find((item) => item.id === col)
+  if (!dest) return
+  const origin = board.geoms.find((item) => item.slotIndex !== null) ?? dest
+  if (dest.slotIndex === index && origin === dest) return
+
+  const from = origin.slotIndex ?? 0
+  const step = board.slotH + CARD_GAP
+  const movers: FlipMove[] = []
+
+  if (origin === dest) {
+    for (let i = 0; i < dest.cards.length; i += 1) {
+      let dy = 0
+      if (from < index && i >= from && i < index) dy = step
+      else if (index < from && i >= index && i < from) dy = -step
+      if (dy) movers.push({ el: dest.cards[i].el, dx: 0, dy })
+    }
+    const dy = slotTop(dest, from, board.slotH) - slotTop(dest, index, board.slotH)
+    if (dy) movers.push({ el: board.slot, dx: 0, dy })
+  } else {
+    for (let i = from; i < origin.cards.length; i += 1) {
+      movers.push({ el: origin.cards[i].el, dx: 0, dy: step })
+    }
+    for (let i = index; i < dest.cards.length; i += 1) {
+      movers.push({ el: dest.cards[i].el, dx: 0, dy: -step })
+    }
+    movers.push({
+      el: board.slot,
+      dx: origin.listLeft - dest.listLeft,
+      dy: slotTop(origin, from, board.slotH) - slotTop(dest, index, board.slotH),
+    })
+    origin.bottom -= step
+    dest.bottom += step
+    origin.slotIndex = null
+  }
+
+  dest.slotIndex = index
+  const before = dest.cards[index]?.el
+  if (before) dest.list.insertBefore(board.slot, before)
+  else dest.list.appendChild(board.slot)
+  playFlip(movers)
 }
 
-function clearLiveDragDom() {
-  document.querySelector('.kanban-card-slot.is-live')?.remove()
+function setDropColumn(board: BoardDrag, col: PriorityId | null) {
+  if (board.dropCol === col) return
+  for (const item of board.geoms) {
+    if (item.id === board.dropCol) item.el.classList.remove('is-drop-target')
+    if (item.id === col) item.el.classList.add('is-drop-target')
+  }
+  board.dropCol = col
+}
+
+function clearLiveDragDom(grid?: HTMLElement | null, board?: BoardDrag | null) {
+  document.querySelector('.kanban-card-slot')?.remove()
+  document.querySelector('.kanban-ghost-layer')?.remove()
   document.querySelectorAll('.is-dragging-source').forEach((el) => el.classList.remove('is-dragging-source'))
-  setDropColumn(null)
+  document.querySelectorAll('.is-drop-target').forEach((el) => el.classList.remove('is-drop-target'))
+  if (board) {
+    for (const geom of board.geoms) {
+      for (const card of geom.cards) {
+        card.el.style.transition = ''
+        card.el.style.transform = ''
+      }
+    }
+  }
+  grid?.classList.remove('is-reordering')
 }
 
-function BoardTicket({
+function spawnGhost(source: HTMLElement, live: DragLive): HTMLElement {
+  const layer = document.createElement('div')
+  layer.className = 'kanban-ghost-layer'
+  layer.setAttribute('aria-hidden', 'true')
+  const clone = source.cloneNode(true) as HTMLElement
+  clone.removeAttribute('data-card-id')
+  clone.classList.add('is-ghost')
+  clone.style.width = `${live.width}px`
+  layer.appendChild(clone)
+  document.body.appendChild(layer)
+  return layer
+}
+
+const BoardTicket = memo(function BoardTicket({
   card,
   column,
   ghost,
@@ -327,8 +438,10 @@ function BoardTicket({
     return (
       <article
         data-card-id={ghost ? undefined : id}
-        className={`kanban-card glass-inline glass-lite${ghost ? ' is-ghost' : ''}`}
+        className={`kanban-card${ghost ? ' is-ghost' : ''}`}
         onPointerDown={onPointerDown}
+        role={ghost ? undefined : 'button'}
+        title={ghost ? undefined : 'Abrir ficha en una ventana'}
       >
         <div className="kanban-card-top">
           <span className="kanban-drag-handle" aria-hidden>
@@ -356,8 +469,10 @@ function BoardTicket({
   return (
     <article
       data-card-id={ghost ? undefined : id}
-      className={`kanban-card glass-inline glass-lite${ghost ? ' is-ghost' : ''}`}
+      className={`kanban-card${ghost ? ' is-ghost' : ''}`}
       onPointerDown={onPointerDown}
+      role={ghost ? undefined : 'button'}
+      title={ghost ? undefined : 'Abrir ficha en una ventana'}
     >
       <div className="kanban-card-top">
         <span className="kanban-drag-handle" aria-hidden>
@@ -384,28 +499,37 @@ function BoardTicket({
       </footer>
     </article>
   )
-}
+})
 
-export default function BoardsManagerView({ workshop }: Props) {
+export default function BoardsManagerView({ workshop, onOpenLead, refreshToken = 0 }: Props) {
   const range = resolveDateRange('mes', '', '')
   const { items, loading, error, sourceNotice, refresh } = useOperationalData(workshop, range)
+
+  useEffect(() => {
+    if (refreshToken > 0) void refresh()
+  }, [refreshToken, refresh])
   const [activeDepartment, setActiveDepartment] = useState<DepartmentId>('mechanics')
   const [priorities, setPriorities] = useState<PriorityMap>(() => loadJson(priorityKey(workshop.id), {}))
   const [manualEntries, setManualEntries] = useState<ManualEntry[]>(() =>
     loadJson(manualKey(workshop.id), []),
   )
   const [orders, setOrders] = useState<OrderMap>(() => loadJson(orderKey(workshop.id), {}))
-  const [drag, setDrag] = useState<DragLive | null>(null)
   const [showNewEntry, setShowNewEntry] = useState(false)
   const [draftTitle, setDraftTitle] = useState('')
   const [draftPhone, setDraftPhone] = useState('')
   const [draftNote, setDraftNote] = useState('')
 
-  const ghostRef = useRef<HTMLDivElement>(null)
+  const ghostLayerRef = useRef<HTMLElement | null>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const boardRef = useRef<BoardDrag | null>(null)
   const lastPtrRef = useRef({ x: 0, y: 0 })
   const dragRef = useRef<DragLive | null>(null)
   const hoverRef = useRef<HoverSlot | null>(null)
   const rafRef = useRef(0)
+  const dragListenRef = useRef<{
+    move: (e: PointerEvent) => void
+    up: () => void
+  } | null>(null)
   const pendingRef = useRef<{
     id: string
     card: BoardCard
@@ -416,6 +540,7 @@ export default function BoardsManagerView({ workshop }: Props) {
     grabY: number
     width: number
     height: number
+    sourceEl: HTMLElement
   } | null>(null)
   const columnsRef = useRef<Record<PriorityId, BoardCard[]>>({
     urgente: [],
@@ -499,27 +624,6 @@ export default function BoardsManagerView({ workshop }: Props) {
     deptRef.current = activeDepartment
   }, [activeDepartment])
 
-  useEffect(() => {
-    dragRef.current = drag
-  }, [drag])
-
-  useLayoutEffect(() => {
-    if (!drag) {
-      clearLiveDragDom()
-      return
-    }
-    const source = document.querySelector<HTMLElement>(`[data-card-id="${drag.id}"]`)
-    source?.classList.add('is-dragging-source')
-    const startIndex = Math.max(
-      0,
-      columnsRef.current[drag.fromCol].findIndex((card) => cardId(card) === drag.id),
-    )
-    hoverRef.current = { col: drag.fromCol, index: startIndex }
-    placeSlot(drag.fromCol, startIndex, drag.height)
-    setDropColumn(drag.fromCol)
-    moveGhost(lastPtrRef.current.x, lastPtrRef.current.y, drag)
-  }, [drag])
-
   const placeCard = useCallback((id: string, to: PriorityId, index: number) => {
     const dept = deptRef.current
     const workshopId = workshopIdRef.current
@@ -552,9 +656,8 @@ export default function BoardsManagerView({ workshop }: Props) {
   }, [])
 
   const moveGhost = (clientX: number, clientY: number, live: DragLive) => {
-    const el = ghostRef.current
+    const el = ghostLayerRef.current
     if (!el) return
-    el.style.width = `${live.width}px`
     el.style.transform = `translate3d(${clientX - live.grabX}px, ${clientY - live.grabY}px, 0)`
   }
 
@@ -571,24 +674,84 @@ export default function BoardsManagerView({ workshop }: Props) {
     if (live && slot) placeCard(live.id, slot.col, slot.index)
     dragRef.current = null
     hoverRef.current = null
-    clearLiveDragDom()
-    setDrag(null)
+    ghostLayerRef.current = null
+    const board = boardRef.current
+    boardRef.current = null
+    clearLiveDragDom(gridRef.current, board)
   }, [placeCard])
 
+  const openCard = useCallback(
+    (card: BoardCard) => {
+      if (!onOpenLead) return
+      if (card.kind === 'peticion') {
+        onOpenLead(card.item)
+        return
+      }
+      const entry = card.entry
+      onOpenLead({
+        idpeticion: entry.id,
+        idtaller: workshop.id,
+        descripcion: entry.note || null,
+        idtipopeticion: null,
+        tipopeticion: 'Tarea manual',
+        fechainicio: entry.createdAt,
+        fechafin: null,
+        fechacreacion: entry.createdAt,
+        caller: entry.phone || null,
+        gestionado: null,
+        gestionemail: null,
+        gestionfecha: null,
+        gestionobservaciones: entry.note || null,
+        idcita: entry.id,
+        cita: {
+          idcita: entry.id,
+          fecha: null,
+          nombre: entry.title,
+          apellidos: null,
+          telefono: entry.phone || null,
+          movil: null,
+          email: null,
+          matricula: null,
+          marca: null,
+          modelo: null,
+          asunto: entry.note || null,
+        },
+      })
+    },
+    [onOpenLead, workshop.id],
+  )
+  const openCardRef = useRef(openCard)
   useEffect(() => {
+    openCardRef.current = openCard
+  }, [openCard])
+
+  const detachDragListeners = useCallback(() => {
+    const listeners = dragListenRef.current
+    if (!listeners) return
+    window.removeEventListener('pointermove', listeners.move)
+    window.removeEventListener('pointerup', listeners.up)
+    window.removeEventListener('pointercancel', listeners.up)
+    dragListenRef.current = null
+  }, [])
+
+  const attachDragListeners = useCallback(() => {
+    if (dragListenRef.current) return
+
     const flushMove = () => {
       rafRef.current = 0
       const { x, y } = lastPtrRef.current
       const live = dragRef.current
       if (!live) return
       moveGhost(x, y, live)
-      const next = hitHover(x, y, hoverRef.current)
+      const board = boardRef.current
+      if (!board) return
+      const next = hitHover(x, y, board, hoverRef.current)
       if (!next) return
       const cur = hoverRef.current
       if (cur && cur.col === next.col && cur.index === next.index) return
       hoverRef.current = next
-      placeSlot(next.col, next.index, live.height)
-      setDropColumn(next.col)
+      placeSlot(board, next.col, next.index)
+      setDropColumn(board, next.col)
     }
 
     const onMove = (e: PointerEvent) => {
@@ -609,7 +772,33 @@ export default function BoardsManagerView({ workshop }: Props) {
         dragRef.current = live
         document.body.style.userSelect = 'none'
         document.body.style.cursor = 'move'
-        setDrag(live)
+        const grid = gridRef.current
+        const source = pending.sourceEl
+        const list = source.closest<HTMLElement>('.kanban-cards')
+        ghostLayerRef.current = spawnGhost(source, live)
+        moveGhost(e.clientX, e.clientY, live)
+        grid?.classList.add('is-reordering')
+        const slot = document.createElement('div')
+        slot.className = 'kanban-card-slot'
+        slot.style.height = `${live.height}px`
+        list?.insertBefore(slot, source)
+        source.classList.add('is-dragging-source')
+        const startIndex = Math.max(
+          0,
+          columnsRef.current[live.fromCol].findIndex((card) => cardId(card) === live.id),
+        )
+        const geoms = grid ? measureBoard(grid, live.id) : []
+        const fromGeom = geoms.find((item) => item.id === live.fromCol)
+        if (fromGeom) fromGeom.slotIndex = startIndex
+        const board: BoardDrag = {
+          geoms,
+          slot,
+          slotH: live.height,
+          dropCol: null,
+        }
+        boardRef.current = board
+        hoverRef.current = { col: live.fromCol, index: startIndex }
+        setDropColumn(board, live.fromCol)
         return
       }
 
@@ -619,47 +808,58 @@ export default function BoardsManagerView({ workshop }: Props) {
     }
 
     const onUp = () => {
-      if (pendingRef.current) {
+      const pending = pendingRef.current
+      detachDragListeners()
+      if (pending) {
         pendingRef.current = null
+        openCardRef.current(pending.card)
         return
       }
       if (!dragRef.current) return
       endDrag()
     }
 
+    dragListenRef.current = { move: onMove, up: onUp }
     window.addEventListener('pointermove', onMove, { passive: false })
     window.addEventListener('pointerup', onUp)
     window.addEventListener('pointercancel', onUp)
-    return () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', onUp)
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    }
-  }, [endDrag])
+  }, [detachDragListeners, endDrag])
 
-  const startCardDrag = (
-    e: ReactPointerEvent<HTMLElement>,
-    card: BoardCard,
-    fromCol: PriorityId,
-  ) => {
+  useEffect(
+    () => () => {
+      detachDragListeners()
+      clearLiveDragDom(gridRef.current, boardRef.current)
+    },
+    [detachDragListeners],
+  )
+
+  const onGridPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
     const target = e.target as HTMLElement
     if (target.closest('button, a, input, textarea, select')) return
-    const rect = e.currentTarget.getBoundingClientRect()
+    const ticket = target.closest<HTMLElement>('[data-card-id]')
+    const column = ticket?.closest<HTMLElement>('[data-kanban-col]')
+    const col = column?.dataset.kanbanCol as PriorityId | undefined
+    const id = ticket?.dataset.cardId
+    if (!ticket || !col || !id) return
+    const card = columnsRef.current[col].find((item) => cardId(item) === id)
+    if (!card) return
+    const rect = ticket.getBoundingClientRect()
     lastPtrRef.current = { x: e.clientX, y: e.clientY }
     pendingRef.current = {
-      id: cardId(card),
+      id,
       card,
-      fromCol,
+      fromCol: col,
       startX: e.clientX,
       startY: e.clientY,
       grabX: e.clientX - rect.left,
       grabY: e.clientY - rect.top,
       width: rect.width,
       height: rect.height,
+      sourceEl: ticket,
     }
-  }
+    attachDragListeners()
+  }, [attachDragListeners])
 
   const openNewEntry = () => {
     setDraftTitle('')
@@ -695,24 +895,8 @@ export default function BoardsManagerView({ workshop }: Props) {
     setShowNewEntry(false)
   }
 
-  const ghostColumn = COLUMNS.find((col) => col.id === drag?.fromCol) ?? COLUMNS[2]
-
   return (
     <div className="dashboard-page boards-page">
-      <header className="dashboard-header-top">
-        <div>
-          <p className="section-eyebrow">Flujos especializados</p>
-          <h1 className="section-title">Gestor de tableros</h1>
-          <p className="section-subtitle mt-1">
-            Elige departamento y mueve las tarjetas según la prioridad del asesor.
-          </p>
-        </div>
-        <button type="button" className="ghost-button" onClick={() => void refresh()} disabled={loading}>
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          Actualizar
-        </button>
-      </header>
-
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
       {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
 
@@ -809,7 +993,12 @@ export default function BoardsManagerView({ workshop }: Props) {
         </form>
       ) : null}
 
-      <div className={`kanban-grid custom-scrollbar-light${drag ? ' is-reordering' : ''}`} role="list">
+      <div
+        ref={gridRef}
+        className="kanban-grid custom-scrollbar-light"
+        role="list"
+        onPointerDown={onGridPointerDown}
+      >
         {COLUMNS.map((column) => {
           const cards = columns[column.id]
           const showEmpty = !loading && cards.length === 0
@@ -818,7 +1007,7 @@ export default function BoardsManagerView({ workshop }: Props) {
             <section
               key={column.id}
               data-kanban-col={column.id}
-              className={`kanban-column glass glass-lite tone-${column.tone}`}
+              className={`kanban-column tone-${column.tone}`}
               aria-label={column.label}
             >
               <header>
@@ -842,7 +1031,6 @@ export default function BoardsManagerView({ workshop }: Props) {
                       key={cardId(card)}
                       card={card}
                       column={column}
-                      onPointerDown={(e) => startCardDrag(e, card, column.id)}
                     />
                   ))
                 )}
@@ -852,11 +1040,6 @@ export default function BoardsManagerView({ workshop }: Props) {
         })}
       </div>
 
-      {drag ? (
-        <div ref={ghostRef} className="kanban-ghost-layer" aria-hidden>
-          <BoardTicket card={drag.card} column={ghostColumn} ghost />
-        </div>
-      ) : null}
     </div>
   )
 }

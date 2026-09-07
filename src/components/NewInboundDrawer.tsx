@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { MessageSquare, PhoneCall, Sparkles, X } from 'lucide-react'
 import VehiclePlate, { formatMatricula } from './ui/VehiclePlate'
-import { LAURA_AVATAR_EVENT, loadLauraAvatar } from '../lib/lauraProfile'
+import { BOT_CONFIG_EVENT, loadActiveBotProfile } from '../lib/botProfiles'
 
 type Canal = 'voz' | 'whatsapp'
 
@@ -72,16 +72,16 @@ export default function NewInboundDrawer({ workshopName, onClose, onSubmit }: Pr
   const [modelo, setModelo] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [canal, setCanal] = useState<Canal>('voz')
-  const [avatar, setAvatar] = useState(loadLauraAvatar)
+  const [profile, setProfile] = useState(loadActiveBotProfile)
   const [avatarOk, setAvatarOk] = useState(true)
 
   useEffect(() => {
     const sync = () => {
-      setAvatar(loadLauraAvatar())
+      setProfile(loadActiveBotProfile())
       setAvatarOk(true)
     }
-    window.addEventListener(LAURA_AVATAR_EVENT, sync)
-    return () => window.removeEventListener(LAURA_AVATAR_EVENT, sync)
+    window.addEventListener(BOT_CONFIG_EVENT, sync)
+    return () => window.removeEventListener(BOT_CONFIG_EVENT, sync)
   }, [])
 
   useEffect(() => {
@@ -112,18 +112,18 @@ export default function NewInboundDrawer({ workshopName, onClose, onSubmit }: Pr
             <span className="inbound-modal-avatar" aria-hidden>
               {avatarOk ? (
                 <img
-                  src={avatar}
+                  src={profile.photo}
                   alt=""
                   onError={() => setAvatarOk(false)}
                 />
               ) : (
-                <span className="inbound-modal-avatar-fallback">L</span>
+                <span className="inbound-modal-avatar-fallback">{profile.name.charAt(0).toUpperCase()}</span>
               )}
             </span>
             <div className="min-w-0">
               <div className="inbound-modal-heading">
                 <h2 id="inbound-title">Simulador de Inbound / Nueva Tarea</h2>
-                <span className="inbound-laura-badge">Laura</span>
+                <span className="inbound-laura-badge">{profile.name}</span>
               </div>
               <p className="section-subtitle">
                 Simula una llamada entrante o mensaje entrante con previsualización en vivo de la placa europea.

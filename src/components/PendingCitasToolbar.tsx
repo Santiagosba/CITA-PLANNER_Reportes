@@ -1,4 +1,4 @@
-import { Download, RefreshCw } from 'lucide-react'
+import { Download } from 'lucide-react'
 import { CALENDAR_SCALE_OPTIONS, type CalendarScale } from '../lib/calendarScale'
 import { type DateRangePreset, type ResolvedDateRange } from '../lib/dateRangePresets'
 import { CHANNEL_OPTIONS } from '../lib/tallerStations'
@@ -62,45 +62,22 @@ export default function PendingCitasToolbar({
   calendarScale,
   onCalendarScaleChange,
   onGoToday,
-  onRefresh,
+  onRefresh: _onRefresh,
   onExport,
 }: Props) {
   const pctDone = !loading && stats.total > 0 ? Math.round(stats.pctHechas) : null
 
-  const title =
-    view === 'calendario'
-      ? 'Calendario'
-      : view === 'tabla'
-        ? 'Listado de consultas'
-        : 'Consultas pendientes'
-
-  const subtitle =
-    view === 'calendario'
-      ? 'Agenda del taller por día, semana, mes o año.'
-      : view === 'tabla'
-        ? 'Todas las consultas del periodo seleccionado.'
-        : 'Llamadas y tareas del chatbot: cuántas están hechas y cuántas faltan.'
-
   return (
     <header className="dashboard-header panel-stack">
-      <div className="dashboard-header-top">
-        <div>
-          <h1 className="section-title">{title}</h1>
-          <p className="section-subtitle mt-1">{subtitle}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={onRefresh} disabled={loading}>
-            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-            Actualizar
+      {view === 'tabla' ? (
+        <div className="dashboard-header-top">
+          <p className="section-subtitle">Exporta el periodo con todos los casos.</p>
+          <Button variant="primary" onClick={onExport} disabled={!canExport}>
+            <Download size={18} />
+            Descargar
           </Button>
-          {view === 'tabla' ? (
-            <Button variant="primary" onClick={onExport} disabled={!canExport}>
-              <Download size={18} />
-              Descargar
-            </Button>
-          ) : null}
         </div>
-      </div>
+      ) : null}
 
       <div className="elevator-filters glass glass-lite">
         <div className="filter-field">

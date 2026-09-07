@@ -1,5 +1,5 @@
 import { ChevronDown, Phone } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { memo, type ReactNode } from 'react'
 import ActionButton, { type ActionStatus } from './ui/ActionButton'
 import VehiclePlate from './ui/VehiclePlate'
 import { formatAgendaTime } from '../lib/agendaGrouping'
@@ -11,14 +11,14 @@ type Props = {
   saveStatus: ActionStatus
   gestionObs: string
   gestionEmail: string
-  onToggle: () => void
+  onToggle: (id: string) => void
   onGestionObsChange: (v: string) => void
   onGestionEmailChange: (v: string) => void
   onMarkGestionado: (gestionado: boolean) => void
-  onOpenLead?: () => void
+  onOpenLead?: (peticion: PeticionPendiente) => void
 }
 
-export default function PeticionRow({
+function PeticionRow({
   peticion: p,
   expanded,
   saveStatus,
@@ -64,10 +64,10 @@ export default function PeticionRow({
           className="prow-toggle"
           onClick={() => {
             if (onOpenLead) {
-              onOpenLead()
+              onOpenLead(p)
               return
             }
-            onToggle()
+            onToggle(p.idpeticion)
           }}
           aria-expanded={openInWindow ? undefined : expanded}
           aria-controls={openInWindow ? undefined : `prow-body-${p.idpeticion}`}
@@ -175,3 +175,5 @@ function Detail({ label, value }: { label: string; value: ReactNode }) {
     </div>
   )
 }
+
+export default memo(PeticionRow)

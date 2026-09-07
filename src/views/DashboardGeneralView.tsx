@@ -1,5 +1,5 @@
-import { useEffect } from 'react'
-import { AlertTriangle, ArrowRight, CalendarCheck2, ClipboardList, RefreshCw, Wrench } from 'lucide-react'
+import { useEffect, useMemo } from 'react'
+import { AlertTriangle, ArrowRight, CalendarCheck2, ClipboardList, Wrench } from 'lucide-react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
 import { HexLoaderScreen } from '../components/ui/HexLoader'
 import Card from '../components/ui/Card'
@@ -32,30 +32,23 @@ export default function DashboardGeneralView({
     if (refreshToken > 0) void refresh()
   }, [refreshToken, refresh])
 
-  const stats = computePeticionesStats(items)
-  const citas = items.filter((item) => Boolean(item.cita?.fecha))
-  const slaCriticos = items.filter(
-    (item) =>
-      !item.gestionado && (isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha)),
+  const stats = useMemo(() => computePeticionesStats(items), [items])
+  const citasCount = useMemo(
+    () => items.reduce((n, item) => n + (item.cita?.fecha ? 1 : 0), 0),
+    [items],
   )
-  const slaCount = slaCriticos.length
+  const slaCount = useMemo(
+    () =>
+      items.reduce((n, item) => {
+        if (item.gestionado) return n
+        if (isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha)) return n + 1
+        return n
+      }, 0),
+    [items],
+  )
 
   return (
     <div className="dashboard-page operational-dashboard">
-      <header className="dashboard-header-top">
-        <div>
-          <p className="section-eyebrow">Control operativo</p>
-          <h1 className="section-title">Dashboard general</h1>
-          <p className="section-subtitle mt-1">
-            Resumen de actividad de {workshop.name} durante {range.label.toLowerCase()}.
-          </p>
-        </div>
-        <button type="button" className="ghost-button" onClick={() => void refresh()} disabled={loading}>
-          <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          Actualizar
-        </button>
-      </header>
-
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
       {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
 
@@ -101,7 +94,7 @@ export default function DashboardGeneralView({
           icon={CalendarCheck2}
           label="Total del mes"
           value={loading ? '—' : stats.total}
-          helper={`${citas.length} con cita en calendario`}
+          helper={`${citasCount} con cita en calendario`}
           tone="brand"
           onClick={onOpenCalendar}
         />

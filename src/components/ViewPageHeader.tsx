@@ -1,0 +1,304 @@
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { Bell, Moon, Search, Server, Sparkles, Sun } from 'lucide-react'
+import { headerNoticeItems, searchPeticionesAi } from '../lib/aiHeaderSearch'
+import { resolveDateRange } from '../lib/dateRangePresets'
+import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
+import { isSlaCritico } from '../lib/tallerStations'
+import { invalidateOperationalData, useOperationalData } from '../hooks/useOperationalData'
+import type { DashboardShellRoute } from './Sidebar'
+import type { Workshop } from '../types'
+import VehiclePlate from './ui/VehiclePlate'
+
+type TriageTab = 'kanban' | 'tabla' | 'calendario'
+
+type Props = {
+  route: DashboardShellRoute
+  triageTab?: TriageTab
+  workshop: Workshop
+  botName: string
+  isDarkMode: boolean
+  onToggleTheme: () => void
+  onOpenLead: (peticion: PeticionPendiente) => void
+  onOpenTriage: (opts?: { slaOnly?: boolean }) => void
+  onSynced: () => void
+}
+
+function pageCopy(route: DashboardShellRoute, triageTab: TriageTab | undefined, botName: string) {
+  if (route === 'pending-citas' && triageTab === 'calendario') {
+    return {
+      title: 'Calendario',
+      subtitle: 'Agenda del taller por día, semana, mes o año.',
+    }
+  }
+  if (route === 'reportes' || (route === 'pending-citas' && triageTab === 'tabla')) {
+    return {
+      title: 'Listado de consultas',
+      subtitle: 'Todas las consultas del periodo seleccionado.',
+    }
+  }
+  switch (route) {
+    case 'dashboard-general':
+      return {
+        title: 'Dashboard General & Control Operativo',
+        subtitle: 'Visión ejecutiva de llamadas, derivaciones a taller y estado de boxes',
+      }
+    case 'pending-citas':
+      return {
+        title: 'Triage operativo',
+        subtitle: 'Llamadas y tareas del chatbot: cuántas están hechas y cuántas faltan.',
+      }
+    case 'boards':
+      return {
+        title: 'Gestor de tableros',
+        subtitle: 'Elige departamento y mueve las tarjetas según la prioridad del asesor.',
+      }
+    case 'laura':
+      return {
+        title: `Asistente de IA ${botName}`,
+        subtitle: 'Monitor de telemetría conversacional, precisión de diagnosis y derivación a taller.',
+      }
+    case 'bot-identity':
+      return {
+        title: 'Identidad del asistente de voz',
+        subtitle: 'Elige quién atiende las llamadas y personaliza nombre, saludo y foto.',
+      }
+    case 'configuration':
+      return {
+        title: 'Ajustes',
+        subtitle: 'Gestiona los parámetros generales de la plataforma.',
+      }
+    default:
+      return {
+        title: 'Control operativo',
+        subtitle: 'Visión ejecutiva de llamadas, derivaciones a taller y estado de boxes',
+      }
+  }
+}
+
+function leadTitle(item: PeticionPendiente): string {
+  const cita = item.cita
+  const name = cita ? [cita.nombre, cita.apellidos].filter(Boolean).join(' ') : ''
+  return name || item.caller || 'Cliente sin identificar'
+}
+
+export default function ViewPageHeader({
+  route,
+  triageTab,
+  workshop,
+  botName,
+  isDarkMode,
+  onToggleTheme,
+  onOpenLead,
+  onOpenTriage,
+  onSynced,
+}: Props) {
+  const range = resolveDateRange('mes', '', '')
+  const { items, loading, refresh } = useOperationalData(workshop, range)
+  const copy = pageCopy(route, triageTab, botName)
+
+  const slaItems = useMemo(
+    () =>
+      items.filter(
+        (item) =>
+          !item.gestionado && (isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha)),
+      ),
+    [items],
+  )
+  const slaCount = slaItems.length
+
+  const [query, setQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [noticesOpen, setNoticesOpen] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const searchRef = useRef<HTMLDivElement>(null)
+  const noticesRef = useRef<HTMLDivElement>(null)
+
+  const hits = useMemo(() => searchPeticionesAi(items, query), [items, query])
+  const notices = useMemo(() => headerNoticeItems(items), [items])
+
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node
+      if (!searchRef.current?.contains(t)) setSearchOpen(false)
+      if (!noticesRef.current?.contains(t)) setNoticesOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSearchOpen(false)
+        setNoticesOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [])
+
+  const openHit = (item: PeticionPendiente) => {
+    setSearchOpen(false)
+    setNoticesOpen(false)
+    setQuery('')
+    onOpenLead(item)
+  }
+
+  const submitSearch = (e: FormEvent) => {
+    e.preventDefault()
+    setSearchOpen(true)
+    if (hits[0]) openHit(hits[0].item)
+  }
+
+  const syncDms = async () => {
+    setSyncing(true)
+    invalidateOperationalData(workshop)
+    await refresh()
+    onSynced()
+    setSyncing(false)
+  }
+
+  return (
+    <header className="view-page-header">
+      <div className="view-page-header-copy">
+        <h1 className="section-title">{copy.title}</h1>
+        <div className="view-page-header-meta">
+          <span className="badge tone-neutral">{workshop.name}</span>
+          <button
+            type="button"
+            className={`badge ${slaCount > 0 ? 'tone-negative' : 'tone-positive'}`}
+            onClick={() => onOpenTriage({ slaOnly: slaCount > 0 })}
+          >
+            {loading ? '…' : slaCount} SLA crítico
+          </button>
+        </div>
+        <p className="section-subtitle mt-1">{copy.subtitle}</p>
+      </div>
+
+      <div className="view-page-header-tools">
+        <div className="view-page-search" ref={searchRef}>
+          <form className="view-page-search-field" onSubmit={submitSearch}>
+            <label className="sr-only" htmlFor="avi-ai-search">
+              Buscar con IA
+            </label>
+            <Search size={18} className="view-page-search-icon" aria-hidden />
+            <input
+              id="avi-ai-search"
+              className="view-page-search-input"
+              type="search"
+              value={query}
+              placeholder="Buscar matrícula, cliente o avería..."
+              onChange={(e) => {
+                setQuery(e.target.value)
+                setSearchOpen(true)
+              }}
+              onFocus={() => setSearchOpen(true)}
+              autoComplete="off"
+            />
+            <Sparkles size={16} className="view-page-search-ai" aria-hidden />
+          </form>
+          {searchOpen && query.trim() ? (
+            <div className="view-page-popover glass glass-lite" role="listbox" aria-label="Resultados de Laura">
+              <p className="view-page-popover-hint">
+                <Sparkles size={14} aria-hidden />
+                Laura interpreta «{query.trim()}»
+              </p>
+              {hits.length === 0 ? (
+                <p className="section-subtitle view-page-popover-empty">No hay coincidencias en este taller.</p>
+              ) : (
+                <ul className="view-page-popover-list custom-scrollbar-light">
+                  {hits.map((hit) => (
+                    <li key={hit.item.idpeticion}>
+                      <button type="button" className="view-page-popover-row" onClick={() => openHit(hit.item)}>
+                        <span className="view-page-popover-row-top">
+                          <strong>{leadTitle(hit.item)}</strong>
+                          <span className="badge tone-muted">{hit.reason}</span>
+                        </span>
+                        <span className="view-page-popover-row-meta">
+                          {hit.item.cita?.matricula ? (
+                            <VehiclePlate value={hit.item.cita.matricula} compact />
+                          ) : (
+                            <span>{hit.item.tipopeticion || 'Sin tipo'}</span>
+                          )}
+                          <time>{formatFecha(hit.item.fechainicio)}</time>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        <button type="button" className="ghost-button" onClick={() => void syncDms()} disabled={syncing || loading}>
+          <Server size={16} className={syncing ? 'animate-spin' : ''} aria-hidden />
+          Sync DMS
+        </button>
+
+        <button
+          type="button"
+          className="ghost-button"
+          onClick={onToggleTheme}
+          aria-pressed={isDarkMode}
+        >
+          {isDarkMode ? <Sun size={16} aria-hidden /> : <Moon size={16} aria-hidden />}
+          {isDarkMode ? 'Claro' : 'Oscuro'}
+        </button>
+
+        <div className="view-page-bell" ref={noticesRef}>
+          <button
+            type="button"
+            className={`view-page-bell-btn ${noticesOpen ? 'is-open' : ''}`}
+            onClick={() => setNoticesOpen((open) => !open)}
+            aria-expanded={noticesOpen}
+            aria-haspopup="dialog"
+            title="Notificaciones"
+          >
+            <Bell size={18} aria-hidden />
+            {notices.length > 0 ? (
+              <span className="view-page-bell-dot" aria-hidden />
+            ) : null}
+            <span className="sr-only">
+              {notices.length > 0 ? `${notices.length} avisos` : 'Sin avisos'}
+            </span>
+          </button>
+          {noticesOpen ? (
+            <div className="view-page-popover glass glass-lite view-page-notices" role="dialog" aria-label="Notificaciones">
+              <div className="view-page-notices-head">
+                <strong>Avisos del taller</strong>
+                <button type="button" className="ghost-button" onClick={() => setNoticesOpen(false)}>
+                  Cerrar
+                </button>
+              </div>
+              {notices.length === 0 ? (
+                <p className="section-subtitle view-page-popover-empty">No hay avisos pendientes.</p>
+              ) : (
+                <ul className="view-page-popover-list custom-scrollbar-light">
+                  {notices.map((item) => {
+                    const sla = isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha)
+                    return (
+                      <li key={item.idpeticion}>
+                        <button type="button" className="view-page-popover-row" onClick={() => openHit(item)}>
+                          <span className="view-page-popover-row-top">
+                            <strong>{leadTitle(item)}</strong>
+                            <span className={`badge ${sla ? 'tone-negative' : 'tone-warning'}`}>
+                              {sla ? 'SLA crítico' : isPeticionPendiente(item) ? 'Pendiente' : 'Aviso'}
+                            </span>
+                          </span>
+                          <span className="view-page-popover-row-meta">
+                            <span>{item.tipopeticion || item.descripcion || 'Sin detalle'}</span>
+                            <time>{formatFecha(item.fechainicio)}</time>
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </header>
+  )
+}

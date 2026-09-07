@@ -147,13 +147,8 @@ export default function App() {
 
     const hubIconEnv = hubIcon?.trim()
     const hubRowIcon = (crmHubWebBranding?.icon_image_url || '').trim()
-    const licenseLogo = (
-      licenseLogoUrl?.trim() ||
-      (slugBranding?.branding?.logo_url as string | undefined)?.trim() ||
-      ''
-    ).trim()
-    const desired = hubIconEnv || hubRowIcon || licenseLogo
-    const fallback = link.dataset.defaultHref || CRM_FAVICON_FALLBACK_HREF
+    const desired = hubIconEnv || hubRowIcon
+    const fallback = CRM_FAVICON_FALLBACK_HREF
 
     if (desired) {
       if (faviconAppliedFor.current !== desired) {

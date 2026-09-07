@@ -6,7 +6,7 @@ import { supabaseOperations } from './supabase'
 import { getCrmHubWebIdFromEnv } from './hubWebEnv'
 import { HUB_WEB_SLUG_CRM } from './hubSites'
 
-export const CRM_FAVICON_FALLBACK_HREF = '/favicon.svg'
+export const CRM_FAVICON_FALLBACK_HREF = '/avibot-logo.png'
 
 export interface CrmHubWebBranding {
   id: string

@@ -14,7 +14,6 @@ import {
   PhoneCall,
   Plus,
   Save,
-  Settings,
   Tag,
   Trash2,
   Upload,
@@ -484,17 +483,6 @@ export default function SettingsShellView({ workshop, isDarkMode: _isDarkMode, s
 
   return (
     <div className="flex h-full min-h-0 flex-col panel-stack animate-fade-in-up">
-      <div className="shrink-0">
-        <p className="section-eyebrow">Ajustes</p>
-        <h1 className="section-title flex items-center gap-2">
-          <Settings size={24} className="text-[var(--muted)]" aria-hidden />
-          Configuración
-        </h1>
-        <p className="section-subtitle mt-1">
-          Gestiona los parámetros generales de la plataforma (maqueta Hub).
-        </p>
-      </div>
-
       <div className="nav-segment custom-scrollbar-light shrink-0 overflow-x-auto">
         {visibleTabs.map((tab) => {
           const Icon = tab.icon

@@ -1,4 +1,5 @@
 import {
+  BadgeCheck,
   ClipboardList,
   Columns3,
   LayoutDashboard,
@@ -10,20 +11,58 @@ import {
   Settings,
   Sparkles,
   Sun,
-  Table2,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { DashboardShellRoute } from './Sidebar'
+import { BOT_CONFIG_EVENT, loadActiveBotProfile } from '../lib/botProfiles'
 
 const NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] = [
   { id: 'dashboard-general', label: 'Dashboard general', icon: LayoutDashboard },
-  { id: 'pending-citas', label: 'Consultas pendientes', icon: ClipboardList },
+  { id: 'pending-citas', label: 'Triage operativo', icon: ClipboardList },
   { id: 'boards', label: 'Gestor de tableros', icon: Columns3 },
-  { id: 'reportes', label: 'Listado completo', icon: Table2 },
   { id: 'laura', label: 'Asistente de IA Laura', icon: Sparkles },
-  { id: 'configuration', label: 'Ajustes', icon: Settings },
+  { id: 'bot-identity', label: 'Identidad del bot', icon: BadgeCheck },
 ]
+
+/** Pieza extruida: apila capas del mismo vector en Z para darle grosor 3D real. */
+function ExtrudedPiece({
+  className,
+  z = 0,
+  layers = 7,
+  spacing = 0.8,
+  children,
+}: {
+  className?: string
+  z?: number
+  layers?: number
+  spacing?: number
+  children: ReactNode
+}) {
+  const half = ((layers - 1) * spacing) / 2
+  return (
+    <span className={`a3d-piece ${className ?? ''}`.trim()} style={{ transform: `translateZ(${z}px)` }}>
+      {Array.from({ length: layers }).map((_, i) => (
+        <span
+          key={i}
+          className="a3d-piece-layer"
+          style={{
+            transform: `translateZ(${(half - i * spacing).toFixed(2)}px)`,
+            filter:
+              i === 0
+                ? 'drop-shadow(0 2px 3px rgba(8, 15, 30, 0.35))'
+                : `brightness(${Math.max(0.32, 0.7 - (i / (layers - 1)) * 0.38).toFixed(2)})`,
+          }}
+        >
+          {children}
+        </span>
+      ))}
+    </span>
+  )
+}
+
+/* Icono oficial AVIBOT (imagen real) que se extruye en capas para el efecto 3D */
+const AVIBOT_ICON = <img src="/avibot-logo.png" alt="" draggable={false} />
 
 type Props = {
   workshopName: string
@@ -43,7 +82,6 @@ type Props = {
 
 export default function AppShell({
   workshopName,
-  licenseLogoUrl,
   productName,
   activeRoute,
   onNavigate,
@@ -56,6 +94,62 @@ export default function AppShell({
   asesorRole,
   children,
 }: Props) {
+  const [botName, setBotName] = useState(() => loadActiveBotProfile().name)
+  useEffect(() => {
+    const sync = () => setBotName(loadActiveBotProfile().name)
+    window.addEventListener(BOT_CONFIG_EVENT, sync)
+    return () => window.removeEventListener(BOT_CONFIG_EVENT, sync)
+  }, [])
+
+  // El logo 3D de marca sigue el puntero del ratón (rotación suave).
+  const cubeRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const cube = cubeRef.current
+    if (!cube) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
+    let raf = 0
+    let last: MouseEvent | null = null
+    let lastRy = 0
+    let lastRx = 0
+    let rect = cube.getBoundingClientRect()
+    const refreshRect = () => {
+      rect = cube.getBoundingClientRect()
+    }
+    const flush = () => {
+      raf = 0
+      const e = last
+      if (!e) return
+      const cx = rect.left + rect.width / 2
+      const cy = rect.top + rect.height / 2
+      const dx = e.clientX - cx
+      const dy = e.clientY - cy
+      // Cada lado se normaliza con SU propia distancia al borde de la ventana:
+      // así el icono llega al ángulo máximo también hacia la izquierda/arriba,
+      // aunque esté pegado a ese borde.
+      const rangeX = dx < 0 ? Math.max(cx, 1) : Math.max(window.innerWidth - cx, 1)
+      const rangeY = dy < 0 ? Math.max(cy, 1) : Math.max(window.innerHeight - cy, 1)
+      const ry = clamp((dx / rangeX) * 16, -16, 16)
+      const rx = clamp((-dy / rangeY) * 12, -12, 12)
+      if (Math.abs(ry - lastRy) < 0.2 && Math.abs(rx - lastRx) < 0.2) return
+      lastRy = ry
+      lastRx = rx
+      cube.style.setProperty('--cube-ry', `${ry.toFixed(2)}deg`)
+      cube.style.setProperty('--cube-rx', `${rx.toFixed(2)}deg`)
+    }
+    const onMove = (e: MouseEvent) => {
+      last = e
+      if (!raf) raf = requestAnimationFrame(flush)
+    }
+    window.addEventListener('mousemove', onMove, { passive: true })
+    window.addEventListener('resize', refreshRect)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('resize', refreshRect)
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [])
+
   return (
     <div className={`dashboard-shell ${isDarkMode ? '' : 'is-light'}`.trim()}>
       <a href="#main-content" className="skip-link">
@@ -65,16 +159,15 @@ export default function AppShell({
       <aside className="dashboard-sidebar glass glass-lite" aria-label="Navegación principal">
         <div className="dashboard-sidebar-brand">
           <div className="logo-slot logo-slot-sm">
-            {licenseLogoUrl ? (
-              <img
-                src={licenseLogoUrl}
-                alt=""
-                width={140}
-                height={40}
-                className="logo-slot-img"
-                referrerPolicy="no-referrer"
-              />
-            ) : null}
+            <div className="logo-cube" ref={cubeRef} aria-label="AVIBOT">
+              <span className="logo-cube-core">
+                <ExtrudedPiece className="a3d-icon" z={0} layers={12} spacing={0.75}>
+                  {AVIBOT_ICON}
+                </ExtrudedPiece>
+              </span>
+              {/* Recubrimiento liquid glass con reflejos RTX sobre el icono */}
+              <span className="logo-glass" aria-hidden />
+            </div>
           </div>
           <p className="section-eyebrow">{productName}</p>
           <p className="dashboard-sidebar-workshop">{workshopName}</p>
@@ -98,22 +191,33 @@ export default function AppShell({
           {NAV.map((item) => {
             const Icon = item.icon
             const active = activeRoute === item.id
+            const label = item.id === 'laura' ? `Asistente de IA ${botName}` : item.label
             return (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => onNavigate(item.id)}
+                title={label}
                 className={`dashboard-nav-item ${active ? 'is-active' : ''}`}
                 aria-current={active ? 'page' : undefined}
               >
                 <Icon size={18} aria-hidden />
-                {item.label}
+                {label}
               </button>
             )
           })}
         </nav>
 
         <div className="dashboard-sidebar-footer">
+          <button
+            type="button"
+            className={`dashboard-nav-item ${activeRoute === 'configuration' ? 'is-active' : ''}`}
+            onClick={() => onNavigate('configuration')}
+            aria-current={activeRoute === 'configuration' ? 'page' : undefined}
+          >
+            <Settings size={18} aria-hidden />
+            Ajustes
+          </button>
           <button
             type="button"
             className="dashboard-nav-item"

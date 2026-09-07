@@ -170,6 +170,12 @@ export default function CalendarTallerView({
       const key = toDateInputValue(new Date(cita.fecha!))
       map.get(key)?.get(slotOf(cita))?.push(cita)
     }
+    // Orden cronológico dentro de cada franja para poder separar por hora
+    for (const slotsMap of map.values()) {
+      for (const list of slotsMap.values()) {
+        list.sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)))
+      }
+    }
     return map
   }, [visibleCitas, gridDays, slots])
 
@@ -235,10 +241,11 @@ export default function CalendarTallerView({
       </section>
 
       {scale === 'dia' || scale === 'semana' ? (
-        <div className="calendar-schedule-wrap glass glass-lite custom-scrollbar-light">
+        <div className="calendar-schedule-wrap glass glass-lite">
           {loading ? (
             <HexLoaderScreen size="md" label="Cargando agenda del taller…" />
           ) : (
+            <div className="calendar-schedule-scroll custom-scrollbar-light">
             <table className={`calendar-schedule${scale === 'semana' ? ' is-week' : ' is-day'}`}>
               <thead>
                 <tr>
@@ -277,18 +284,23 @@ export default function CalendarTallerView({
                           {items.length === 0 ? (
                             <div className="calendar-slot is-free">Libre</div>
                           ) : (
-                            items.map((cita) => (
-                              <button
-                                key={cita.idcita}
-                                type="button"
-                                className={`calendar-slot is-busy${onOpenCita ? ' is-clickable' : ''}`}
-                                onClick={() => onOpenCita?.(cita)}
-                              >
-                                <strong>{vehicleLabel(cita)}</strong>
-                                <span className="calendar-slot-customer">{customerLabel(cita)}</span>
-                                {cita.matricula ? <VehiclePlate value={cita.matricula} compact /> : null}
-                              </button>
-                            ))
+                            items.map((cita, idx) => {
+                              // Solo se agrupan sin línea las citas a la misma hora exacta
+                              const sameTime = idx > 0 && citaTime(cita) === citaTime(items[idx - 1])
+                              return (
+                                <button
+                                  key={cita.idcita}
+                                  type="button"
+                                  className={`calendar-slot is-busy${onOpenCita ? ' is-clickable' : ''}${sameTime ? ' is-same-time' : ''}`}
+                                  onClick={() => onOpenCita?.(cita)}
+                                >
+                                  {citaTime(cita) && !sameTime ? <time>{citaTime(cita)}</time> : null}
+                                  <strong>{vehicleLabel(cita)}</strong>
+                                  <span className="calendar-slot-customer">{customerLabel(cita)}</span>
+                                  {cita.matricula ? <VehiclePlate value={cita.matricula} compact /> : null}
+                                </button>
+                              )
+                            })
                           )}
                         </td>
                       )
@@ -297,6 +309,7 @@ export default function CalendarTallerView({
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       ) : null}
@@ -309,6 +322,7 @@ export default function CalendarTallerView({
 
       {scale === 'mes' && !loading ? (
         <div className="calendar-month glass glass-lite">
+          <div className="calendar-month-board custom-scrollbar-light">
           <div className="calendar-month-weekdays">
             {WEEKDAY_LABELS.map((label) => (
               <span key={label}>{label}</span>
@@ -329,18 +343,14 @@ export default function CalendarTallerView({
                     {items.length > 0 ? <small>{items.length}</small> : null}
                   </button>
                   <div className="calendar-month-events">
-                    {items.slice(0, 3).map((cita) => (
+                    {items.map((cita) => (
                       <CitaChip key={cita.idcita} cita={cita} compact onOpen={onOpenCita} />
                     ))}
-                    {items.length > 3 ? (
-                      <button type="button" className="calendar-more" onClick={() => openDay(date)}>
-                        +{items.length - 3} más
-                      </button>
-                    ) : null}
                   </div>
                 </article>
               )
             })}
+          </div>
           </div>
         </div>
       ) : null}

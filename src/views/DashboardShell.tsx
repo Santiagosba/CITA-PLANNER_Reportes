@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import AppShell from '../components/AppShell'
+import ViewPageHeader from '../components/ViewPageHeader'
 import GestionBubbleDock, { MAX_TASKS, type AgendaSessionItem } from '../components/GestionBubbleDock'
 import LeadGestionDrawer, { type WinRect } from '../components/LeadGestionDrawer'
 import NewInboundDrawer from '../components/NewInboundDrawer'
@@ -11,9 +12,11 @@ import PendingCitasView from './PendingCitasView'
 import DashboardGeneralView from './DashboardGeneralView'
 import BoardsManagerView from './BoardsManagerView'
 import LauraIntelligenceView from './LauraIntelligenceView'
+import BotIdentityView from './BotIdentityView'
 import { mapSessionUserToCrmUser, type Workshop } from '../types'
 import { isGlobalAviAdmin } from '../lib/operationsConnect'
 import { getAppProductName } from '../lib/appIdentity'
+import { BOT_CONFIG_EVENT, loadActiveBotProfile } from '../lib/botProfiles'
 import {
   updatePeticionGestion,
   type PeticionPendiente,
@@ -43,13 +46,33 @@ type GestionSession = {
 }
 
 function defaultRect(index: number): WinRect {
-  const offset = (index % 6) * 28
-  return {
-    x: Math.max(48, Math.round(window.innerWidth / 2 - 360) + offset),
-    y: Math.max(36, 72 + offset),
-    w: 720,
-    h: Math.min(760, Math.round(window.innerHeight * 0.78)),
-  }
+  const margin = 20
+  const topGap = 56
+  // Ventana algo más estrecha para que quepan varias columnas ordenadas
+  const w = Math.min(680, Math.max(400, Math.round(window.innerWidth * 0.4)))
+  const h = Math.min(760, Math.round(window.innerHeight * 0.78))
+
+  // Cascada diagonal: cada ficha se desplaza un poco respecto a la anterior
+  // para que su barra de título (con la X de cerrar) quede siempre accesible.
+  const stepX = 34
+  const stepY = 38
+  const usableH = Math.max(stepY, window.innerHeight - h - topGap - margin)
+  const perColumn = Math.max(1, Math.floor(usableH / stepY) + 1)
+  const col = Math.floor(index / perColumn)
+  const row = index % perColumn
+
+  // Cada nueva columna arranca desplazada a la derecha para no solaparse
+  const columnShift = Math.min(Math.round(w * 0.55), 320)
+  const baseX = margin + col * columnShift
+  const x = Math.min(
+    Math.max(margin, window.innerWidth - w - margin),
+    baseX + row * stepX,
+  )
+  const y = Math.min(
+    Math.max(topGap, window.innerHeight - h - margin),
+    topGap + row * stepY,
+  )
+  return { x: Math.max(margin, x), y, w, h }
 }
 
 type SessionWindowProps = {
@@ -128,11 +151,19 @@ export default function DashboardShell({
   const [activeId, setActiveId] = useState<string | null>(null)
   const [inboundOpen, setInboundOpen] = useState(false)
   const [gestionBump, setGestionBump] = useState(0)
+  const [triageSlaOnly, setTriageSlaOnly] = useState(false)
+  const [botName, setBotName] = useState(() => loadActiveBotProfile().name)
   const [capacityNotice, setCapacityNotice] = useState<string | null>(null)
   const [agendaTucked, setAgendaTucked] = useState(false)
   const [sideMinWave, setSideMinWave] = useState(0)
   const zRef = useRef(100)
   const canEditHubBranding = isGlobalAviAdmin({ user: sessionUser })
+
+  useEffect(() => {
+    const sync = () => setBotName(loadActiveBotProfile().name)
+    window.addEventListener(BOT_CONFIG_EVENT, sync)
+    return () => window.removeEventListener(BOT_CONFIG_EVENT, sync)
+  }, [])
 
   const bumpZ = useCallback(() => {
     zRef.current += 1
@@ -480,6 +511,21 @@ export default function DashboardShell({
       asesorName={asesor.displayName}
       asesorRole={asesor.role}
     >
+      <ViewPageHeader
+        route={shellRoute}
+        triageTab={shellRoute === 'reportes' ? 'tabla' : triageTab}
+        workshop={workshop}
+        botName={botName}
+        isDarkMode={isDarkMode}
+        onToggleTheme={onToggleTheme}
+        onOpenLead={openLead}
+        onOpenTriage={(opts) => {
+          setTriageSlaOnly(Boolean(opts?.slaOnly))
+          setTriageTab('kanban')
+          setShellRoute('pending-citas')
+        }}
+        onSynced={() => setGestionBump((n) => n + 1)}
+      />
       {shellRoute === 'dashboard-general' ? (
         <DashboardGeneralView
           workshop={workshop}
@@ -495,9 +541,11 @@ export default function DashboardShell({
           refreshToken={gestionBump}
         />
       ) : shellRoute === 'boards' ? (
-        <BoardsManagerView workshop={workshop} />
+        <BoardsManagerView workshop={workshop} onOpenLead={openLead} refreshToken={gestionBump} />
       ) : shellRoute === 'laura' ? (
         <LauraIntelligenceView workshopName={workshop.name} />
+      ) : shellRoute === 'bot-identity' ? (
+        <BotIdentityView />
       ) : shellRoute === 'configuration' ? (
         <div className="dashboard-page">
           <SettingsShellView
@@ -511,6 +559,7 @@ export default function DashboardShell({
           workshop={workshop}
           isDarkMode={isDarkMode}
           initialTab={shellRoute === 'reportes' ? 'tabla' : triageTab}
+          initialSlaOnly={triageSlaOnly}
           key={`${shellRoute}-${triageTab}`}
           refreshToken={gestionBump}
           onOpenLead={openLead}

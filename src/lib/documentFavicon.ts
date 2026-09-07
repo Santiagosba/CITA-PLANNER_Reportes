@@ -1,5 +1,5 @@
 /** Simple favicon desde URL Hub (`icon_image_url`) o recurso estático local. */
-export function applyHubWebDocumentFavicon(imageUrl: string | null | undefined, fallbackHref = '/favicon.svg'): void {
+export function applyHubWebDocumentFavicon(imageUrl: string | null | undefined, fallbackHref = '/avibot-logo.png'): void {
   const trimmed = (imageUrl ?? '').trim();
   const href = trimmed || fallbackHref;
   let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');

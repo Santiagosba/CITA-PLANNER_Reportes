@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Activity, Camera, Mic, PhoneCall, Sparkles, Timer, Trash2 } from 'lucide-react'
 import Card from '../components/ui/Card'
+import { resizeImageFile } from '../lib/lauraProfile'
 import {
-  DEFAULT_LAURA_AVATAR,
-  LAURA_AVATAR_EVENT,
-  clearLauraAvatar,
-  loadLauraAvatar,
-  resizeImageFile,
-  saveLauraAvatar,
-} from '../lib/lauraProfile'
+  BOT_CONFIG_EVENT,
+  loadActiveBotProfile,
+  updateBotProfile,
+} from '../lib/botProfiles'
 
 type LauraTab = 'rendimiento' | 'calidad' | 'sla'
 
@@ -25,29 +23,38 @@ const DAILY = [
 ]
 
 const TIPOLOGIA = [
-  { label: 'Cita Mecánica', value: 42, color: '#0a55b8' },
-  { label: 'Cita Carrocería', value: 24, color: '#2563eb' },
-  { label: 'Peritaje de Seguros', value: 18, color: '#3b82f6' },
-  { label: 'Recambios y Flotas', value: 11, color: '#60a5fa' },
-  { label: 'Ventas VN / VO', value: 5, color: '#93c5fd' },
+  { label: 'Cita Mecánica', short: 'Mecánica', value: 42, color: '#0a55b8' },
+  { label: 'Cita Carrocería', short: 'Carrocería', value: 24, color: '#2563eb' },
+  { label: 'Peritaje de Seguros', short: 'Peritaje', value: 18, color: '#3b82f6' },
+  { label: 'Recambios y Flotas', short: 'Recambios', value: 11, color: '#60a5fa' },
+  { label: 'Ventas VN / VO', short: 'Ventas', value: 5, color: '#7dd3fc' },
 ] as const
 
 const PRECISION = [
   {
     value: '99,4%',
     pct: 99.4,
+    cobertura: 97.5,
+    muestras: 1482,
+    color: '#0a55b8',
     title: 'Reconocimiento de Matrícula (OCR / Fonética)',
     detail: 'Validación contra formato DGT (4 dígitos + 3 letras)',
   },
   {
     value: '94,8%',
     pct: 94.8,
+    cobertura: 92,
+    muestras: 1162,
+    color: '#f59e0b',
     title: 'Acierto en Asignación de Box / Operación',
     detail: 'Correcta tipificación (Mecánica, Chapa, Peritaje, EV)',
   },
   {
     value: '96,8%',
     pct: 96.8,
+    cobertura: 88,
+    muestras: 420,
+    color: '#22a06b',
     title: 'Cumplimiento SLA Alerta Asesor (<15 min)',
     detail: 'Tiempo medio de primer contacto humano: 8,5 minutos',
   },
@@ -129,10 +136,11 @@ export default function LauraIntelligenceView({ workshopName }: Props) {
             <Card className="laura-panel" padding="md">
               <p className="section-eyebrow">Distribución por Tipología</p>
               <h2 className="ops-card-title">Pentágono 3D · Clasificación IA según motivo</h2>
-              <Pentagon3D
-                caption="5 ramas de posventa"
+              <Radar3D
+                caption="5 ramas de posventa · escala 0–50%"
                 axes={TIPOLOGIA.map((item) => ({
                   label: item.label,
+                  short: item.short,
                   value: item.value,
                   color: item.color,
                 }))}
@@ -141,12 +149,11 @@ export default function LauraIntelligenceView({ workshopName }: Props) {
             <Card className="laura-panel" padding="md">
               <p className="section-eyebrow">Distribución por Canal</p>
               <h2 className="ops-card-title">Pastel vertical · Entradas a centralita</h2>
-              <VerticalPie
-                center="98,7%"
+              <UprightPie
                 caption="Disco 3D de pie · Canal Voz"
                 slices={[
                   { label: 'Voz Telefónica (Laura AI)', value: '98,7%', pct: 98.7, color: '#0a55b8', icon: true },
-                  { label: 'WhatsApp', value: '1,3%', pct: 1.3, color: '#93c5fd' },
+                  { label: 'WhatsApp', value: '1,3%', pct: 1.3, color: '#f59e0b' },
                 ]}
               />
             </Card>
@@ -162,10 +169,11 @@ export default function LauraIntelligenceView({ workshopName }: Props) {
             <Card className="laura-panel" padding="md">
               <p className="section-eyebrow">Distribución por Tipología</p>
               <h2 className="ops-card-title">Pentágono 3D · Clasificación IA según motivo</h2>
-              <Pentagon3D
-                caption="5 ramas de posventa"
+              <Radar3D
+                caption="5 ramas de posventa · escala 0–50%"
                 axes={TIPOLOGIA.map((item) => ({
                   label: item.label,
+                  short: item.short,
                   value: item.value,
                   color: item.color,
                 }))}
@@ -174,12 +182,11 @@ export default function LauraIntelligenceView({ workshopName }: Props) {
             <Card className="laura-panel" padding="md">
               <p className="section-eyebrow">Canal de entrada</p>
               <h2 className="ops-card-title">Pastel vertical · Entradas a centralita</h2>
-              <VerticalPie
-                center="98,7%"
+              <UprightPie
                 caption="Disco 3D de pie · Voz frente a WhatsApp"
                 slices={[
                   { label: 'Voz Telefónica (Laura AI)', value: '98,7%', pct: 98.7, color: '#0a55b8', icon: true },
-                  { label: 'WhatsApp', value: '1,3%', pct: 1.3, color: '#93c5fd' },
+                  { label: 'WhatsApp', value: '1,3%', pct: 1.3, color: '#f59e0b' },
                 ]}
               />
             </Card>
@@ -220,18 +227,18 @@ export default function LauraIntelligenceView({ workshopName }: Props) {
 
 function LauraProfileCard({ workshopName }: { workshopName: string }) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const [avatar, setAvatar] = useState(loadLauraAvatar)
+  const [profile, setProfile] = useState(loadActiveBotProfile)
   const [avatarOk, setAvatarOk] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const custom = avatar !== DEFAULT_LAURA_AVATAR
+  const custom = profile.photo !== profile.portrait
 
   useEffect(() => {
     const sync = () => {
-      setAvatar(loadLauraAvatar())
+      setProfile(loadActiveBotProfile())
       setAvatarOk(true)
     }
-    window.addEventListener(LAURA_AVATAR_EVENT, sync)
-    return () => window.removeEventListener(LAURA_AVATAR_EVENT, sync)
+    window.addEventListener(BOT_CONFIG_EVENT, sync)
+    return () => window.removeEventListener(BOT_CONFIG_EVENT, sync)
   }, [])
 
   const onPick = async (file: File | undefined) => {
@@ -242,8 +249,7 @@ function LauraProfileCard({ workshopName }: { workshopName: string }) {
     }
     try {
       const dataUrl = await resizeImageFile(file)
-      saveLauraAvatar(dataUrl)
-      setAvatar(dataUrl)
+      updateBotProfile(profile.id, { photo: dataUrl })
       setAvatarOk(true)
       setError(null)
     } catch {
@@ -258,13 +264,13 @@ function LauraProfileCard({ workshopName }: { workshopName: string }) {
           type="button"
           className="laura-avatar-btn"
           onClick={() => inputRef.current?.click()}
-          aria-label="Cambiar foto de perfil de Laura"
+          aria-label={`Cambiar foto de perfil de ${profile.name}`}
         >
           {avatarOk ? (
-            <img src={avatar} alt="" onError={() => setAvatarOk(false)} />
+            <img src={profile.photo} alt="" onError={() => setAvatarOk(false)} />
           ) : (
             <span className="laura-avatar-fallback" aria-hidden>
-              L
+              {profile.name.charAt(0).toUpperCase()}
             </span>
           )}
           <span className="laura-avatar-cam">
@@ -282,8 +288,8 @@ function LauraProfileCard({ workshopName }: { workshopName: string }) {
           }}
         />
         <div className="laura-profile-copy">
-          <p className="section-eyebrow">Laura Intelligence · Voz Activa ASR+LLM</p>
-          <h1 className="section-title">Asistente de IA Laura</h1>
+          <p className="section-eyebrow">{profile.name} Intelligence · Voz Activa ASR+LLM</p>
+          <h2 className="ops-card-title">Asistente de IA {profile.name}</h2>
           <p className="section-subtitle mt-1">
             Monitor de telemetría conversacional, precisión de diagnosis y rendimiento de derivación a taller
             en {workshopName}.
@@ -298,8 +304,7 @@ function LauraProfileCard({ workshopName }: { workshopName: string }) {
                 type="button"
                 className="ghost-button"
                 onClick={() => {
-                  clearLauraAvatar()
-                  setAvatar(DEFAULT_LAURA_AVATAR)
+                  updateBotProfile(profile.id, { photo: '' })
                   setAvatarOk(true)
                   setError(null)
                 }}
@@ -339,14 +344,28 @@ function polarPoint(cx: number, cy: number, radius: number, angleDeg: number) {
 function PrecisionBlock() {
   return (
     <Card className="laura-panel" padding="md">
-      <p className="section-eyebrow">Calidad de lenguaje</p>
-      <h2 className="ops-card-title">Métricas de Precisión de Lenguaje Natural Automotriz</h2>
-      <ul className="laura-circle-grid">
-        {PRECISION.map((item, index) => (
-          <li key={item.title} style={{ ['--i' as string]: String(index) }}>
-            <CircleGauge pct={item.pct} label={item.value} />
-            <span>{item.title}</span>
-            <small>{item.detail}</small>
+      <div className="laura-chart-head">
+        <div>
+          <p className="section-eyebrow">Calidad de lenguaje</p>
+          <h2 className="ops-card-title">Métricas de Precisión de Lenguaje Natural Automotriz</h2>
+        </div>
+        <div className="laura-chart-legend">
+          <span>Bubble chart</span>
+        </div>
+      </div>
+      <BubbleChart />
+      <p className="laura-bubble-cap">
+        Eje X: precisión del modelo · Eje Y: cobertura de casos · Tamaño y color de burbuja: muestras evaluadas.
+      </p>
+      <ul className="laura-bubble-legend">
+        {PRECISION.map((item) => (
+          <li key={item.title}>
+            <i style={{ background: item.color }} aria-hidden />
+            <div>
+              <span>{item.title}</span>
+              <small>{item.detail}</small>
+            </div>
+            <strong>{item.value}</strong>
           </li>
         ))}
       </ul>
@@ -354,80 +373,213 @@ function PrecisionBlock() {
   )
 }
 
-function CircleGauge({ pct, label }: { pct: number; label: string }) {
-  const radius = 52
-  const length = 2 * Math.PI * radius
+function BubbleChart() {
+  const W = 640
+  const H = 380
+  const plotL = 66
+  const plotR = W - 26
+  const plotT = 26
+  const plotB = H - 62
+  const xMin = 89
+  const xMax = 100.5
+  const yMin = 80
+  const yMax = 100
+  const maxSize = Math.max(...PRECISION.map((item) => item.muestras))
+  const xOf = (p: number) => plotL + ((p - xMin) / (xMax - xMin)) * (plotR - plotL)
+  const yOf = (c: number) => plotB - ((c - yMin) / (yMax - yMin)) * (plotB - plotT)
+  const rOf = (m: number) => 15 + (m / maxSize) * 26
+  const xTicks = [90, 92, 94, 96, 98, 100]
+  const yTicks = [80, 85, 90, 95, 100]
+  const midX = (plotL + plotR) / 2
+  const midY = (plotT + plotB) / 2
+
   return (
-    <div className="laura-circle-3d" style={{ ['--pct' as string]: String(pct) }}>
-      <div className="laura-circle-scene" aria-hidden>
-        <div className="laura-circle-depth" />
-        <svg viewBox="0 0 120 120" className="laura-circle-svg">
-          <circle className="is-track" cx="60" cy="60" r={radius} />
-          <circle
-            className="is-fill"
-            cx="60"
-            cy="60"
-            r={radius}
-            strokeDasharray={`${(pct / 100) * length} ${length}`}
-          />
-        </svg>
-        <strong>{label}</strong>
-      </div>
+    <div className="laura-bubble">
+      <svg viewBox={`0 0 ${W} ${H}`} className="laura-bubble-svg" role="img" aria-label="Bubble chart de precisión">
+        <defs>
+          {PRECISION.map((item, index) => (
+            <radialGradient key={index} id={`lauraBubble${index}`} cx="36%" cy="28%" r="76%">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.85" />
+              <stop offset="30%" stopColor={item.color} stopOpacity="0.62" />
+              <stop offset="78%" stopColor={item.color} stopOpacity="0.86" />
+              <stop offset="100%" stopColor={item.color} stopOpacity="1" />
+            </radialGradient>
+          ))}
+          <radialGradient id="lauraBubbleGloss" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.92" />
+            <stop offset="70%" stopColor="#ffffff" stopOpacity="0.12" />
+            <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+
+        {yTicks.map((c) => (
+          <g key={`y-${c}`}>
+            <line className="laura-bubble-grid" x1={plotL} y1={yOf(c)} x2={plotR} y2={yOf(c)} />
+            <text className="laura-bubble-tick" x={plotL - 12} y={yOf(c) + 4} textAnchor="end">
+              {c}%
+            </text>
+          </g>
+        ))}
+        {xTicks.map((p) => (
+          <g key={`x-${p}`}>
+            <line className="laura-bubble-grid" x1={xOf(p)} y1={plotT} x2={xOf(p)} y2={plotB} />
+            <text className="laura-bubble-tick" x={xOf(p)} y={plotB + 24} textAnchor="middle">
+              {p}%
+            </text>
+          </g>
+        ))}
+
+        <text className="laura-bubble-axis" x={midX} y={H - 14} textAnchor="middle">
+          Precisión del modelo (%)
+        </text>
+        <text
+          className="laura-bubble-axis"
+          x={18}
+          y={midY}
+          textAnchor="middle"
+          transform={`rotate(-90 18 ${midY})`}
+        >
+          Cobertura de casos (%)
+        </text>
+
+        {PRECISION.map((item, index) => {
+          const cx = xOf(item.pct)
+          const cy = yOf(item.cobertura)
+          const r = rOf(item.muestras)
+          return (
+            <g key={item.title} className="laura-bubble-node" style={{ ['--i' as string]: String(index) }}>
+              {/* halo exterior */}
+              <circle className="laura-bubble-ring" cx={cx} cy={cy} r={r} stroke={item.color} />
+              {/* cuerpo de cristal translúcido */}
+              <circle cx={cx} cy={cy} r={r} fill={`url(#lauraBubble${index})`} stroke={item.color} strokeWidth={1} strokeOpacity={0.45} />
+              {/* borde de luz interior (rim light) */}
+              <circle className="laura-bubble-rim" cx={cx} cy={cy} r={r - 1.2} />
+              {/* refracción inferior */}
+              <ellipse
+                className="laura-bubble-refract"
+                cx={cx}
+                cy={cy + r * 0.42}
+                rx={r * 0.62}
+                ry={r * 0.24}
+                fill={item.color}
+              />
+              {/* brillo especular superior */}
+              <ellipse
+                className="laura-bubble-gloss"
+                cx={cx - r * 0.3}
+                cy={cy - r * 0.36}
+                rx={r * 0.46}
+                ry={r * 0.28}
+              />
+              <text className="laura-bubble-val" x={cx} y={cy - 1} textAnchor="middle">
+                {item.value}
+              </text>
+              <text className="laura-bubble-sub" x={cx} y={cy + 14} textAnchor="middle">
+                {item.muestras.toLocaleString('es-ES')}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
     </div>
   )
 }
 
-function Pentagon3D({
+function Radar3D({
   caption,
   axes,
 }: {
   caption: string
-  axes: { label: string; value: number; color: string }[]
+  axes: { label: string; short: string; value: number; color: string }[]
 }) {
-  const cx = 140
-  const cy = 140
-  const radius = 92
-  const max = Math.max(...axes.map((axis) => axis.value), 1)
-  const rings = [0.25, 0.5, 0.75, 1]
-  const ringPaths = rings.map((scale) =>
+  const size = 320
+  const cx = size / 2
+  const cy = size / 2 + 4
+  const radius = 104
+  const scaleMax = 50
+  const ringValues = [10, 20, 30, 40, 50]
+
+  const ringPaths = ringValues.map((v) =>
     axes
       .map((_, index) => {
-        const p = polarPoint(cx, cy, radius * scale, index * 72)
+        const p = polarPoint(cx, cy, radius * (v / scaleMax), index * 72)
         return `${index === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`
       })
       .join(' ') + ' Z',
   )
+  const valuePts = axes.map((axis, index) =>
+    polarPoint(cx, cy, radius * (Math.min(axis.value, scaleMax) / scaleMax), index * 72),
+  )
   const valuePath =
-    axes
-      .map((axis, index) => {
-        const p = polarPoint(cx, cy, radius * (axis.value / max), index * 72)
-        return `${index === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`
-      })
-      .join(' ') + ' Z'
-  const labels = axes.map((axis, index) => ({
+    valuePts.map((p, index) => `${index === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ') + ' Z'
+  const labelPts = axes.map((axis, index) => ({
     ...axis,
-    ...polarPoint(cx, cy, radius + 28, index * 72),
+    ...polarPoint(cx, cy, radius + 34, index * 72),
   }))
 
   return (
     <div className="laura-chart-block">
-      <div className="laura-penta-3d" aria-hidden>
-        <div className="laura-penta-scene">
-          <svg viewBox="0 0 280 280" className="laura-penta-svg">
-            {ringPaths.map((d) => (
-              <path key={d} className="laura-penta-ring" d={d} />
+      <div className="laura-radar" aria-hidden>
+        <div className="laura-radar-stage">
+          <svg viewBox={`0 0 ${size} ${size}`} className="laura-radar-svg">
+            <defs>
+              <radialGradient id="lauraRadarFill" cx="50%" cy="42%" r="68%">
+                <stop offset="0%" stopColor="rgba(96,165,250,0.55)" />
+                <stop offset="100%" stopColor="rgba(11,99,214,0.28)" />
+              </radialGradient>
+            </defs>
+            {ringPaths.map((d, index) => (
+              <path key={d} className="laura-radar-ring" d={d} style={{ ['--i' as string]: String(index) }} />
             ))}
             {axes.map((_, index) => {
               const p = polarPoint(cx, cy, radius, index * 72)
-              return <line key={index} className="laura-penta-axis" x1={cx} y1={cy} x2={p.x} y2={p.y} />
+              return (
+                <line
+                  key={index}
+                  className="laura-radar-axis"
+                  x1={cx}
+                  y1={cy}
+                  x2={p.x}
+                  y2={p.y}
+                  style={{ ['--i' as string]: String(index) }}
+                />
+              )
             })}
-            <path className="laura-penta-fill" d={valuePath} />
+            <path className="laura-radar-area" d={valuePath} />
+            {valuePts.map((p, index) => (
+              <circle
+                key={index}
+                className="laura-radar-dot"
+                cx={p.x}
+                cy={p.y}
+                r="5"
+                style={{ ['--i' as string]: String(index) }}
+              />
+            ))}
+            {ringValues.map((v) => {
+              const p = polarPoint(cx, cy, radius * (v / scaleMax), 0)
+              return (
+                <text key={v} className="laura-radar-scale" x={cx + 5} y={p.y + 3}>
+                  {v}%
+                </text>
+              )
+            })}
           </svg>
+          {labelPts.map((item) => (
+            <span
+              key={item.label}
+              className="laura-radar-label"
+              style={{ left: `${(item.x / size) * 100}%`, top: `${(item.y / size) * 100}%` }}
+            >
+              <b style={{ color: item.color }}>{item.value}%</b>
+              {item.short}
+            </span>
+          ))}
         </div>
       </div>
       <p className="section-subtitle">{caption}</p>
       <ul className="laura-legend">
-        {labels.map((item) => (
+        {axes.map((item) => (
           <li key={item.label}>
             <i style={{ background: item.color }} aria-hidden />
             <span>{item.label}</span>
@@ -439,29 +591,57 @@ function Pentagon3D({
   )
 }
 
-function VerticalPie({
-  center,
+function UprightPie({
   caption,
   slices,
 }: {
-  center: string
   caption: string
   slices: { label: string; value: string; pct: number; color: string; icon?: boolean }[]
 }) {
   const gradient = pieGradient(slices)
+  const box = 200
+  const cxy = box / 2
+  let acc = 0
+  const callouts = slices.map((slice) => {
+    const midPct = acc + slice.pct / 2
+    acc += slice.pct
+    const p = polarPoint(cxy, cxy, box * 0.42, midPct * 3.6)
+    return { ...slice, x: (p.x / box) * 100, y: (p.y / box) * 100 }
+  })
+  const lead = slices[0]
+
   return (
     <div className="laura-chart-block">
-      <div className="laura-pie-vertical" aria-hidden>
-        <div className="laura-pie-scene is-vertical">
-          {Array.from({ length: 18 }, (_, layer) => (
+      <div className="laura-upie">
+        <div className="laura-upie-stage" aria-hidden>
+          {Array.from({ length: 14 }, (_, layer) => (
             <span
               key={layer}
-              className={`laura-pie-layer${layer === 0 ? ' is-top' : ''}`}
+              className={`laura-upie-layer${layer === 0 ? ' is-face' : ''}`}
               style={{ background: gradient, ['--z' as string]: String(layer) }}
             />
           ))}
+          <span className="laura-upie-hole">
+            <b>{lead?.value}</b>
+            <small>Voz</small>
+          </span>
         </div>
-        <strong className="laura-pie-center is-vertical">{center}</strong>
+        <div className="laura-upie-callouts">
+          {callouts.map((item, index) => (
+            <span
+              key={item.label}
+              className="laura-upie-tag"
+              style={{
+                left: `${item.x}%`,
+                top: `${item.y}%`,
+                ['--dot' as string]: item.color,
+                ['--i' as string]: String(index),
+              }}
+            >
+              {item.value}
+            </span>
+          ))}
+        </div>
       </div>
       <p className="section-subtitle">{caption}</p>
       <ul className="laura-legend">
@@ -491,11 +671,12 @@ function ParetoChart() {
     })
   }, [])
   const maxVolume = rows[0]?.volume ?? 1
-  const line = rows
+  const cols = rows.length
+  const linePoints = rows
     .map((item, index) => {
-      const x = 28 + (index / Math.max(rows.length - 1, 1)) * 244
-      const y = 168 - (item.cumulative / 100) * 140
-      return `${index === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
+      const x = ((index + 0.5) / cols) * 100
+      const y = 100 - item.cumulative
+      return `${x.toFixed(2)},${y.toFixed(2)}`
     })
     .join(' ')
 
@@ -512,16 +693,57 @@ function ParetoChart() {
         </div>
       </div>
       <div className="laura-pareto" role="img" aria-label="Gráfico de Pareto del volumen diario">
-        <svg className="laura-pareto-line" viewBox="0 0 300 180" preserveAspectRatio="none">
-          <path d={line} />
-        </svg>
-        {rows.map((item, index) => (
-          <div key={`${item.day}-${item.volume}`} className="laura-pareto-col" style={{ ['--i' as string]: String(index) }}>
-            <strong>{item.volume}</strong>
-            <span className="laura-pareto-bar" style={{ height: `${(item.volume / maxVolume) * 100}%` }} />
-            <small>{item.day}</small>
-            <em>{Math.round(item.cumulative)}%</em>
+        <div className="laura-pareto-axis is-left" aria-hidden>
+          <span>{maxVolume}</span>
+          <span>{Math.round(maxVolume * 0.5)}</span>
+          <span>0</span>
+        </div>
+        <div className="laura-pareto-plot">
+          <div className="laura-pareto-grid" aria-hidden>
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
           </div>
+          <div className="laura-pareto-bars">
+            {rows.map((item, index) => (
+              <div
+                key={`${item.day}-${item.volume}`}
+                className="laura-pareto-col"
+                style={{ ['--i' as string]: String(index) }}
+              >
+                <span className="laura-pareto-value">{item.volume}</span>
+                <span className="laura-pareto-bar" style={{ height: `${(item.volume / maxVolume) * 100}%` }} />
+              </div>
+            ))}
+          </div>
+          <svg className="laura-pareto-line" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <polyline points={linePoints} vectorEffect="non-scaling-stroke" pathLength={100} />
+          </svg>
+          {rows.map((item, index) => (
+            <span
+              key={`dot-${item.day}`}
+              className="laura-pareto-dot"
+              style={{
+                left: `${((index + 0.5) / cols) * 100}%`,
+                bottom: `${item.cumulative}%`,
+                ['--i' as string]: String(index),
+              }}
+            >
+              <em>{Math.round(item.cumulative)}%</em>
+            </span>
+          ))}
+        </div>
+        <div className="laura-pareto-axis is-right" aria-hidden>
+          <span>100%</span>
+          <span>50%</span>
+          <span>0%</span>
+        </div>
+      </div>
+      <div className="laura-pareto-xaxis" aria-hidden>
+        {rows.map((item) => (
+          <span key={`x-${item.day}`}>{item.day}</span>
         ))}
       </div>
       <ul className="laura-chart-keys">
