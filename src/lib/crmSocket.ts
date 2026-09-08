@@ -4,7 +4,7 @@
  */
 
 import { io, type Socket } from 'socket.io-client'
-import { crmAccessToken, crmApiBase } from './crmApi'
+import { crmAccessToken, crmRealtimeBase } from './crmApi'
 
 export type TranscriptionEvent = {
   call_control_id: string
@@ -33,7 +33,7 @@ let socket: Socket | null = null
 let registeredUser: string | null = null
 
 export function getCrmSocket(): Socket | null {
-  const base = crmApiBase()
+  const base = crmRealtimeBase()
   if (!base) return null
   if (socket) return socket
   socket = io(base, {

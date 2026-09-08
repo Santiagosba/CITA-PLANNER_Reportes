@@ -26,6 +26,9 @@ function pageIsLocal(): boolean {
   return typeof window !== 'undefined' && isLoopbackHost(window.location.hostname)
 }
 
+/** Host público de api-crm. Vercel no puede proxificar WebSockets. */
+export const CRM_PUBLIC_ORIGIN = 'https://api-crm.avigo.es'
+
 function isUsableCrmUrl(raw: string): boolean {
   try {
     const target = new URL(raw)
@@ -44,15 +47,22 @@ export function crmApiBase(): string {
   const raw = (import.meta.env.VITE_CRM_API_URL as string | undefined)?.trim()
   const cleaned = raw ? raw.replace(/\/+$/, '') : ''
   if (cleaned && isUsableCrmUrl(cleaned)) return cleaned
-  // En Vercel / preview: /api/webrtc, /api/call* y /socket.io los reescribe vercel.json.
-  // Se devuelve el origen absoluto porque socket.io interpreta una ruta relativa
-  // como namespace, no como URL base.
+  // HTTP en Vercel: /api/webrtc y /api/call* los reescribe vercel.json (mismo origen).
   const sameOrigin = String(import.meta.env.VITE_CRM_API_SAME_ORIGIN || '').trim().toLowerCase()
   const allowSameOrigin = sameOrigin === '1' || sameOrigin === 'true' || (typeof window !== 'undefined' && !pageIsLocal())
   if (allowSameOrigin && typeof window !== 'undefined') {
     return window.location.origin
   }
   return ''
+}
+
+/** Socket.io tiene que ir al host real de api-crm: Vercel no hace proxy de WebSockets. */
+export function crmRealtimeBase(): string {
+  const raw = (import.meta.env.VITE_CRM_API_URL as string | undefined)?.trim()
+  const cleaned = raw ? raw.replace(/\/+$/, '') : ''
+  if (cleaned && isUsableCrmUrl(cleaned)) return cleaned
+  if (typeof window !== 'undefined' && !pageIsLocal()) return CRM_PUBLIC_ORIGIN
+  return crmApiBase()
 }
 
 export function isCrmApiConfigured(): boolean {
@@ -255,8 +265,13 @@ export type RateEstimate = {
 /** Tarifa estimada por minuto hacia un destino (`GET /api/calls/rate-estimate`). */
 export async function fetchRateEstimate(to: string): Promise<RateEstimate | null> {
   const qs = new URLSearchParams({ to })
-  const res = await crmFetch<{ estimate: RateEstimate | null }>(`/api/calls/rate-estimate?${qs.toString()}`)
-  return res.estimate ?? null
+  try {
+    const res = await crmFetch<{ estimate: RateEstimate | null }>(`/api/calls/rate-estimate?${qs.toString()}`)
+    return res.estimate ?? null
+  } catch (e) {
+    if (e instanceof CrmApiError && (e.status === 404 || e.status === 0)) return null
+    throw e
+  }
 }
 
 /** URL firmada (5 min) de la grabación (`GET /api/calls/:id/recording`). Requiere rol supervisor+. */
