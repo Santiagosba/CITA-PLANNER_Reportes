@@ -78,18 +78,28 @@ async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
 }
 
 async function parseJson<T>(res: Response): Promise<T> {
-  if (res.status === 401) {
-    throw new SqlServerApiError('Tu sesión ha caducado. Vuelve a entrar.', 'session-expired')
-  }
-
-  let body: { error?: string; ok?: boolean } & T
+  let body: { error?: string; ok?: boolean; code?: string } & T
   try {
-    body = (await res.json()) as { error?: string; ok?: boolean } & T
+    body = (await res.json()) as { error?: string; ok?: boolean; code?: string } & T
   } catch {
+    if (res.status === 401) {
+      throw new SqlServerApiError('Tu sesión ha caducado. Vuelve a entrar.', 'session-expired')
+    }
     if (res.status === 502 || res.status === 500 || res.status === 503) {
       throw new SqlServerApiError(apiDownMessage(), 'api-down')
     }
     throw new SqlServerApiError(`Error API SQL (${res.status})`)
+  }
+  if (res.status === 401) {
+    // La API no pudo validar el JWT (clave Supabase mal puesta en Dokploy).
+    // No echar al usuario: es un fallo del servidor, no de su sesión.
+    if (body.code === 'invalid-token' || body.code === 'no-token' || body.code === 'config') {
+      throw new SqlServerApiError(
+        body.error || 'La API SQL no pudo validar la sesión. Revisa SUPABASE_ANON_KEY en el servidor.',
+        'api-down',
+      )
+    }
+    throw new SqlServerApiError('Tu sesión ha caducado. Vuelve a entrar.', 'session-expired')
   }
   if (!res.ok || body.ok === false) {
     const msg = body.error || res.statusText || 'Error API SQL Server'
