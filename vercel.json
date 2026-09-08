@@ -5,6 +5,26 @@
   "framework": "vite",
   "rewrites": [
     {
+      "source": "/api/webrtc/:path*",
+      "destination": "https://api-crm.avigo.es/api/webrtc/:path*"
+    },
+    {
+      "source": "/api/call/:path*",
+      "destination": "https://api-crm.avigo.es/api/call/:path*"
+    },
+    {
+      "source": "/api/calls/:path*",
+      "destination": "https://api-crm.avigo.es/api/calls/:path*"
+    },
+    {
+      "source": "/socket.io",
+      "destination": "https://api-crm.avigo.es/socket.io"
+    },
+    {
+      "source": "/socket.io/:path*",
+      "destination": "https://api-crm.avigo.es/socket.io/:path*"
+    },
+    {
       "source": "/api/:path*",
       "destination": "http://avi-bot-avibotcitaplanner-khxi1c-391083-76-13-141-36.sslip.io/api/:path*"
     },

@@ -18,14 +18,38 @@ export class CrmApiError extends Error {
   }
 }
 
+function isLoopbackHost(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
+}
+
+function pageIsLocal(): boolean {
+  return typeof window !== 'undefined' && isLoopbackHost(window.location.hostname)
+}
+
+function isUsableCrmUrl(raw: string): boolean {
+  try {
+    const target = new URL(raw)
+    // Una web pública no puede llamar a localhost (Private Network Access).
+    if (isLoopbackHost(target.hostname) && !pageIsLocal()) return false
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && target.protocol === 'http:') {
+      return false
+    }
+  } catch {
+    return false
+  }
+  return true
+}
+
 export function crmApiBase(): string {
   const raw = (import.meta.env.VITE_CRM_API_URL as string | undefined)?.trim()
-  if (raw) return raw.replace(/\/+$/, '')
-  // Detrás de un proxy que reenvía /api/call*, /api/webrtc y /socket.io a api-crm.
+  const cleaned = raw ? raw.replace(/\/+$/, '') : ''
+  if (cleaned && isUsableCrmUrl(cleaned)) return cleaned
+  // En Vercel / preview: /api/webrtc, /api/call* y /socket.io los reescribe vercel.json.
   // Se devuelve el origen absoluto porque socket.io interpreta una ruta relativa
   // como namespace, no como URL base.
   const sameOrigin = String(import.meta.env.VITE_CRM_API_SAME_ORIGIN || '').trim().toLowerCase()
-  if ((sameOrigin === '1' || sameOrigin === 'true') && typeof window !== 'undefined') {
+  const allowSameOrigin = sameOrigin === '1' || sameOrigin === 'true' || (typeof window !== 'undefined' && !pageIsLocal())
+  if (allowSameOrigin && typeof window !== 'undefined') {
     return window.location.origin
   }
   return ''
