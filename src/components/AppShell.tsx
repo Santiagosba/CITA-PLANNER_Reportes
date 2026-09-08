@@ -144,6 +144,7 @@ export default function AppShell({
     if (!cube) return
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v))
+    const toDegrees = 180 / Math.PI
     let raf = 0
     let last: MouseEvent | null = null
     let lastRy = 0
@@ -152,6 +153,8 @@ export default function AppShell({
     const refreshRect = () => {
       rect = cube.getBoundingClientRect()
     }
+    // La entrada del sidebar usa transform; al terminar se guarda el centro real.
+    const settleTimer = window.setTimeout(refreshRect, 520)
     const flush = () => {
       raf = 0
       const e = last
@@ -160,13 +163,10 @@ export default function AppShell({
       const cy = rect.top + rect.height / 2
       const dx = e.clientX - cx
       const dy = e.clientY - cy
-      // Cada lado se normaliza con SU propia distancia al borde de la ventana:
-      // así el icono llega al ángulo máximo también hacia la izquierda/arriba,
-      // aunque esté pegado a ese borde.
-      const rangeX = dx < 0 ? Math.max(cx, 1) : Math.max(window.innerWidth - cx, 1)
-      const rangeY = dy < 0 ? Math.max(cy, 1) : Math.max(window.innerHeight - cy, 1)
-      const ry = clamp((dx / rangeX) * 16, -16, 16)
-      const rx = clamp((-dy / rangeY) * 12, -12, 12)
+      // Orientación perspectiva real: el vector logo→puntero define ambos
+      // ángulos. No depende de la distancia del logo a los bordes del viewport.
+      const ry = clamp(Math.atan2(dx, 180) * toDegrees, -34, 34)
+      const rx = clamp(-Math.atan2(dy, 220) * toDegrees, -24, 24)
       if (Math.abs(ry - lastRy) < 0.2 && Math.abs(rx - lastRx) < 0.2) return
       lastRy = ry
       lastRx = rx
@@ -182,6 +182,7 @@ export default function AppShell({
     return () => {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('resize', refreshRect)
+      window.clearTimeout(settleTimer)
       if (raf) cancelAnimationFrame(raf)
     }
   }, [])

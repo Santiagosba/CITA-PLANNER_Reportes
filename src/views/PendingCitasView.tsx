@@ -477,8 +477,8 @@ export default function PendingCitasView({
               {agendaGroups.map((group, groupIndex) => (
                 <section
                   key={group.label}
-                  className="agenda-day-group triage-group-enter"
-                  style={{ animationDelay: `${Math.min(groupIndex, 5) * 45}ms` }}
+                  className={`agenda-day-group${groupIndex < 6 ? ' triage-group-enter' : ''}`}
+                  style={groupIndex < 6 ? { animationDelay: `${groupIndex * 40}ms` } : undefined}
                 >
                   <h2 className="agenda-day-label">
                     {group.label}
@@ -498,7 +498,7 @@ export default function PendingCitasView({
                         onGestionEmailChange={setGestionEmail}
                         onMarkGestionado={handleMarkGestionado}
                         onOpenLead={onOpenLead}
-                        revealIndex={itemIndex}
+                        revealIndex={groupIndex === 0 ? itemIndex : 16}
                       />
                     ))}
                   </ul>
@@ -551,8 +551,8 @@ export default function PendingCitasView({
                     return (
                       <tr
                         key={p.idpeticion}
-                        className={onOpenLead ? 'report-row-clickable' : undefined}
-                        style={{ animationDelay: `${Math.min(index, 12) * 24}ms` }}
+                        className={`${onOpenLead ? 'report-row-clickable' : ''}${index < 18 ? ' triage-row-enter' : ''}`.trim() || undefined}
+                        style={index < 18 ? { animationDelay: `${index * 20}ms` } : undefined}
                         role={onOpenLead ? 'button' : undefined}
                         tabIndex={onOpenLead ? 0 : undefined}
                         onClick={() => onOpenLead?.(p)}

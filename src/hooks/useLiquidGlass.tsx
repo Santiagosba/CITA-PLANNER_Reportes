@@ -1,245 +1,191 @@
-import { useEffect, useId, useRef, type RefObject } from 'react'
+import type { RefObject } from 'react'
 
 /**
- * Liquid glass real para una ventana, sobre el fondo VIVO (sin rasterizar el DOM).
+ * Liquid glass: lente de 9 piezas (4 lados + 4 esquinas + centro plano).
  *
- * Modelo óptico: lente biconvexa de canto redondeado (como el `bevelMode: 0` de
- * las librerías WebGL). El centro es plano (no desvía), y en los últimos `BEVEL`
- * px la superficie se curva: el fondo se «tira» hacia dentro siguiendo la normal
- * de la forma (rectángulo redondeado real, esquinas incluidas), con aberración
- * cromática (R/G/B se desvían distinto) y un brillo Fresnel en el filo.
- *
- * Se genera un mapa de desplazamiento (canvas → PNG, 1/4 de resolución) a la
- * medida del marco y se conecta a un filtro SVG propio de la ventana. El CSS lo
- * aplica en las dos capas con `backdrop-filter: var(--lg-filter) …`: el anillo lo
- * muestra nítido y el cuerpo lo combina con un blur ligero.
- * También publica `--lg-mx / --lg-my` (puntero en %) para el reflejo del cuerpo.
+ * El canto óptico vive en tiras de `BEVEL` px. Los lados se estiran solo en
+ * la dirección tangente, donde el mapa es constante, así que al agrandar o
+ * encoger la ventana el filo no se deforma ni se regenera.
  */
 
-/**
- * Profundidad de la curvatura (px): hasta dónde entra la lente desde el filo.
- * Es mayor que el anillo nítido (`--lg-rim`, 16 px) para que la refracción
- * continúe bajo el cuerpo esmerilado y toda la ventana se comporte como vidrio.
- */
 const BEVEL = 56
-/** Desvío máximo en el filo (px). */
 const MAX_SHIFT = 16
-/** Aberración cromática: R y B se desvían ±este porcentaje respecto a G. */
-const CHROMA = 0.09
-/** El mapa es suave: se genera a 1/4 de resolución y se estira. */
-const MAP_SCALE = 0.25
-const MAP_CACHE_MAX = 20
-const RESIZE_MAP_INTERVAL = 96
-const mapCache = new Map<string, string>()
+const CORNER_RADIUS = 24
+const DEFS_ID = 'lg-shared-defs-v2'
 
-/** Perfil del canto: pendiente de una lente circular, suavizada y acotada. */
+type EdgeTile = 'n' | 's' | 'e' | 'w'
+type CornerTile = 'nw' | 'ne' | 'sw' | 'se'
+type LensTile = EdgeTile | CornerTile
+
 function bevelProfile(t: number): number {
   const u = 1 - Math.min(1, Math.max(0, t))
-  // Mezcla cuadrática/cúbica: fuerte en el filo, se apaga suave hacia el centro.
   return u * u * (0.6 + 0.4 * u)
 }
 
-/**
- * Mapa RG: 128 = sin desvío; >128 muestra hacia +x/+y, <128 hacia −x/−y.
- * Usa la SDF de un rectángulo redondeado para que la normal sea correcta en
- * las esquinas (no una simple suma de gradientes horizontal + vertical).
- */
-export function buildDisplacementMap(width: number, height: number, cornerRadius: number): string | null {
-  const cacheKey = `${Math.round(width)}x${Math.round(height)}@${cornerRadius.toFixed(1)}`
-  const cached = mapCache.get(cacheKey)
-  if (cached) return cached
+function putShift(px: Uint8ClampedArray, i: number, nx: number, ny: number, s: number) {
+  px[i] = Math.round(128 - 127 * nx * s)
+  px[i + 1] = Math.round(128 - 127 * ny * s)
+  px[i + 2] = 0
+  px[i + 3] = 255
+}
 
-  const w = Math.max(4, Math.round(width * MAP_SCALE))
-  const h = Math.max(4, Math.round(height * MAP_SCALE))
+function canvasToUrl(w: number, h: number, paint: (px: Uint8ClampedArray) => void): string {
   const canvas = document.createElement('canvas')
   canvas.width = w
   canvas.height = h
   const ctx = canvas.getContext('2d')
-  if (!ctx) return null
+  if (!ctx) return ''
+  const img = ctx.createImageData(w, h)
+  paint(img.data)
+  ctx.putImageData(img, 0, 0)
+  return canvas.toDataURL('image/png')
+}
 
-  const rim = BEVEL * MAP_SCALE
-  const r = Math.max(0, Math.min(cornerRadius * MAP_SCALE, Math.min(w, h) / 2 - 0.01))
+function sdfRoundRect(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  radius: number,
+): { nx: number; ny: number; inside: number } {
+  const r = Math.max(0, Math.min(radius, Math.min(w, h) / 2 - 0.01))
   const hx = w / 2
   const hy = h / 2
   const bx = hx - r
   const by = hy - r
-
-  const img = ctx.createImageData(w, h)
-  const px = img.data
-  let i = 0
-  for (let y = 0; y < h; y++) {
-    const py = y + 0.5 - hy
-    const qy = Math.abs(py) - by
-    for (let x = 0; x < w; x++) {
-      const pxx = x + 0.5 - hx
-      const qx = Math.abs(pxx) - bx
-
-      // Normal exterior de la forma en este punto y distancia al borde (hacia dentro).
-      let nx: number
-      let ny: number
-      let inside: number
-      if (qx > 0 && qy > 0) {
-        const len = Math.hypot(qx, qy) || 1
-        nx = qx / len
-        ny = qy / len
-        inside = r - len
-      } else if (qx > qy) {
-        nx = 1
-        ny = 0
-        inside = r - qx
-      } else {
-        nx = 0
-        ny = 1
-        inside = r - qy
-      }
-      nx *= Math.sign(pxx) || 1
-      ny *= Math.sign(py) || 1
-
-      const s = bevelProfile(inside / rim)
-      // Desvío hacia dentro = −normal.
-      px[i] = Math.round(128 - 127 * nx * s)
-      px[i + 1] = Math.round(128 - 127 * ny * s)
-      px[i + 2] = 0
-      px[i + 3] = 255
-      i += 4
-    }
+  const pxx = x - hx
+  const py = y - hy
+  const qx = Math.abs(pxx) - bx
+  const qy = Math.abs(py) - by
+  let nx: number
+  let ny: number
+  let inside: number
+  if (qx > 0 && qy > 0) {
+    const len = Math.hypot(qx, qy) || 1
+    nx = qx / len
+    ny = qy / len
+    inside = r - len
+  } else if (qx > qy) {
+    nx = 1
+    ny = 0
+    inside = r - qx
+  } else {
+    nx = 0
+    ny = 1
+    inside = r - qy
   }
-  ctx.putImageData(img, 0, 0)
-  const result = canvas.toDataURL('image/png')
-  mapCache.set(cacheKey, result)
-  if (mapCache.size > MAP_CACHE_MAX) {
-    const oldest = mapCache.keys().next().value
-    if (oldest) mapCache.delete(oldest)
-  }
-  return result
+  nx *= Math.sign(pxx) || 1
+  ny *= Math.sign(py) || 1
+  return { nx, ny, inside }
 }
 
-/** Solo Chromium/Firefox aceptan `backdrop-filter: url(#svg)`; Safari lo ignora. */
+function buildEdgeTile(kind: EdgeTile): string {
+  const along = 8
+  const across = BEVEL
+  const vertical = kind === 'e' || kind === 'w'
+  const w = vertical ? across : along
+  const h = vertical ? along : across
+  return canvasToUrl(w, h, (px) => {
+    let i = 0
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let t: number
+        let nx: number
+        let ny: number
+        if (kind === 'n') {
+          t = (y + 0.5) / h
+          nx = 0
+          ny = -1
+        } else if (kind === 's') {
+          t = 1 - (y + 0.5) / h
+          nx = 0
+          ny = 1
+        } else if (kind === 'w') {
+          t = (x + 0.5) / w
+          nx = -1
+          ny = 0
+        } else {
+          t = 1 - (x + 0.5) / w
+          nx = 1
+          ny = 0
+        }
+        putShift(px, i, nx, ny, bevelProfile(t))
+        i += 4
+      }
+    }
+  })
+}
+
+function buildCornerTile(kind: CornerTile): string {
+  const box = BEVEL * 4
+  const originX = kind.includes('e') ? box - BEVEL : 0
+  const originY = kind.includes('s') ? box - BEVEL : 0
+  return canvasToUrl(BEVEL, BEVEL, (px) => {
+    let i = 0
+    for (let y = 0; y < BEVEL; y++) {
+      for (let x = 0; x < BEVEL; x++) {
+        const { nx, ny, inside } = sdfRoundRect(
+          originX + x + 0.5,
+          originY + y + 0.5,
+          box,
+          box,
+          CORNER_RADIUS,
+        )
+        putShift(px, i, nx, ny, bevelProfile(inside / BEVEL))
+        i += 4
+      }
+    }
+  })
+}
+
+function displacementFilterMarkup(id: string, href: string): string {
+  const scale = MAX_SHIFT * 2
+  return `<filter id="${id}" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB">
+    <feImage href="${href}" preserveAspectRatio="none" result="lgmap"/>
+    <feDisplacementMap in="SourceGraphic" in2="lgmap" scale="${scale}" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>`
+}
+
+function ensureSharedLensFilters() {
+  if (typeof document === 'undefined') return
+  if (document.getElementById(DEFS_ID)) return
+  const tiles: LensTile[] = ['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se']
+  const markup = tiles
+    .map((tile) => {
+      const href = tile.length === 1 ? buildEdgeTile(tile as EdgeTile) : buildCornerTile(tile as CornerTile)
+      return displacementFilterMarkup(`lg2-shared-${tile}`, href)
+    })
+    .join('')
+  const parsed = new DOMParser().parseFromString(
+    `<svg xmlns="http://www.w3.org/2000/svg" id="${DEFS_ID}" class="lg-defs" aria-hidden="true" focusable="false" width="0" height="0">${markup}</svg>`,
+    'image/svg+xml',
+  )
+  document.body.appendChild(document.importNode(parsed.documentElement, true))
+}
+
 function supportsSvgBackdrop(): boolean {
   if (typeof CSS === 'undefined' || !CSS.supports) return false
   return CSS.supports('backdrop-filter', 'url(#x)') || CSS.supports('-webkit-backdrop-filter', 'url(#x)')
 }
 
-const KEEP_R = '1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0'
-const KEEP_G = '0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0'
-const KEEP_B = '0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0'
+const LENS_PARTS: LensTile[] = ['n', 's', 'e', 'w', 'nw', 'ne', 'sw', 'se']
 
-export function useLiquidGlass(frameRef: RefObject<HTMLElement | null>, activationKey: unknown = true) {
-  const rawId = useId()
-  const filterId = 'lg' + rawId.replace(/[^a-zA-Z0-9]/g, '')
-  const imgRef = useRef<SVGFEImageElement>(null)
-
-  useEffect(() => {
-    const el = frameRef.current
-    if (!el) return
-
-    const refract = supportsSvgBackdrop()
-    if (refract) el.style.setProperty('--lg-filter', `url(#${filterId})`)
-
-    let raf = 0
-    let resizeTimer = 0
-    let lastPaintAt = 0
-    let lastKey = ''
-    const paint = (force = false) => {
-      raf = 0
-      const w = el.clientWidth
-      const h = el.clientHeight
-      if (!w || !h) return
-      const radius = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0
-      const key = `${w}x${h}@${radius}`
-      if (!force && key === lastKey) return
-      lastKey = key
-      const url = buildDisplacementMap(w, h, radius)
-      if (url) imgRef.current?.setAttribute('href', url)
-      lastPaintAt = performance.now()
-    }
-    const requestPaint = () => {
-      const remaining = RESIZE_MAP_INTERVAL - (performance.now() - lastPaintAt)
-      if (remaining <= 0) {
-        if (!raf) raf = requestAnimationFrame(() => paint())
-        return
-      }
-      if (!resizeTimer) {
-        resizeTimer = window.setTimeout(() => {
-          resizeTimer = 0
-          if (!raf) raf = requestAnimationFrame(() => paint())
-        }, remaining)
-      }
-    }
-    const refresh = () => {
-      if (raf) cancelAnimationFrame(raf)
-      if (resizeTimer) window.clearTimeout(resizeTimer)
-      resizeTimer = 0
-      raf = requestAnimationFrame(() => paint(true))
-    }
-    let ro: ResizeObserver | null = null
-    if (refract) {
-      paint()
-      ro = new ResizeObserver(requestPaint)
-      ro.observe(el)
-      el.addEventListener('liquidglass:refresh', refresh)
-    }
-
-    // Luz que sigue al puntero (reflejo del cuerpo).
-    let lightRaf = 0
-    let px = 0
-    let py = 0
-    let bounds: DOMRect | null = null
-    const onEnter = () => {
-      bounds = el.getBoundingClientRect()
-    }
-    const onMove = (e: PointerEvent) => {
-      // El drag ya tiene su propio rAF. Evita aquí una lectura de layout adicional.
-      if (el.closest('.is-gesturing, .is-size-tween')) return
-      px = e.clientX
-      py = e.clientY
-      if (lightRaf) return
-      lightRaf = requestAnimationFrame(() => {
-        lightRaf = 0
-        const r = bounds ?? el.getBoundingClientRect()
-        if (!r.width || !r.height) return
-        el.style.setProperty('--lg-mx', `${(((px - r.left) / r.width) * 100).toFixed(1)}%`)
-        el.style.setProperty('--lg-my', `${(((py - r.top) / r.height) * 100).toFixed(1)}%`)
-      })
-    }
-    const onLeave = () => {
-      bounds = null
-      el.style.removeProperty('--lg-mx')
-      el.style.removeProperty('--lg-my')
-    }
-    el.addEventListener('pointerenter', onEnter, { passive: true })
-    el.addEventListener('pointermove', onMove, { passive: true })
-    el.addEventListener('pointerleave', onLeave)
-
-    return () => {
-      ro?.disconnect()
-      if (raf) cancelAnimationFrame(raf)
-      if (resizeTimer) window.clearTimeout(resizeTimer)
-      if (lightRaf) cancelAnimationFrame(lightRaf)
-      el.removeEventListener('pointerenter', onEnter)
-      el.removeEventListener('pointermove', onMove)
-      el.removeEventListener('pointerleave', onLeave)
-      el.removeEventListener('liquidglass:refresh', refresh)
-      el.style.removeProperty('--lg-filter')
-      onLeave()
-    }
-  }, [frameRef, filterId, activationKey])
-
-  const scale = MAX_SHIFT * 2
+export function useLiquidGlass(
+  _frameRef: RefObject<HTMLElement | null>,
+  _activationKey: unknown = true,
+) {
   return (
-    <svg className="lg-defs" aria-hidden focusable="false" width="0" height="0">
-      <filter id={filterId} x="0" y="0" width="1" height="1" colorInterpolationFilters="sRGB">
-        <feImage ref={imgRef} preserveAspectRatio="none" result="lgmap" />
-        {/* Aberración cromática: cada canal se refracta con un índice distinto */}
-        <feDisplacementMap in="SourceGraphic" in2="lgmap" scale={scale * (1 - CHROMA)} xChannelSelector="R" yChannelSelector="G" result="dr" />
-        <feColorMatrix in="dr" type="matrix" values={KEEP_R} result="cr" />
-        <feDisplacementMap in="SourceGraphic" in2="lgmap" scale={scale} xChannelSelector="R" yChannelSelector="G" result="dg" />
-        <feColorMatrix in="dg" type="matrix" values={KEEP_G} result="cg" />
-        <feDisplacementMap in="SourceGraphic" in2="lgmap" scale={scale * (1 + CHROMA)} xChannelSelector="R" yChannelSelector="G" result="db" />
-        <feColorMatrix in="db" type="matrix" values={KEEP_B} result="cb" />
-        <feComposite in="cr" in2="cg" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="crg" />
-        <feComposite in="crg" in2="cb" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" />
-      </filter>
-    </svg>
+    <div className="lg-lens" aria-hidden>
+      {LENS_PARTS.map((part) => (
+        <span key={part} className={`lg-lens-part lg-lens-${part}`} />
+      ))}
+    </div>
   )
+}
+
+/* Los ocho mapas son pequeños y compartidos. Prepararlos al cargar el módulo
+   evita que la primera ficha o app aparezca antes que su capa refractiva. */
+if (typeof document !== 'undefined' && supportsSvgBackdrop()) {
+  if (document.body) queueMicrotask(ensureSharedLensFilters)
+  else document.addEventListener('DOMContentLoaded', ensureSharedLensFilters, { once: true })
 }

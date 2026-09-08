@@ -2874,7 +2874,7 @@ html.dark .hex-loader-aura,
   transform-style: preserve-3d;
   /* Rotación controlada por JS (sigue el ratón); casi de frente en reposo */
   transform: rotateX(var(--cube-rx, -3deg)) rotateY(var(--cube-ry, 5deg));
-  transition: transform 260ms ease-out;
+  transition: transform 120ms ease-out;
   will-change: transform;
 }
 
@@ -3963,7 +3963,7 @@ html.dark .hex-loader-aura,
   animation: triage-item-enter 340ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
-.triage-stage .report-table tbody tr {
+.triage-stage .report-table tbody tr.triage-row-enter {
   animation: triage-row-enter 300ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
@@ -12331,14 +12331,13 @@ body > .os-desk-layer.dashboard-shell {
 }
 
 /* ── Marco de las ventanas (fichas + apps) y barra de tareas ──
-   El marco es transparente; el vidrio son dos capas físicas:
+   El marco es transparente; el vidrio son tres capas físicas:
+   .lg-lens  8 tiras de refracción (lados + esquinas) de --lg-bevel px fijos
    ::before  cuerpo esmerilado (blur + tinte + reflejo + luz que sigue al puntero)
-   ::after   anillo refractivo: el borde muestra el fondo SIN blur pero desplazado
-             hacia dentro con un mapa de desplazamiento SVG (feDisplacementMap),
-             igual que el canto de una lente. El mapa lo genera useLiquidGlass()
-             a la medida de cada ventana y llega por --lg-filter.               */
+   ::after   anillo Fresnel: brillo del filo, sin deformar al cambiar de tamaño */
 :root {
   /* Canto visible fino en las ventanas; la curvatura óptica continúa 56 px. */
+  --lg-bevel: 56px;
   --lg-rim: 8px;
   --lg-rim-tint: rgba(255, 255, 255, 0.18);
   --lg-rim-fx: saturate(1.7) brightness(1.1) contrast(1.06);
@@ -12347,6 +12346,8 @@ body > .os-desk-layer.dashboard-shell {
   --lg-rim-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.95),
     inset 1px 0 0 rgba(255, 255, 255, 0.6),
+    inset 2px 0 0 rgba(74, 222, 255, 0.14),
+    inset -2px 0 0 rgba(196, 91, 255, 0.11),
     inset 0 0 0 1px rgba(255, 255, 255, 0.4),
     inset 0 0 9px rgba(255, 255, 255, 0.55),
     inset -1px -1px 0 rgba(15, 23, 42, 0.1);
@@ -12359,6 +12360,8 @@ body > .os-desk-layer.dashboard-shell {
   --lg-rim-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.26),
     inset 1px 0 0 rgba(255, 255, 255, 0.14),
+    inset 2px 0 0 rgba(74, 222, 255, 0.12),
+    inset -2px 0 0 rgba(196, 91, 255, 0.09),
     inset 0 0 0 1px rgba(255, 255, 255, 0.1),
     inset 0 0 9px rgba(255, 255, 255, 0.16),
     inset -1px -1px 0 rgba(0, 0, 0, 0.4);
@@ -12403,17 +12406,63 @@ body > .os-desk-layer.dashboard-shell {
   pointer-events: none;
 }
 
-/* Anillo refractivo (capa inferior, ocupa todo): fondo nítido desplazado hacia dentro */
+/* Anillo Fresnel (encima de la lente): el canto no depende del tamaño. */
 .lead-os-frame::after,
 .call-agenda-panel::after {
   inset: 0;
   z-index: -2;
   border-radius: inherit;
-  background: var(--lg-rim-tint);
+  background: transparent;
   box-shadow: var(--lg-rim-shadow);
-  -webkit-backdrop-filter: var(--lg-filter, blur(0px)) var(--lg-rim-fx);
-  backdrop-filter: var(--lg-filter, blur(0px)) var(--lg-rim-fx);
 }
+
+/* Lente 9-slice: el bevel se queda en px. Los lados se estiran solo en tangente. */
+.lg-lens {
+  position: absolute;
+  inset: 0;
+  z-index: -3;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.lg-lens-part {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+  -webkit-backdrop-filter: var(--lg-part-filter) var(--lg-rim-fx);
+  backdrop-filter: var(--lg-part-filter) var(--lg-rim-fx);
+}
+
+.lg-lens-n,
+.lg-lens-s {
+  left: var(--lg-bevel);
+  right: var(--lg-bevel);
+  height: var(--lg-bevel);
+}
+.lg-lens-n { top: 0; --lg-part-filter: url(#lg2-shared-n); }
+.lg-lens-s { bottom: 0; --lg-part-filter: url(#lg2-shared-s); }
+
+.lg-lens-e,
+.lg-lens-w {
+  top: var(--lg-bevel);
+  bottom: var(--lg-bevel);
+  width: var(--lg-bevel);
+}
+.lg-lens-w { left: 0; --lg-part-filter: url(#lg2-shared-w); }
+.lg-lens-e { right: 0; --lg-part-filter: url(#lg2-shared-e); }
+
+.lg-lens-nw,
+.lg-lens-ne,
+.lg-lens-sw,
+.lg-lens-se {
+  width: var(--lg-bevel);
+  height: var(--lg-bevel);
+}
+.lg-lens-nw { top: 0; left: 0; --lg-part-filter: url(#lg2-shared-nw); }
+.lg-lens-ne { top: 0; right: 0; --lg-part-filter: url(#lg2-shared-ne); }
+.lg-lens-sw { bottom: 0; left: 0; --lg-part-filter: url(#lg2-shared-sw); }
+.lg-lens-se { bottom: 0; right: 0; --lg-part-filter: url(#lg2-shared-se); }
 
 /* Cuerpo esmerilado (capa superior, dentro del anillo) */
 .lead-os-frame::before,
@@ -12422,18 +12471,12 @@ body > .os-desk-layer.dashboard-shell {
   z-index: -1;
   border-radius: calc(var(--lg-outer-radius) - var(--lg-rim));
   background:
-    radial-gradient(
-      42% 34% at var(--lg-mx, 30%) var(--lg-my, -8%),
-      var(--lg-light),
-      rgba(255, 255, 255, 0) 72%
-    ),
     var(--lgw-sheen),
     var(--lgw-bg);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-  /* La refracción ya viene hecha por la capa inferior (::after cubre toda la
-     ventana y su lente entra BEVEL px bajo el cuerpo); aquí solo blur ligero. */
+  /* La refracción vive en .lg-lens (56 px fijos). Aquí solo el cuerpo mate. */
   -webkit-backdrop-filter: var(--lgw-blur);
   backdrop-filter: var(--lgw-blur);
 }
@@ -12592,6 +12635,19 @@ body > .os-desk-layer.dashboard-shell {
 .lead-os-window:is(.is-enter-spawn, .is-enter-restore, .is-closing, .is-minimizing) .lead-os-frame,
 .call-agenda-root:is(.is-size-tween, .is-enter, .is-exiting, .is-tucking) .call-agenda-panel {
   will-change: transform, opacity;
+}
+
+/* Apps y barra cambian la caja real durante maximizar/restaurar. No promover
+   aquí una captura `transform`: Chromium conservaría el backdrop antiguo y el
+   vidrio parecería llegar tarde o estirarse. */
+.lead-os-window.tool-window.is-size-tween,
+.call-agenda-root.is-size-tween {
+  will-change: left, top, width, height;
+}
+
+.lead-os-window.tool-window.is-size-tween .tool-window-frame,
+.call-agenda-root.is-size-tween .call-agenda-panel {
+  will-change: auto;
 }
 
 /* ── Motion de carga y actualización ──

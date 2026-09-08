@@ -85,7 +85,19 @@ export function commitWinRectToElement(el: HTMLElement, rect: WinRect): void {
   el.style.removeProperty('transform')
 }
 
-/** Sincroniza la lente al iniciar o terminar un resize/maximizado. */
+/** Anima left/top/width/height para que el canto de cristal no se escale. */
+export function animateWinBox(el: HTMLElement, from: DOMRect): Animation {
+  const to = el.getBoundingClientRect()
+  return el.animate(
+    [
+      { left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px` },
+      { left: `${to.left}px`, top: `${to.top}px`, width: `${to.width}px`, height: `${to.height}px` },
+    ],
+    { duration: 420, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+  )
+}
+
+/** Sincroniza la luz del cristal al terminar un resize/maximizado. */
 export function refreshLiquidGlass(root: HTMLElement | null): void {
   if (!root) return
   const frame = root.matches('.lead-os-frame, .call-agenda-panel')

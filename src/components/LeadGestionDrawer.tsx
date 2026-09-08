@@ -27,6 +27,7 @@ import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib
 import { isSlaCritico } from '../lib/tallerStations'
 import { useLiquidGlass } from '../hooks/useLiquidGlass'
 import {
+  animateWinBox,
   applyDockVars,
   applyScatterVars,
   applyWinMoveToElement,
@@ -150,16 +151,7 @@ function LeadGestionDrawer({
     }
     el.classList.add('is-size-tween')
     refreshLiquidGlass(el)
-    const animation = el.animate(
-      [
-        {
-          transform: `translate3d(${from.left - to.left}px, ${from.top - to.top}px, 0) scale(${from.width / to.width}, ${from.height / to.height})`,
-          transformOrigin: 'top left',
-        },
-        { transform: 'translate3d(0, 0, 0) scale(1)', transformOrigin: 'top left' },
-      ],
-      { duration: 420, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
-    )
+    const animation = animateWinBox(el, from)
     maxAnimationRef.current = animation
     const finish = () => {
       if (maxAnimationRef.current === animation) maxAnimationRef.current = null

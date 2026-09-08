@@ -15,7 +15,7 @@ El resultado combina cuatro propiedades:
 
 ## Componentes involucrados
 
-- `src/hooks/useLiquidGlass.tsx`: genera la lente y controla la luz interactiva.
+- `src/hooks/useLiquidGlass.tsx`: genera y precarga la lente compartida.
 - `src/styles/avi-crm.css`: compone las capas, tintes, blur, bordes y fallbacks.
 - `src/components/ToolWindow.tsx`: activa el efecto en las apps flotantes.
 - `src/components/LeadGestionDrawer.tsx`: activa el efecto en las fichas.
@@ -29,8 +29,8 @@ detrás de su contenido:
 ```text
 Contenido de la ventana
 └── ::before  Cuerpo translúcido (tinte + blur + reflejo)
-    └── ::after  Lente refractiva completa (SVG + aberración cromática)
-        └── Dashboard vivo situado detrás de la ventana
+    └── ::after  Fresnel y separación cian/magenta
+        └── .lg-lens  Lente refractiva SVG por piezas
 ```
 
 No se rasteriza el dashboard ni se sustituye por una captura. Los filtros leen
@@ -38,8 +38,9 @@ el contenido real que el navegador está componiendo detrás de cada ventana.
 
 ## 1. La lente refractiva
 
-`useLiquidGlass()` crea un mapa de desplazamiento a la medida de cada ventana.
-El mapa se genera en un `canvas` a un cuarto de la resolución para reducir coste.
+`useLiquidGlass()` crea **ocho mapas fijos** (4 lados + 4 esquinas) una sola vez.
+Cada tira mide `BEVEL = 56px`. Al redimensionar, los lados se estiran solo en
+la dirección tangente, donde el mapa es constante: el canto no se deforma.
 
 Cada píxel guarda en sus canales:
 
@@ -64,24 +65,10 @@ visible sea más estrecho. Esto evita que el efecto termine bruscamente.
 
 ## 2. Aberración cromática
 
-El hook inyecta un filtro SVG único dentro de cada ventana. Ese filtro ejecuta
-tres desplazamientos:
-
-- Rojo: refracción base menos 9 %.
-- Verde: refracción base.
-- Azul: refracción base más 9 %.
-
-Después separa y vuelve a combinar los canales. La diferencia solo se aprecia
-claramente donde la lente tiene pendiente, especialmente en el filo.
-
-El filtro llega al CSS mediante una variable propia del elemento:
-
-```css
---lg-filter: url(#identificador-unico);
-```
-
-Cada ventana necesita un identificador independiente para evitar que dos
-instancias compartan accidentalmente el mismo mapa.
+Hay 8 filtros SVG compartidos (`#lg2-shared-n`, esquinas, etc.). Cada uno ejecuta
+un único desplazamiento del fondo. La separación cromática visible se dibuja
+en el anillo Fresnel con líneas cian y magenta. Esto conserva la apariencia y
+reduce las pasadas SVG de 24 a 8 por ventana.
 
 ## 3. Cuerpo translúcido
 
@@ -93,7 +80,6 @@ añade el acabado translúcido:
 .call-agenda-panel::before {
   inset: var(--lg-rim);
   background:
-    radial-gradient(/* luz interactiva */),
     var(--lgw-sheen),
     var(--lgw-bg);
   backdrop-filter: var(--lgw-blur);
@@ -114,17 +100,11 @@ prioridad visual.
 
 ## 4. Canto, Fresnel y reflejos
 
-`::after` cubre toda la ventana y aplica el filtro refractivo:
+`.lg-lens` aplica la refracción. `::after` solo pinta el Fresnel, sin filtro:
 
 ```css
-.lead-os-frame::after,
-.call-agenda-panel::after {
-  background: var(--lg-rim-tint);
-  box-shadow: var(--lg-rim-shadow);
-  backdrop-filter:
-    var(--lg-filter, blur(0px))
-    var(--lg-rim-fx);
-}
+.lg-lens-n { height: var(--lg-bevel); backdrop-filter: url(#lg-shared-n) var(--lg-rim-fx); }
+.lead-os-frame::after { box-shadow: var(--lg-rim-shadow); }
 ```
 
 El `box-shadow` interior simula Fresnel y la iluminación del material:
@@ -134,9 +114,7 @@ El `box-shadow` interior simula Fresnel y la iluminación del material:
 - Arista ligeramente más oscura abajo y a la derecha.
 - En la barra de tareas, matices cian y violeta refuerzan la aberración.
 
-El reflejo radial del cuerpo sigue el puntero mediante `--lg-mx` y `--lg-my`.
-Las actualizaciones se agrupan con `requestAnimationFrame` para realizar como
-máximo una escritura visual por fotograma.
+El reflejo del cuerpo es fijo: el cristal no registra movimientos del puntero.
 
 ## 5. Integración en React
 
@@ -165,37 +143,28 @@ todavía era `null`; al abrir la barra después, la refracción no se inicializa
 
 ## 6. Redimensionado y maximizado
 
-Un `ResizeObserver` vigila cada marco. Cuando cambia su tamaño:
+El cristal no se regenera al cambiar de tamaño:
 
-1. Agrupa las notificaciones con `requestAnimationFrame`.
-2. Durante un resize limita la reconstrucción a una cada 96 ms; el filtro,
-   tinte y blur nunca se sustituyen, por lo que el material mantiene continuidad.
-3. Al finalizar, recibe `liquidglass:refresh` para ajustar el mapa definitivo.
-4. Lee anchura, altura y radio actuales.
-5. Reutiliza un mapa de la caché LRU o genera uno nuevo.
-6. Actualiza el `<feImage>` del filtro SVG.
+1. Las 8 tiras se colocan con CSS (`top/left/right/bottom` + `--lg-bevel`).
+2. Los mapas de desplazamiento son compartidos y permanentes.
+3. El cuerpo (`::before`) usa el mismo blur y tinte en cualquier tamaño.
+4. El anillo Fresnel (`::after`) es solo sombra, también en px.
+5. Maximizar anima `left/top/width/height` (no `scale`) para no estirar el canto.
 
-El mapa no se vuelve a crear si las dimensiones y el radio no han cambiado.
+Los mapas compartidos se preparan al cargar el módulo, antes de abrir una ficha.
 
 ## 7. Rendimiento
 
 La implementación evita capturar y rasterizar el DOM:
 
 - El dashboard sigue siendo HTML vivo.
-- El mapa se actualiza como máximo cada 96 ms durante resize y una vez al terminar.
-- Los últimos 20 mapas se conservan en una caché LRU.
-- El movimiento del puntero reutiliza el rectángulo leído en `pointerenter` y
-  solo actualiza dos variables CSS; durante un drag se pausa para no forzar
-  una lectura de layout adicional.
+- Los 8 mapas de la lente se generan una vez y se reutilizan en todas las ventanas.
+- Redimensionar no toca el canvas ni el SVG: solo cambia el layout CSS.
+- No hay listeners de puntero por ventana ni escrituras CSS por movimiento.
 - Elementos interiores como teclas y tarjetas no añaden otro
   `backdrop-filter`.
-- El mapa se calcula a una cuarta parte de la resolución.
 - Arrastrar utiliza `translate3d` y fija `left/top` una sola vez al soltar.
-- Maximizar/restaurar usa FLIP con Web Animations (`transform`) en lugar de
-  animar `left`, `top`, `width` y `height`.
-- Refracción, aberración, tinte y blur permanecen iguales durante movimiento,
-  resize, apertura, maximizado y minimizado. La continuidad se obtiene moviendo
-  con `translate3d`, estirando temporalmente el mapa y actualizándolo con throttle.
+- Maximizar/restaurar anima la caja real para que el bevel siga midiendo 56 px.
 
 Esto resulta más adecuado para un CRM dinámico que una solución WebGL basada
 en capturas de todo el dashboard.

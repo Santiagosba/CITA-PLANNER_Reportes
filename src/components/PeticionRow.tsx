@@ -57,11 +57,12 @@ function PeticionRow({
 
   const openInWindow = Boolean(onOpenLead)
   const showBody = expanded && !openInWindow
+  const animateEntry = revealIndex < 16
 
   return (
     <li
-      className={`prow glass glass-lite triage-item-enter${showBody ? ' is-expanded' : ''}${openInWindow ? ' is-windowed' : ''}`}
-      style={{ animationDelay: `${Math.min(revealIndex, 12) * 28}ms` }}
+      className={`prow glass glass-lite${animateEntry ? ' triage-item-enter' : ''}${showBody ? ' is-expanded' : ''}${openInWindow ? ' is-windowed' : ''}`}
+      style={animateEntry ? { animationDelay: `${revealIndex * 24}ms` } : undefined}
     >
       <div className="prow-head">
         <button

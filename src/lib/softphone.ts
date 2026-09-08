@@ -18,7 +18,7 @@
  */
 
 import { useSyncExternalStore } from 'react'
-import { TelnyxRTC, type Call, type INotification } from '@telnyx/webrtc'
+import type { TelnyxRTC as TelnyxClient, Call, INotification } from '@telnyx/webrtc'
 import {
   CrmApiError,
   fetchOutboundCli,
@@ -110,7 +110,7 @@ function saveHistory(history: FinishedCall[]) {
   }
 }
 
-let client: TelnyxRTC | null = null
+let client: TelnyxClient | null = null
 let rtcCall: Call | null = null
 let state: SoftphoneState = {
   status: 'off',
@@ -405,12 +405,19 @@ async function doConnect(): Promise<void> {
     setState({ status: 'off', error: 'Falta VITE_CRM_API_URL para activar el softphone.' })
     return
   }
+  setState({ status: 'connecting', error: null })
+
+  let TelnyxRTC: typeof import('@telnyx/webrtc').TelnyxRTC
+  try {
+    ;({ TelnyxRTC } = await import('@telnyx/webrtc'))
+  } catch {
+    setState({ status: 'error', error: 'No se pudo cargar el módulo de llamadas.' })
+    return
+  }
   if (!TelnyxRTC.webRTCInfo || typeof RTCPeerConnection === 'undefined') {
     setState({ status: 'error', error: 'Este navegador no soporta llamadas WebRTC.' })
     return
   }
-
-  setState({ status: 'connecting', error: null })
 
   let creds: Awaited<ReturnType<typeof fetchWebrtcCredentials>>
   try {

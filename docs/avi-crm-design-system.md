@@ -166,29 +166,28 @@ lleva sombra propia y usa fondos semitransparentes blancos (`rgba(255,255,255,0.
 ### 4.1 Liquid glass (ventanas del escritorio)
 
 Las fichas, apps y la barra de tareas (`.lead-os-frame`, `.call-agenda-panel`) no
-son un `glass` plano: el marco es transparente y el vidrio son dos capas físicas.
+son un `glass` plano: el marco es transparente y el vidrio son tres capas físicas.
 
 Tokens propios con prefijo `--lgw-*` (no reutilizar `--glass-*`, que ya son los
 tokens de la superficie `.glass`: `--glass-blur` es una longitud y `--glass-sheen`
 un número; mezclarlos invalida las declaraciones).
 
-- `::after` lente (capa inferior, cubre toda la ventana) — refracta el fondo con
-  `feDisplacementMap` (lente biconvexa: centro plano, la curvatura entra `BEVEL`
-  = 56 px desde el filo), con aberración cromática (R/G/B se desvían ±9 %), brillo
-  y saturación (`--lg-rim-fx`) y Fresnel: resplandor que nace en el filo, línea
-  especular arriba y arista en sombra abajo/derecha (`--lg-rim-shadow`). En los
-  8 px exteriores de las ventanas (`--lg-rim`) se ve nítida; la barra usa 10 px
-  y un filo cian/violeta ligeramente más marcado para que la aberración se lea
-  bien incluso en su tamaño compacto.
+- `.lg-lens` lente de 9 piezas (8 tiras de `--lg-bevel` = 56 px) — refracta el
+  fondo con `feDisplacementMap` compartido (lados + esquinas). Los lados se
+  estiran solo en tangente, así que agrandar o encoger no deforma el canto.
+  Cada tira hace una sola pasada SVG. En los 8 px exteriores (`--lg-rim`) se ve
+  nítida; la barra usa 10 px.
+- `::after` anillo Fresnel — resplandor del filo, línea especular y arista en
+  sombra (`--lg-rim-shadow`), con líneas cian/magenta para la separación
+  cromática. No se escala ópticamente con el tamaño.
 - `::before` cuerpo (capa superior, `inset: var(--lg-rim)`) — solo `blur(14px)` y
   tinte `--lgw-bg` (60 % blanco / 62 % gris-azul en oscuro): vidrio claro en el que
   el fondo se ve doblado y suavizado, y el texto de la ventana sigue leyéndose.
-  Reflejo diagonal `--lgw-sheen` y luz `--lg-light` que sigue al puntero
-  (`--lg-mx / --lg-my`). No se usan máscaras (backdrop-filter + mask es frágil).
-- El mapa de desplazamiento lo genera `useLiquidGlass(frameRef)` a la medida de
-  cada ventana a partir de la SDF del rectángulo redondeado (esquinas correctas,
-  canvas a 1/4 de resolución) y lo inyecta como `<svg class="lg-defs">` dentro del
-  marco; el CSS lo recibe en `--lg-filter`. Se rehace al redimensionar.
+  Reflejo diagonal fijo `--lgw-sheen`; no sigue al puntero. No se usan máscaras
+  (`backdrop-filter` + `mask` es frágil).
+- Los mapas los genera `useLiquidGlass()` una sola vez (SVG compartido en
+  `document.body`) al cargar el módulo. Redimensionar no regenera nada: el layout
+  CSS mueve las tiras y una ficha nueva no espera a que se construya su lente.
 - Los paneles con montaje condicional deben pasar una clave de activación:
   `useLiquidGlass(panelRef, mountedKey)`. Así el filtro se inicializa cuando el
   nodo reaparece (por ejemplo, al abrir la barra desde su píldora minimizada).
