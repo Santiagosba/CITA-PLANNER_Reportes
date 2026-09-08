@@ -12,7 +12,7 @@ interface LoginViewProps {
   workshopDisplayName?: string | null
   externalNotice?: { kind: 'error' | 'info'; message: string } | null
   onDismissNotice?: () => void
-  onDemoLogin?: (asesor: DemoAsesor) => void
+  onDemoLogin?: (asesor: DemoAsesor) => void | Promise<void>
 }
 
 export default function LoginView({
@@ -28,8 +28,20 @@ export default function LoginView({
   const [showPassword, setShowPassword] = useState(false)
   const [loginStatus, setLoginStatus] = useState<ActionStatus>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [demoBusyId, setDemoBusyId] = useState<string | null>(null)
 
   const logoUrl = branding?.logo_url?.trim()
+
+  const handleDemoClick = async (asesor: DemoAsesor) => {
+    if (!onDemoLogin || demoBusyId) return
+    setError(null)
+    setDemoBusyId(asesor.id)
+    try {
+      await onDemoLogin(asesor)
+    } finally {
+      setDemoBusyId(null)
+    }
+  }
 
   useEffect(() => {
     if (externalNotice) setError(null)
@@ -94,7 +106,9 @@ export default function LoginView({
                   key={asesor.id}
                   type="button"
                   className="login-asesor-card"
-                  onClick={() => onDemoLogin(asesor)}
+                  onClick={() => void handleDemoClick(asesor)}
+                  disabled={demoBusyId !== null}
+                  aria-busy={demoBusyId === asesor.id}
                 >
                   <span className="login-asesor-avatar" aria-hidden>
                     {asesor.initials}

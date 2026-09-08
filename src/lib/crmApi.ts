@@ -7,6 +7,7 @@
  */
 
 import { supabase } from './supabase'
+import { handleExpiredSession } from './sessionGuard'
 
 export class CrmApiError extends Error {
   status: number
@@ -19,14 +20,22 @@ export class CrmApiError extends Error {
 
 export function crmApiBase(): string {
   const raw = (import.meta.env.VITE_CRM_API_URL as string | undefined)?.trim()
-  return raw ? raw.replace(/\/+$/, '') : ''
+  if (raw) return raw.replace(/\/+$/, '')
+  // Detrás de un proxy que reenvía /api/call*, /api/webrtc y /socket.io a api-crm.
+  // Se devuelve el origen absoluto porque socket.io interpreta una ruta relativa
+  // como namespace, no como URL base.
+  const sameOrigin = String(import.meta.env.VITE_CRM_API_SAME_ORIGIN || '').trim().toLowerCase()
+  if ((sameOrigin === '1' || sameOrigin === 'true') && typeof window !== 'undefined') {
+    return window.location.origin
+  }
+  return ''
 }
 
 export function isCrmApiConfigured(): boolean {
   return Boolean(crmApiBase())
 }
 
-async function bearerToken(): Promise<string | null> {
+export async function crmAccessToken(): Promise<string | null> {
   try {
     const { data } = await supabase.auth.getSession()
     const token = data?.session?.access_token
@@ -42,7 +51,7 @@ async function crmFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   const headers = new Headers(init.headers)
   if (!headers.has('Content-Type') && init.body) headers.set('Content-Type', 'application/json')
-  const token = await bearerToken()
+  const token = await crmAccessToken()
   if (token) headers.set('Authorization', `Bearer ${token}`)
 
   let res: Response
@@ -64,6 +73,9 @@ async function crmFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   if (!res.ok) {
+    if (res.status === 401 && token && !(await handleExpiredSession())) {
+      throw new CrmApiError('Tu sesión ha caducado. Vuelve a entrar.', 401)
+    }
     const apiError =
       body && typeof body === 'object' && 'error' in body ? String((body as { error: unknown }).error) : ''
     throw new CrmApiError(apiError || `Error api-crm (${res.status})`, res.status)
@@ -162,10 +174,115 @@ export async function fetchCustomerCalls(phone: string): Promise<CustomerCallIte
   return (res.items || []).filter((item) => item.tipo === 'llamada' || !item.tipo)
 }
 
+export type CallCostBreakdownItem = {
+  product: string
+  cost: number
+  currency: string
+  billed_sec: number | null
+  rate: number | null
+  rate_measured_in: string | null
+}
+
+export type CallCost = {
+  amount: number
+  currency: string
+  rate_per_min: number | null
+  billed_sec: number | null
+  breakdown: CallCostBreakdownItem[]
+  updated_at: string | null
+}
+
+export type CallDetail = {
+  id: string
+  telefono_destino: string | null
+  telefono_origen: string | null
+  direccion: 'outgoing' | 'incoming' | string | null
+  estado: string | null
+  fecha_inicio: string | null
+  fecha_respuesta: string | null
+  fecha_fin: string | null
+  duracion_seg: number | null
+  hangup_cause: string | null
+  /** Transcripción («Transcripción de la llamada\nAsesor: …») o resumen. */
+  notas: string | null
+  notas_titular: string | null
+  tags: unknown[]
+  agente: string | null
+  cliente: string | null
+  call_control_id: string | null
+  call_session_id: string | null
+  recording: { available: boolean; url: string | null; duration_sec: number | null }
+  cost: CallCost | null
+  /** Telnyx todavía no ha publicado el coste; conviene volver a preguntar. */
+  cost_pending: boolean
+}
+
+/** Detalle completo de una llamada del softphone (`GET /api/calls/log/:id`). */
+export function fetchCallDetail(callId: string): Promise<CallDetail> {
+  return crmFetch<CallDetail>(`/api/calls/log/${encodeURIComponent(callId)}`)
+}
+
+export type RateEstimate = {
+  ratePerMin: number
+  currency: string
+  source: 'history' | 'default'
+}
+
+/** Tarifa estimada por minuto hacia un destino (`GET /api/calls/rate-estimate`). */
+export async function fetchRateEstimate(to: string): Promise<RateEstimate | null> {
+  const qs = new URLSearchParams({ to })
+  const res = await crmFetch<{ estimate: RateEstimate | null }>(`/api/calls/rate-estimate?${qs.toString()}`)
+  return res.estimate ?? null
+}
+
 /** URL firmada (5 min) de la grabación (`GET /api/calls/:id/recording`). Requiere rol supervisor+. */
 export async function fetchRecordingUrl(callId: string): Promise<string> {
   const res = await crmFetch<{ url: string }>(`/api/calls/${encodeURIComponent(callId)}/recording`)
   return res.url
+}
+
+/** Arranca el streaming Deepgram de api-crm (`POST /api/call/transcription/start`). */
+export function startCallTranscription(refs: {
+  call_control_id: string
+  call_session_id?: string | null
+}): Promise<{ success: boolean }> {
+  return crmFetch<{ success: boolean }>('/api/call/transcription/start', {
+    method: 'POST',
+    body: JSON.stringify({
+      call_control_id: refs.call_control_id,
+      call_session_id: refs.call_session_id || undefined,
+    }),
+  })
+}
+
+export type CallCostDay = {
+  day: string
+  calls: number
+  cost: number
+  duration_sec: number
+}
+
+export type CallCostStats = {
+  from: string
+  to: string
+  currency: string
+  calls: number
+  answered: number
+  duration_sec: number
+  cost: number
+  with_cost: number
+  with_recording: number
+  with_transcript: number
+  series: CallCostDay[]
+}
+
+/** Totales y serie diaria de costes del softphone (`GET /api/calls/cost-stats`). */
+export function fetchCallCostStats(range?: { from?: string; to?: string }): Promise<CallCostStats> {
+  const qs = new URLSearchParams()
+  if (range?.from) qs.set('from', range.from)
+  if (range?.to) qs.set('to', range.to)
+  const suffix = qs.toString() ? `?${qs.toString()}` : ''
+  return crmFetch<CallCostStats>(`/api/calls/cost-stats${suffix}`)
 }
 
 /** Cuelga por Call Control si conocemos el `call_control_id` (`POST /api/call/hangup`). */

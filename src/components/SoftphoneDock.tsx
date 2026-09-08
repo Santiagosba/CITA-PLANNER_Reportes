@@ -14,8 +14,11 @@ import {
   RefreshCw,
   X,
 } from 'lucide-react'
-import { softphone, useSoftphone, type ActiveCall, type FinishedCall, type TranscriptLine } from '../lib/softphone'
+import { estimatedCallCost, softphone, useSoftphone, type ActiveCall, type FinishedCall, type TranscriptLine } from '../lib/softphone'
+import { useSoftphoneLevels } from '../lib/audioLevels'
+import { fmtMoney } from '../lib/callFormat'
 import { apps, useApps } from '../lib/apps'
+import SoundWave from './SoundWave'
 
 const AFTER_CALL_MS = 9000
 
@@ -190,8 +193,10 @@ export default function SoftphoneDock() {
   }, [call])
 
   const inConversation = call?.phase === 'active' || call?.phase === 'held'
-
+  const levels = useSoftphoneLevels(Boolean(call && inConversation))
   const now = Date.now()
+  const liveCost = call ? estimatedCallCost(call, now) : null
+  const lastLine = call?.transcript.length ? call.transcript[call.transcript.length - 1] : null
 
   return (
     <>
@@ -245,7 +250,24 @@ export default function SoftphoneDock() {
             </div>
           </div>
 
-          {inConversation && showTranscript ? <LiveTranscript lines={call.transcript} /> : null}
+          <SoundWave compact levels={levels} label="Intensidad de la llamada en curso" />
+
+          <div className="softphone-live-meta">
+            <span>{liveCost ? fmtMoney(liveCost.amount, liveCost.currency) : 'Coste al colgar'}</span>
+            <span>{call.recording ? 'Grabando' : inConversation ? 'Conectando grabación…' : 'Sin grabar aún'}</span>
+            <span>{call.transcript.some((l) => l.final) ? 'Transcribiendo' : inConversation ? 'Esperando voz…' : 'Transcripción al contestar'}</span>
+          </div>
+
+          {inConversation && showTranscript ? (
+            lastLine ? (
+              <p className={`softphone-live-line ${lastLine.speaker}${lastLine.final ? '' : ' is-partial'}`}>
+                <strong>{lastLine.speaker === 'asesor' ? 'Asesor' : 'Cliente'}</strong>
+                <span>{lastLine.text}</span>
+              </p>
+            ) : (
+              <LiveTranscript lines={call.transcript} />
+            )
+          ) : null}
 
           <div className="softphone-actions">
             {call.direction === 'incoming' && call.phase === 'ringing' ? (

@@ -37,7 +37,10 @@ export function parseConnectSiteIds(user: any | null | undefined): ConnectSiteId
   const hasAm = Object.prototype.hasOwnProperty.call(am, 'connect_site_ids')
   const hasUm = Object.prototype.hasOwnProperty.call(um, 'connect_site_ids')
   if (!hasAm && !hasUm) return { mode: 'legacy' }
-  const raw = hasAm ? am.connect_site_ids : um.connect_site_ids
+  // `user_metadata` es editable por el usuario. Si contiene un alcance antiguo
+  // sin equivalente firmado en app_metadata, se deniega hasta reprovisionarlo.
+  if (!hasAm) return { mode: 'scoped', siteIds: new Set() }
+  const raw = am.connect_site_ids
   const list = rawClaimToUuidList(raw).map(normalizeUuid).filter(Boolean)
   return { mode: 'scoped', siteIds: new Set(list) }
 }

@@ -19,7 +19,7 @@ import {
   isGlobalAviAdmin,
   type ConnectRoute,
 } from './lib/operationsConnect'
-import { buildDemoSession, loadDemoSession, saveDemoSession, type DemoAsesor } from './lib/demoAsesores'
+import { clearLegacyDemoSession, demoAsesoresEnabled, signInAsDemoAsesor, type DemoAsesor } from './lib/demoAsesores'
 import { parseConnectSiteIds, scopedSitesEmptyDenied } from './lib/connectSiteScope'
 import type { SlugBrandingContext } from './lib/licenseBrandingContext'
 import { buildSlugBrandingContext } from './lib/licenseBrandingContext'
@@ -276,7 +276,8 @@ export default function App() {
         data: { session: s },
       } = await supabase.auth.getSession()
       if (cancelled) return
-      setSession(s ?? loadDemoSession())
+      clearLegacyDemoSession()
+      setSession(s ?? null)
       if ((s?.user as any)?.user_metadata?.calendar_theme != null) {
         const theme = (s!.user as any).user_metadata.calendar_theme === 'dark'
         setIsDarkMode(theme)
@@ -295,12 +296,9 @@ export default function App() {
       if (newSession) {
         setSession(newSession)
       } else {
-        const demo = loadDemoSession()
-        setSession(demo)
-        if (!demo) {
-          setSelectedWorkshop(null)
-          setPreferredWorkshopIdTaller(null)
-        }
+        setSession(null)
+        setSelectedWorkshop(null)
+        setPreferredWorkshopIdTaller(null)
       }
       if (_event === 'SIGNED_OUT') {
         replaceStateToRoot(null)
@@ -606,11 +604,11 @@ export default function App() {
     }
   }, [])
 
-  const handleDemoLogin = useCallback((asesor: DemoAsesor) => {
-    const demo = buildDemoSession(asesor)
-    saveDemoSession(demo)
+  const handleDemoLogin = useCallback(async (asesor: DemoAsesor) => {
     setLoginNotice(null)
-    setSession(demo)
+    const { error } = await signInAsDemoAsesor(asesor)
+    if (error) setLoginNotice({ kind: 'error', message: error })
+    // Con éxito, `onAuthStateChange` fija la sesión real (JWT) como en cualquier login.
   }, [])
 
   const rootClass = isDarkMode ? 'dark' : ''
@@ -631,7 +629,7 @@ export default function App() {
           workshopDisplayName={slugBranding?.displayName ?? null}
           externalNotice={loginNotice}
           onDismissNotice={() => setLoginNotice(null)}
-          onDemoLogin={handleDemoLogin}
+          onDemoLogin={demoAsesoresEnabled() ? handleDemoLogin : undefined}
         />
       </div>
     )

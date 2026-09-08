@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { Clock3, Delete, Grid3x3, Phone, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing, Sparkles, Trash2, User } from 'lucide-react'
+import { ChevronRight, Clock3, Delete, Grid3x3, Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing, Sparkles, Trash2, User } from 'lucide-react'
 import { phoneTail, softphone, toDialNumber, useSoftphone, type FinishedCall } from '../lib/softphone'
 import { loadImportantContacts } from './ContactsApp'
+import PhoneCallDetail from './PhoneCallDetail'
+import PhoneLiveCall, { LiveTranscript } from './PhoneLiveCall'
+
+function callKey(call: FinishedCall): string {
+  return `${call.endedAt}-${call.number}`
+}
 
 type PadTab = 'keypad' | 'history'
 
@@ -47,12 +53,25 @@ function prettyNumber(raw: string): string {
   return [cc, groups, extra].filter(Boolean).join(' ')
 }
 
-function HistoryRow({ call, onPick, onCall }: { call: FinishedCall; onPick: () => void; onCall: () => void }) {
+function HistoryRow({
+  call,
+  selected,
+  onOpen,
+  onCall,
+}: {
+  call: FinishedCall
+  selected: boolean
+  onOpen: () => void
+  onCall: () => void
+}) {
   const missed = !call.answered
   const Icon = missed ? PhoneMissed : call.direction === 'incoming' ? PhoneIncoming : PhoneOutgoing
+  const extras: string[] = []
+  if (call.answered && call.logId) extras.push('grabación')
+  if (call.transcript.length > 0) extras.push('transcripción')
   return (
-    <li className={`phone-history-row${missed ? ' is-missed' : ''}`}>
-      <button type="button" className="phone-history-main" onClick={onPick} title="Poner en el marcador">
+    <li className={`phone-history-row${missed ? ' is-missed' : ''}${selected ? ' is-selected' : ''}`}>
+      <button type="button" className="phone-history-main" onClick={onOpen} title="Ver grabación, transcripción y coste" aria-expanded={selected}>
         <span className="phone-history-icon" aria-hidden>
           <Icon size={14} />
         </span>
@@ -61,9 +80,11 @@ function HistoryRow({ call, onPick, onCall }: { call: FinishedCall; onPick: () =
           <span>
             {call.label && call.label !== call.number ? `${prettyNumber(call.number)} · ` : ''}
             {missed ? 'Sin respuesta' : fmtDuration(call.durationSec)}
+            {extras.length > 0 ? ` · ${extras.join(' + ')}` : ''}
           </span>
         </span>
         <time className="phone-history-when font-mono">{fmtWhen(call.endedAt)}</time>
+        <ChevronRight size={14} className="phone-history-chevron" aria-hidden />
       </button>
       <button type="button" className="phone-history-call" onClick={onCall} aria-label={`Llamar a ${call.number}`}>
         <Phone size={14} />
@@ -147,11 +168,12 @@ function buildSuggestions(history: FinishedCall[], query: string): DialSuggestio
  * activa marca el número; en llamada envía tonos DTMF.
  */
 export default function SoftphonePad({ onCalled, initialTab = 'keypad', roomy = false }: Props) {
-  const { status, callerId, call, history } = useSoftphone()
+  const { status, callerId, call, history, lastCall } = useSoftphone()
   const [tab, setTab] = useState<PadTab>(initialTab)
   const [value, setValue] = useState('')
   const [busy, setBusy] = useState(false)
   const [pressed, setPressed] = useState<string | null>(null)
+  const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const pressTimer = useRef(0)
 
@@ -162,6 +184,23 @@ export default function SoftphonePad({ onCalled, initialTab = 'keypad', roomy = 
   const suggestions = useMemo(() => buildSuggestions(history, value), [history, value])
 
   useEffect(() => () => window.clearTimeout(pressTimer.current), [])
+
+  // Al entrar una llamada, el panel en vivo vive en la pestaña «Teclado».
+  useEffect(() => {
+    if (call) setTab('keypad')
+  }, [call])
+
+  // Al colgar una llamada atendida, abrimos su ficha para ver cómo llegan
+  // grabación, transcripción y coste.
+  const lastSeenRef = useRef(0)
+  useEffect(() => {
+    if (!lastCall || lastCall.endedAt === lastSeenRef.current) return
+    lastSeenRef.current = lastCall.endedAt
+    if (lastCall.answered && lastCall.logId) {
+      setSelectedKey(callKey(lastCall))
+      setTab('history')
+    }
+  }, [lastCall])
 
   const flash = (d: string) => {
     setPressed(d)
@@ -203,6 +242,10 @@ export default function SoftphonePad({ onCalled, initialTab = 'keypad', roomy = 
   }
 
   const historyView = useMemo(() => history.slice(0, 200), [history])
+  const selectedCall = useMemo(
+    () => (selectedKey ? historyView.find((c) => callKey(c) === selectedKey) ?? null : null),
+    [historyView, selectedKey],
+  )
 
   return (
     <div className={`phone-pad${roomy ? ' is-roomy' : ''}`}>
@@ -230,37 +273,41 @@ export default function SoftphonePad({ onCalled, initialTab = 'keypad', roomy = 
         </button>
       </div>
 
-      {tab === 'keypad' ? (
+      {tab === 'keypad' && call ? (
+        <div className="phone-pad-main is-live">
+          <PhoneLiveCall call={call} callerId={callerId} />
+          <div className="phone-live-inline">
+            <LiveTranscript call={call} />
+          </div>
+          <aside className="phone-suggest phone-suggest-live" aria-label="Transcripción en vivo">
+            <LiveTranscript call={call} />
+          </aside>
+        </div>
+      ) : tab === 'keypad' ? (
         <div className="phone-pad-main">
         <div className="phone-pad-dial">
-          <div className={`phone-pad-display lg-surface${inCall ? ' is-dtmf' : ''}`}>
-            {inCall ? (
-              <span className="phone-pad-display-hint">En llamada · las teclas envían tonos</span>
-            ) : (
-              <>
-                <input
-                  ref={inputRef}
-                  className="phone-pad-input font-mono"
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="off"
-                  placeholder="Escribe o marca…"
-                  value={prettyNumber(value)}
-                  onChange={(e) => setValue(e.target.value.replace(/[^\d+*#]/g, '').slice(0, 20))}
-                  onKeyDown={onKeyDown}
-                  aria-label="Número a marcar"
-                />
-                <button
-                  type="button"
-                  className="phone-pad-backspace"
-                  onClick={backspace}
-                  disabled={!value}
-                  aria-label="Borrar último dígito"
-                >
-                  <Delete size={16} />
-                </button>
-              </>
-            )}
+          <div className="phone-pad-display lg-surface">
+            <input
+              ref={inputRef}
+              className="phone-pad-input font-mono"
+              type="tel"
+              inputMode="tel"
+              autoComplete="off"
+              placeholder="Escribe o marca…"
+              value={prettyNumber(value)}
+              onChange={(e) => setValue(e.target.value.replace(/[^\d+*#]/g, '').slice(0, 20))}
+              onKeyDown={onKeyDown}
+              aria-label="Número a marcar"
+            />
+            <button
+              type="button"
+              className="phone-pad-backspace"
+              onClick={backspace}
+              disabled={!value}
+              aria-label="Borrar último dígito"
+            >
+              <Delete size={16} />
+            </button>
           </div>
 
           <div className="phone-keypad" role="group" aria-label="Teclado numérico">
@@ -281,22 +328,16 @@ export default function SoftphonePad({ onCalled, initialTab = 'keypad', roomy = 
           </div>
 
           <div className="phone-pad-actions">
-            {inCall ? (
-              <button type="button" className="lg-call is-hangup" onClick={() => void softphone.hangup()} aria-label="Colgar">
-                <PhoneOff size={22} aria-hidden />
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="lg-call"
-                onClick={() => void dial()}
-                disabled={!valid || busy || !ready}
-                title={!ready ? 'El teléfono no está conectado' : 'Llamar'}
-                aria-label="Llamar"
-              >
-                <Phone size={22} aria-hidden />
-              </button>
-            )}
+            <button
+              type="button"
+              className="lg-call"
+              onClick={() => void dial()}
+              disabled={!valid || busy || !ready}
+              title={!ready ? 'El teléfono no está conectado' : 'Llamar'}
+              aria-label="Llamar"
+            >
+              <Phone size={22} aria-hidden />
+            </button>
           </div>
 
           <p className="phone-pad-hint">
@@ -317,9 +358,7 @@ export default function SoftphonePad({ onCalled, initialTab = 'keypad', roomy = 
             <Sparkles size={13} aria-hidden />
             {value ? 'Coincidencias' : 'A quién llamar'}
           </p>
-          {inCall ? (
-            <p className="phone-pad-hint">Sugerencias al colgar.</p>
-          ) : suggestions.length === 0 ? (
+          {suggestions.length === 0 ? (
             <p className="phone-pad-hint">
               {value
                 ? 'Ningún contacto ni llamada reciente coincide.'
@@ -364,28 +403,46 @@ export default function SoftphonePad({ onCalled, initialTab = 'keypad', roomy = 
         </aside>
         </div>
       ) : (
-        <div className="phone-history">
+        <div className={`phone-history${selectedCall ? ' has-detail' : ''}`}>
           {historyView.length === 0 ? (
             <p className="phone-pad-hint phone-history-empty">Todavía no hay llamadas desde este navegador.</p>
           ) : (
             <>
-              <ul className="phone-history-list custom-scrollbar-light">
-                {historyView.map((c) => (
-                  <HistoryRow
-                    key={`${c.endedAt}-${c.number}`}
-                    call={c}
-                    onPick={() => {
-                      setValue(c.number)
-                      setTab('keypad')
-                    }}
-                    onCall={() => void dial(c.number)}
-                  />
-                ))}
-              </ul>
-              <button type="button" className="ghost-button phone-history-clear" onClick={() => softphone.clearHistory()}>
-                <Trash2 size={13} aria-hidden />
-                Vaciar historial
-              </button>
+              <div className="phone-history-side">
+                <ul className="phone-history-list custom-scrollbar-light">
+                  {historyView.map((c) => {
+                    const key = callKey(c)
+                    return (
+                      <HistoryRow
+                        key={key}
+                        call={c}
+                        selected={key === selectedKey}
+                        onOpen={() => setSelectedKey((prev) => (prev === key ? null : key))}
+                        onCall={() => void dial(c.number, c.label)}
+                      />
+                    )
+                  })}
+                </ul>
+                <button
+                  type="button"
+                  className="ghost-button phone-history-clear"
+                  onClick={() => {
+                    setSelectedKey(null)
+                    softphone.clearHistory()
+                  }}
+                >
+                  <Trash2 size={13} aria-hidden />
+                  Vaciar historial
+                </button>
+              </div>
+              {selectedCall ? (
+                <PhoneCallDetail
+                  key={callKey(selectedCall)}
+                  call={selectedCall}
+                  onBack={() => setSelectedKey(null)}
+                  onCall={(n, label) => void dial(n, label)}
+                />
+              ) : null}
             </>
           )}
         </div>

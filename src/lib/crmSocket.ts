@@ -4,7 +4,7 @@
  */
 
 import { io, type Socket } from 'socket.io-client'
-import { crmApiBase } from './crmApi'
+import { crmAccessToken, crmApiBase } from './crmApi'
 
 export type TranscriptionEvent = {
   call_control_id: string
@@ -37,6 +37,9 @@ export function getCrmSocket(): Socket | null {
   if (!base) return null
   if (socket) return socket
   socket = io(base, {
+    auth: async (done) => {
+      done({ token: (await crmAccessToken()) || '' })
+    },
     withCredentials: true,
     transports: ['websocket', 'polling'],
     reconnectionAttempts: Infinity,
@@ -53,6 +56,22 @@ export function registerCrmSocketUser(crmUserId: string | null | undefined) {
   registeredUser = crmUserId?.trim() || null
   const s = getCrmSocket()
   if (s?.connected && registeredUser) s.emit('register_user', registeredUser)
+}
+
+/** Se suscribe a la sala privada de una llamada después de validar su propiedad en api-crm. */
+export function subscribeCrmSocketCall(call: {
+  logId?: string | null
+  callControlId?: string | null
+  sessionId?: string | null
+}) {
+  if (!call.logId || (!call.callControlId && !call.sessionId)) return
+  const s = getCrmSocket()
+  if (!s) return
+  s.emit('subscribe_call', {
+    logId: call.logId,
+    callControlId: call.callControlId || undefined,
+    sessionId: call.sessionId || undefined,
+  })
 }
 
 export function onCrmTranscription(handler: (evt: TranscriptionEvent) => void): () => void {

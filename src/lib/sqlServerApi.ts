@@ -5,6 +5,8 @@
 
 import type { GestionPatch, PeticionPendiente, PeticionesFilters, TipoPeticionRow } from './peticionesPendientes'
 import type { CitaTaller } from './citasTaller'
+import { supabase } from './supabase'
+import { handleExpiredSession } from './sessionGuard'
 
 function apiBase(): string {
   const colleague = (import.meta.env.VITE_COLLEAGUE_API_URL as string | undefined)?.trim()
@@ -32,13 +34,21 @@ const API_DOWN_MSG =
 
 async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   try {
-    return await fetch(input, init)
+    const headers = new Headers(init?.headers)
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (token && !token.startsWith('demo-')) headers.set('Authorization', `Bearer ${token}`)
+    return await fetch(input, { ...init, headers })
   } catch {
     throw new SqlServerApiError(API_DOWN_MSG)
   }
 }
 
 async function parseJson<T>(res: Response): Promise<T> {
+  if (res.status === 401 && !(await handleExpiredSession())) {
+    throw new SqlServerApiError('Tu sesión ha caducado. Vuelve a entrar.', 'session-expired')
+  }
+
   let body: { error?: string; ok?: boolean } & T
   try {
     body = (await res.json()) as { error?: string; ok?: boolean } & T
@@ -78,9 +88,13 @@ export function isSqlServerFallbackEnabled(): boolean {
 }
 
 export class SqlServerApiError extends Error {
-  constructor(message: string) {
+  /** `session-expired` no debe caer al fallback de Supabase: hay que volver al login. */
+  code?: 'session-expired'
+
+  constructor(message: string, code?: 'session-expired') {
     super(message)
     this.name = 'SqlServerApiError'
+    this.code = code
   }
 }
 

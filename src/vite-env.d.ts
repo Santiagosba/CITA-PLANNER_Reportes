@@ -5,8 +5,6 @@ interface ImportMetaEnv {
   readonly VITE_HUB_WEB_ICON_URL?: string
   readonly VITE_SUPABASE_URL?: string
   readonly VITE_SUPABASE_ANON_KEY?: string
-  readonly VITE_SUPABASE_DB_URL?: string
-  readonly SUPABASE_DB_URL?: string
   readonly VITE_HUB_WEB_ID?: string
   /** Slug en `hub_webs` (favicon / fila Hub); por defecto en código se usa `crm`. */
   readonly VITE_HUB_WEB_SLUG?: string
@@ -28,6 +26,12 @@ interface ImportMetaEnv {
   readonly VITE_SQL_API_URL?: string
   /** Si sqlserver falla, usar Supabase (default: true). Pon `false` para forzar solo SQL. */
   readonly VITE_PETICIONES_SQL_FALLBACK?: string
+  /** URL base de api-crm (softphone Telnyx). Vacío = ver `VITE_CRM_API_SAME_ORIGIN`. */
+  readonly VITE_CRM_API_URL?: string
+  /** `1` cuando api-crm se sirve tras el mismo origen que la SPA (proxy /api/call*, /socket.io). */
+  readonly VITE_CRM_API_SAME_ORIGIN?: string
+  /** Contraseña de las cuentas reales `*@taller.demo`. Sin definir → no se muestran asesores de prueba. */
+  readonly VITE_DEMO_ASESOR_PASSWORD?: string
 }
 
 interface ImportMeta {

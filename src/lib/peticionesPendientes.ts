@@ -60,6 +60,8 @@ async function withSqlFallback<T>(label: string, fn: () => Promise<T>, supabaseF
     sqlServerLoginBlocked = false
     return result
   } catch (e) {
+    // Sesión caducada: la copia de Supabase tampoco responderá, hay que volver al login.
+    if (e instanceof SqlServerApiError && e.code === 'session-expired') throw e
     const apiDown =
       e instanceof SqlServerApiError &&
       (/no está en marcha|Falta MSSQL_PASSWORD|no responde/i.test(e.message) || /502|503/i.test(e.message))

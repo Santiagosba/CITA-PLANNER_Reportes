@@ -30,5 +30,13 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",
     "vite": "^6.0.5"
+  },
+  "overrides": {
+    "@telnyx/webrtc": {
+      "uuid": "11.1.1",
+      "@peermetrics/webrtc-stats": {
+        "uuid": "11.1.1"
+      }
+    }
   }
 }

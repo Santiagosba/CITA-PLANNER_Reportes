@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, Camera, Mic, PhoneCall, Sparkles, Timer, Trash2 } from 'lucide-react'
+import { Activity, Camera, Coins, Mic, PhoneCall, Sparkles, Timer, Trash2 } from 'lucide-react'
 import Card from '../components/ui/Card'
+import LauraCallCosts from '../components/LauraCallCosts'
 import { resizeImageFile } from '../lib/lauraProfile'
 import {
   BOT_CONFIG_EVENT,
@@ -8,7 +9,7 @@ import {
   updateBotProfile,
 } from '../lib/botProfiles'
 
-type LauraTab = 'rendimiento' | 'calidad' | 'sla'
+type LauraTab = 'rendimiento' | 'calidad' | 'sla' | 'costes'
 
 const DAILY = [
   { day: '24', volume: 148 },
@@ -102,6 +103,16 @@ export default function LauraIntelligenceView({ workshopName }: Props) {
           <Timer size={16} aria-hidden />
           Tiempos &amp; SLA DMS
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'costes'}
+          className={`triage-view-btn ${tab === 'costes' ? 'is-active' : ''}`}
+          onClick={() => setTab('costes')}
+        >
+          <Coins size={16} aria-hidden />
+          Costes de llamadas
+        </button>
       </div>
 
       {tab === 'rendimiento' || tab === 'sla' ? (
@@ -193,6 +204,8 @@ export default function LauraIntelligenceView({ workshopName }: Props) {
           </section>
         </>
       ) : null}
+
+      {tab === 'costes' ? <LauraCallCosts /> : null}
 
       {tab === 'sla' ? (
         <>

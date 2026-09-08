@@ -22,12 +22,20 @@ import type { TelnyxRTC as TelnyxClient, Call, INotification } from '@telnyx/web
 import {
   CrmApiError,
   fetchOutboundCli,
+  fetchRateEstimate,
   fetchWebrtcCredentials,
   isCrmApiConfigured,
   logCallStart,
   patchCallLog,
+  startCallTranscription,
+  type RateEstimate,
 } from './crmApi'
-import { onCrmTranscription, registerCrmSocketUser, type TranscriptionEvent } from './crmSocket'
+import {
+  onCrmTranscription,
+  registerCrmSocketUser,
+  subscribeCrmSocketCall,
+  type TranscriptionEvent,
+} from './crmSocket'
 
 export type SoftphoneStatus = 'off' | 'connecting' | 'ready' | 'error'
 export type CallDirection = 'outgoing' | 'incoming'
@@ -59,6 +67,8 @@ export type ActiveCall = {
   /** api-crm graba automáticamente en cuanto la llamada se contesta. */
   recording: boolean
   transcript: TranscriptLine[]
+  /** Tarifa estimada por minuto (para el contador de coste en vivo). */
+  rate: RateEstimate | null
 }
 
 export type FinishedCall = {
@@ -71,6 +81,33 @@ export type FinishedCall = {
   durationSec: number
   endedAt: number
   transcript: TranscriptLine[]
+  hangupCause?: string | null
+}
+
+/** Coste estimado de una llamada en curso: tarifa × minutos hablados (redondeo por segundo). */
+export function estimatedCallCost(call: ActiveCall, now = Date.now()): { amount: number; currency: string } | null {
+  if (!call.rate || !call.answeredAt) return null
+  const seconds = Math.max(0, (now - call.answeredAt) / 1000)
+  return { amount: (call.rate.ratePerMin * seconds) / 60, currency: call.rate.currency }
+}
+
+function loadRateEstimate(callId: string, number: string) {
+  if (!number) return
+  fetchRateEstimate(number)
+    .then((rate) => {
+      if (rate && state.call?.id === callId) patchCall({ rate })
+    })
+    .catch(() => undefined)
+}
+
+/** Pide a api-crm el streaming Deepgram sobre esta pata (idempotente en servidor). */
+function requestLiveTranscription(call: ActiveCall | null) {
+  const controlId = call?.callControlId?.trim()
+  if (!controlId || controlId.startsWith('webrtc-')) return
+  void startCallTranscription({
+    call_control_id: controlId,
+    call_session_id: call?.sessionId,
+  }).catch(() => undefined)
 }
 
 export type SoftphoneState = {
@@ -132,7 +169,19 @@ function emit() {
 }
 
 function setState(patch: Partial<SoftphoneState>) {
+  const previousCall = state.call
   state = { ...state, ...patch }
+  const nextCall = state.call
+  if (
+    nextCall &&
+    (
+      previousCall?.logId !== nextCall.logId ||
+      previousCall?.callControlId !== nextCall.callControlId ||
+      previousCall?.sessionId !== nextCall.sessionId
+    )
+  ) {
+    subscribeCrmSocketCall(nextCall)
+  }
   emit()
 }
 
@@ -223,6 +272,9 @@ function syncTelnyxIds(call: Call) {
   const sessionId = ids?.telnyxSessionId || current.sessionId
   if (callControlId !== current.callControlId || sessionId !== current.sessionId) {
     patchCall({ callControlId, sessionId })
+    if (state.call?.phase === 'active' || state.call?.phase === 'held') {
+      requestLiveTranscription({ ...current, callControlId, sessionId })
+    }
   }
 }
 
@@ -264,6 +316,7 @@ function finishCall(cause?: string) {
     durationSec: duration,
     endedAt,
     transcript: current.transcript.filter((line) => line.final),
+    hangupCause: cause || null,
   }
   const history = [finished, ...state.history].slice(0, HISTORY_MAX)
   saveHistory(history)
@@ -300,8 +353,10 @@ function onCallUpdate(call: Call) {
         sessionId: ids?.telnyxSessionId || null,
         recording: false,
         transcript: [],
+        rate: null,
       },
     })
+    loadRateEstimate(call.id, number)
     void logCallStart({
       telefono_destino: state.callerId || number || 'desk',
       telefono_origen: number || null,
@@ -340,6 +395,7 @@ function onCallUpdate(call: Call) {
         muted: call.isAudioMuted,
         recording: true,
       })
+      requestLiveTranscription(state.call)
       break
     case 'held':
       patchCall({ phase: 'held' })
@@ -556,8 +612,10 @@ export const softphone = {
         sessionId: call.telnyxIDs?.telnyxSessionId || null,
         recording: false,
         transcript: [],
+        rate: null,
       },
     })
+    loadRateEstimate(call.id, number)
 
     // Sin ids Telnyx todavía: api-crm los enlaza después por teléfono
     // (`linkRecentSoftphoneToTelnyxLeg`) para colgar la grabación en esta fila.

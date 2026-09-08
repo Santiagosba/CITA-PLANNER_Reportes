@@ -22,18 +22,15 @@ export interface ConnectRoute {
 export function isGlobalAviAdmin(session: { user?: any } | null | undefined): boolean {
   const user = session?.user
   if (!user) return false
-  const um = (user.user_metadata && typeof user.user_metadata === 'object' ? user.user_metadata : {}) as Record<
-    string,
-    unknown
-  >
   const am = (user.app_metadata && typeof user.app_metadata === 'object' ? user.app_metadata : {}) as Record<
     string,
     unknown
   >
-  const roleRaw = (um.role ?? am.role ?? '') as unknown
+  // `user_metadata` lo puede editar el propio usuario: nunca concede privilegios.
+  const roleRaw = (am.role ?? am.user_role ?? '') as unknown
   const role = String(roleRaw).trim().toLowerCase()
   if (role === 'aviadmin' || role === 'admin') return true
-  return isAviAdminProfile(user.email ?? null, (um.role as string | undefined) ?? null)
+  return isAviAdminProfile(user.email ?? null, (am.role as string | undefined) ?? null)
 }
 
 /** Admin real o asesor de prueba: puede listar talleres y ver toda la bandeja. */

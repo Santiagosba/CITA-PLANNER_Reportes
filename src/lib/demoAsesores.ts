@@ -1,3 +1,14 @@
+/**
+ * Asesores de prueba: cuentas REALES de Supabase Auth (email `@taller.demo`) con
+ * `app_metadata.demo_asesor = true` y membresía en `operations.taller_users`.
+ *
+ * El botón del login hace `signInWithPassword` con `VITE_DEMO_ASESOR_PASSWORD`;
+ * si esa variable no está definida, los botones no se muestran (producción).
+ * Ya no existen sesiones falsas en `sessionStorage`: todo pasa por JWT + RLS.
+ */
+
+import { supabase } from './supabase'
+
 export type DemoAsesor = {
   id: string
   firstName: string
@@ -42,56 +53,40 @@ export const DEMO_ASESORES: DemoAsesor[] = [
   },
 ]
 
-const STORAGE_KEY = 'avi_demo_asesor'
+/** Clave de la antigua sesión falsa; se limpia en el arranque por si quedó en navegadores. */
+const LEGACY_STORAGE_KEY = 'avi_demo_asesor'
 
+function demoPassword(): string {
+  return String(import.meta.env.VITE_DEMO_ASESOR_PASSWORD || '').trim()
+}
+
+/** Los botones de asesor de prueba solo existen si el entorno define la contraseña. */
+export function demoAsesoresEnabled(): boolean {
+  return demoPassword() !== ''
+}
+
+/** Solo `app_metadata` (lo escribe el servidor); `user_metadata` lo edita el propio usuario. */
 export function isDemoAsesor(user: unknown): boolean {
-  const record = user as { id?: string; user_metadata?: { demo_asesor?: boolean } } | null
-  if (!record) return false
-  return Boolean(record.user_metadata?.demo_asesor) || String(record.id ?? '').startsWith('demo-asesor-')
+  const record = user as { app_metadata?: { demo_asesor?: unknown } } | null
+  return record?.app_metadata?.demo_asesor === true
 }
 
-export function buildDemoSession(asesor: DemoAsesor) {
+export async function signInAsDemoAsesor(asesor: DemoAsesor): Promise<{ error: string | null }> {
+  const password = demoPassword()
+  if (!password) return { error: 'Los asesores de prueba no están habilitados en este entorno.' }
+  const { error } = await supabase.auth.signInWithPassword({ email: asesor.email, password })
+  if (!error) return { error: null }
   return {
-    access_token: `demo-${asesor.id}`,
-    user: {
-      id: asesor.id,
-      email: asesor.email,
-      user_metadata: {
-        full_name: `${asesor.firstName} ${asesor.lastName}`,
-        first_name: asesor.firstName,
-        last_name: asesor.lastName,
-        role: asesor.role,
-        role_label: asesor.roleLabel,
-        demo_asesor: true,
-      },
-      app_metadata: {},
-    },
+    error:
+      error.message === 'Invalid login credentials'
+        ? 'La cuenta de prueba no está disponible. Revisa VITE_DEMO_ASESOR_PASSWORD.'
+        : 'No se pudo entrar con el asesor de prueba.',
   }
 }
 
-export function saveDemoSession(session: unknown) {
+export function clearLegacyDemoSession() {
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session))
-  } catch {
-    /* ignore */
-  }
-}
-
-export function loadDemoSession(): unknown | null {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as { user?: { id?: string } }
-    if (!isDemoAsesor(parsed?.user)) return null
-    return parsed
-  } catch {
-    return null
-  }
-}
-
-export function clearDemoSession() {
-  try {
-    sessionStorage.removeItem(STORAGE_KEY)
+    sessionStorage.removeItem(LEGACY_STORAGE_KEY)
   } catch {
     /* ignore */
   }
