@@ -3923,12 +3923,139 @@ html.dark .hex-loader-aura,
   color: var(--muted);
   font-size: 13px;
   font-weight: 650;
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    box-shadow 180ms ease,
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.triage-view-btn:hover {
+  transform: translateY(-1px);
+}
+
+.triage-view-btn:active {
+  transform: translateY(0) scale(0.97);
 }
 
 .triage-view-btn.is-active {
   color: #fff;
   background: linear-gradient(135deg, #3b82f6, #0a55b8);
   box-shadow: 0 6px 16px rgba(11, 99, 214, 0.2);
+}
+
+.triage-stage {
+  min-width: 0;
+  transform-origin: top center;
+  animation: triage-stage-enter 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.triage-stage .queue-filterbar,
+.triage-stage .dashboard-report > :first-child {
+  animation: triage-control-enter 300ms 45ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.triage-group-enter {
+  animation: triage-group-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.triage-item-enter {
+  animation: triage-item-enter 340ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.triage-stage .report-table tbody tr {
+  animation: triage-row-enter 300ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.triage-stage .calendar-agenda,
+.triage-stage .calendar-schedule-wrap,
+.triage-stage .calendar-month,
+.triage-stage .calendar-year,
+.triage-stage .calendar-week {
+  animation: triage-calendar-enter 380ms 55ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.metric-value-refresh {
+  display: inline-block;
+  transform-origin: center bottom;
+  animation: triage-value-refresh 300ms cubic-bezier(0.22, 1.2, 0.36, 1) both;
+}
+
+@keyframes triage-stage-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(12px, 0, 0) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes triage-control-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes triage-group-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes triage-item-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes triage-row-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(8px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes triage-calendar-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes triage-value-refresh {
+  0% {
+    opacity: 0.35;
+    transform: translate3d(0, 5px, 0) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
 }
 
 .dashboard-shell.is-light .triage-view-switch {
@@ -6921,6 +7048,8 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   min-height: 0;
   overflow-y: auto;
   padding: 16px 18px;
+  container-type: inline-size;
+  container-name: lead-body;
 }
 
 .lead-drawer-stack {
@@ -7002,19 +7131,72 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
 .lead-sentiment {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  margin: 6px 0;
+  gap: 7px;
+  min-height: 30px;
+  margin: 0;
+  padding: 5px 10px;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.1);
   color: var(--fog-strong);
-  font-size: 14px;
+  font-size: 13px;
   text-transform: capitalize;
+  white-space: nowrap;
 }
 
 .lead-sentiment-dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
   background: var(--color-warning);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.13);
   flex-shrink: 0;
+}
+
+.lead-sentiment-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 108px;
+}
+
+.lead-sentiment-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 14px;
+}
+
+.lead-sentiment-detail {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(15, 17, 21, 0.08);
+  font-size: 12px !important;
+  line-height: 1.4;
+}
+
+.lead-sentiment-detail svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--color-brand);
+}
+
+.dashboard-shell:not(.is-light) .lead-sentiment-detail {
+  border-top-color: rgba(255, 255, 255, 0.09);
+}
+
+@container lead-body (max-width: 560px) {
+  .lead-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lead-sentiment-card {
+    min-height: 0;
+  }
 }
 
 .lead-bullet-list {
@@ -7417,17 +7599,21 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   --dock-dy: 0px;
 }
 
-/* Solo tween el?stico al maximizar/restaurar; nunca tras arrastrar */
+/* Maximizar/restaurar usa FLIP (Web Animations) sobre transform. Mantener aquí
+   una transición de layout reintroduciría cuatro relayouts por fotograma. */
 .lead-os-window.is-size-tween:not(.is-gesturing) {
-  transition:
-    left 0.42s cubic-bezier(0.32, 1.15, 0.54, 1),
-    top 0.42s cubic-bezier(0.32, 1.15, 0.54, 1),
-    width 0.42s cubic-bezier(0.32, 1.15, 0.54, 1),
-    height 0.42s cubic-bezier(0.32, 1.15, 0.54, 1);
+  will-change: transform;
+  transition: none !important;
 }
 
-.lead-os-window.is-gesturing,
-.call-agenda-root.is-gesturing {
+.lead-os-window.is-moving,
+.call-agenda-root.is-moving {
+  will-change: transform;
+  transition: none !important;
+}
+
+.lead-os-window.is-resizing,
+.call-agenda-root.is-resizing {
   will-change: left, top, width, height;
   transition: none !important;
 }
@@ -7645,6 +7831,10 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   right: 12px;
   bottom: 20px;
   z-index: 96;
+  /* Vive directamente dentro de .os-desk-layer, que desactiva eventos para no
+     bloquear el dashboard. Debe recuperarlos explícitamente al no estar dentro
+     de .call-agenda-root. */
+  pointer-events: auto !important;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -7658,10 +7848,29 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
     inset 0 1px 0 rgba(255, 255, 255, 1),
     0 8px 24px rgba(15, 23, 42, 0.14);
   cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
   font: inherit;
   font-size: 14px;
   font-weight: 600;
   animation: agenda-peek-in 0.32s cubic-bezier(0.22, 1.1, 0.36, 1) both;
+}
+
+.agenda-peek:hover {
+  transform: translateY(-2px);
+  border-color: rgba(11, 99, 214, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 14px 32px rgba(15, 23, 42, 0.2);
+}
+
+.agenda-peek:focus-visible {
+  outline: 3px solid rgba(11, 99, 214, 0.28);
+  outline-offset: 3px;
+}
+
+.agenda-peek:active {
+  transform: translateY(0) scale(0.97);
 }
 
 .agenda-peek em {
@@ -8338,6 +8547,7 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   border: 1px solid rgba(255, 255, 255, 0.7);
   background: rgba(15, 17, 21, 0.05);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  animation: taskbar-dock-reveal 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .dashboard-shell:not(.is-light) .taskbar-dock {
@@ -8359,10 +8569,19 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 10px rgba(15, 23, 42, 0.14);
   transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1), filter 160ms ease;
+  animation: taskbar-app-pop 300ms cubic-bezier(0.22, 1.18, 0.36, 1) backwards;
 }
 
 .taskbar-dock-app:hover {
   transform: translateY(-3px) scale(1.06);
+}
+
+.taskbar-dock-app.is-active {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 0 0 2px rgba(11, 99, 214, 0.2),
+    0 6px 14px rgba(15, 23, 42, 0.18);
 }
 
 .taskbar-dock-app.is-minimized {
@@ -9657,7 +9876,8 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   transition:
     background var(--transition-fast),
     color var(--transition-fast),
-    border-color var(--transition-fast);
+    border-color var(--transition-fast),
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .taskbar-tab em {
@@ -9677,6 +9897,7 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   background: rgba(11, 99, 214, 0.1);
   border-color: rgba(11, 99, 214, 0.2);
   color: var(--color-brand);
+  transform: translateY(-1px);
 }
 
 .taskbar-tab.is-active em {
@@ -9723,6 +9944,7 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   transition:
     transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 160ms ease;
+  animation: taskbar-item-reveal 280ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 .taskbar-tool-tile:hover {
@@ -9795,6 +10017,13 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
 
 .taskbar-tool-tile.is-open {
   border-color: rgba(11, 99, 214, 0.3);
+}
+
+.taskbar-tool-tile.is-active {
+  border-color: rgba(11, 99, 214, 0.48);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    0 0 0 2px rgba(11, 99, 214, 0.1);
 }
 
 /* ══ Notas rápidas ══ */
@@ -12058,12 +12287,13 @@ body > .os-desk-layer.dashboard-shell {
    no tapar el efecto.
    ═══════════════════════════════════════════════════════════════════════ */
 :root {
-  /* Cuerpo: esmerilado denso. El fondo se intuye (formas y color), pero el
-     contenido de la ventana manda. La transparencia «de cristal» vive en el anillo. */
-  --lgw-blur: blur(64px) saturate(1.4);
-  --lgw-bg: rgba(255, 255, 255, 0.86);
-  --lgw-bg-soft: rgba(255, 255, 255, 0.5);
-  --lgw-bg-card: rgba(255, 255, 255, 0.72);
+  /* Cuerpo: vidrio claro. Mismo comportamiento óptico que el filo (refracción
+     por --lg-filter) más un blur ligero y un tinte suave para que el texto de la
+     ventana siga leyéndose sobre el fondo que se ve doblado detrás. */
+  --lgw-blur: blur(14px) saturate(1.15);
+  --lgw-bg: rgba(255, 255, 255, 0.6);
+  --lgw-bg-soft: rgba(255, 255, 255, 0.42);
+  --lgw-bg-card: rgba(255, 255, 255, 0.58);
   --lgw-border: rgba(255, 255, 255, 0.78);
   --lgw-edge: rgba(15, 23, 42, 0.12);
   --lgw-sheen: linear-gradient(
@@ -12081,9 +12311,9 @@ body > .os-desk-layer.dashboard-shell {
 }
 
 .dashboard-shell:not(.is-light) {
-  --lgw-bg: rgba(18, 21, 28, 0.86);
+  --lgw-bg: rgba(18, 21, 28, 0.62);
   --lgw-bg-soft: rgba(255, 255, 255, 0.07);
-  --lgw-bg-card: rgba(255, 255, 255, 0.09);
+  --lgw-bg-card: rgba(255, 255, 255, 0.1);
   --lgw-border: rgba(255, 255, 255, 0.16);
   --lgw-edge: rgba(0, 0, 0, 0.45);
   --lgw-sheen: linear-gradient(
@@ -12108,7 +12338,8 @@ body > .os-desk-layer.dashboard-shell {
              igual que el canto de una lente. El mapa lo genera useLiquidGlass()
              a la medida de cada ventana y llega por --lg-filter.               */
 :root {
-  --lg-rim: 16px;
+  /* Canto visible fino en las ventanas; la curvatura óptica continúa 56 px. */
+  --lg-rim: 8px;
   --lg-rim-tint: rgba(255, 255, 255, 0.18);
   --lg-rim-fx: saturate(1.7) brightness(1.1) contrast(1.06);
   /* Fresnel: brillo que nace en el filo y se apaga hacia dentro + línea especular
@@ -12158,10 +12389,10 @@ body > .os-desk-layer.dashboard-shell {
     0 0 0 1px var(--lgw-edge) !important;
 }
 
-/* Sin máscaras (backdrop-filter + mask es frágil entre navegadores): el anillo
-   es una capa completa por debajo y el cuerpo, una capa más pequeña encima que
-   tapa el centro. En el centro el mapa es neutro, así que el cuerpo desenfoca
-   el fondo real sin doble desvío. */
+/* Sin máscaras (backdrop-filter + mask es frágil entre navegadores): la lente
+   (::after) es una capa completa por debajo que refracta TODA la ventana; el
+   cuerpo (::before) es una capa más pequeña encima que solo añade blur ligero
+   y tinte. Así el filo queda nítido y el cuerpo muestra el fondo doblado. */
 .lead-os-frame::before,
 .lead-os-frame::after,
 .call-agenda-panel::before,
@@ -12201,6 +12432,8 @@ body > .os-desk-layer.dashboard-shell {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.7),
     inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  /* La refracción ya viene hecha por la capa inferior (::after cubre toda la
+     ventana y su lente entra BEVEL px bajo el cuerpo); aquí solo blur ligero. */
   -webkit-backdrop-filter: var(--lgw-blur);
   backdrop-filter: var(--lgw-blur);
 }
@@ -12217,8 +12450,30 @@ body > .os-desk-layer.dashboard-shell {
 }
 
 .call-agenda-panel {
+  /* Algo más de canto en la barra para que la refracción se lea en un panel
+     pequeño, pero sin recuperar los 16 px anteriores. */
+  --lg-rim: 10px;
   --lg-outer-radius: 18px;
+  --lg-rim-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 1px 0 0 rgba(74, 222, 255, 0.28),
+    inset -1px 0 0 rgba(196, 91, 255, 0.22),
+    inset 0 0 7px rgba(255, 255, 255, 0.48),
+    inset 0 -1px 0 rgba(32, 66, 120, 0.15);
 }
+
+.dashboard-shell:not(.is-light) .call-agenda-panel {
+  --lg-rim-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 1px 0 0 rgba(74, 222, 255, 0.2),
+    inset -1px 0 0 rgba(196, 91, 255, 0.17),
+    inset 0 0 7px rgba(255, 255, 255, 0.13),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.42);
+}
+
+/* El material no cambia durante drag, resize ni FLIP. Se mantiene la misma
+   refracción, aberración, opacidad y blur para evitar saltos visuales. El coste
+   se controla moviendo con translate3d y reutilizando el mapa óptico. */
 
 /* El SVG con los filtros de cada ventana no ocupa sitio */
 .lg-defs {
@@ -12334,9 +12589,133 @@ body > .os-desk-layer.dashboard-shell {
     0 0 0 1px var(--lgw-edge) !important;
 }
 
-.lead-os-window.is-gesturing .lead-os-frame,
-.call-agenda-root.is-gesturing .call-agenda-panel {
-  will-change: transform;
+.lead-os-window:is(.is-enter-spawn, .is-enter-restore, .is-closing, .is-minimizing) .lead-os-frame,
+.call-agenda-root:is(.is-size-tween, .is-enter, .is-exiting, .is-tucking) .call-agenda-panel {
+  will-change: transform, opacity;
+}
+
+/* ── Motion de carga y actualización ──
+   Solo transform + opacity: entrada orgánica sin forzar layout ni paint extra. */
+.app-sidebar-enter {
+  animation: app-sidebar-enter 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.app-sidebar-enter > * {
+  animation: app-content-rise 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.app-sidebar-enter > :nth-child(2) { animation-delay: 55ms; }
+.app-sidebar-enter > :nth-child(3) { animation-delay: 90ms; }
+.app-sidebar-enter > :nth-child(4) { animation-delay: 125ms; }
+
+.app-view-enter {
+  animation: app-view-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.app-view-enter > .dashboard-page > * {
+  animation: app-content-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.app-view-enter > .dashboard-page > :nth-child(2) { animation-delay: 45ms; }
+.app-view-enter > .dashboard-page > :nth-child(3) { animation-delay: 80ms; }
+.app-view-enter > .dashboard-page > :nth-child(4) { animation-delay: 110ms; }
+.app-view-enter > .dashboard-page > :nth-child(n + 5) { animation-delay: 135ms; }
+
+.taskbar-section-content {
+  transform-origin: top center;
+  animation: taskbar-section-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.taskbar-title-value {
+  animation: taskbar-title-refresh 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes app-sidebar-enter {
+  from {
+    opacity: 0.15;
+    transform: translate3d(-18px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes app-view-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes app-content-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes taskbar-section-in {
+  from {
+    opacity: 0;
+    transform: translate3d(10px, 0, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes taskbar-title-refresh {
+  from {
+    opacity: 0.35;
+    transform: translate3d(0, 4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes taskbar-item-reveal {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes taskbar-dock-reveal {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scaleX(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scaleX(1);
+  }
+}
+
+@keyframes taskbar-app-pop {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.72);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
 }
 
 /* Sin soporte de backdrop-filter (raro hoy): vuelve a superficies casi opacas */

@@ -74,6 +74,27 @@ export function applyWinRectToElement(el: HTMLElement, rect: WinRect): void {
   el.style.height = `${rect.h}px`
 }
 
+/** Mueve una ventana solo en el compositor; evita relayout en cada pointermove. */
+export function applyWinMoveToElement(el: HTMLElement, origin: WinRect, next: WinRect): void {
+  el.style.transform = `translate3d(${next.x - origin.x}px, ${next.y - origin.y}px, 0)`
+}
+
+/** Fija el rect final y devuelve el movimiento al transform base del CSS. */
+export function commitWinRectToElement(el: HTMLElement, rect: WinRect): void {
+  applyWinRectToElement(el, rect)
+  el.style.removeProperty('transform')
+}
+
+/** Sincroniza la lente al iniciar o terminar un resize/maximizado. */
+export function refreshLiquidGlass(root: HTMLElement | null): void {
+  if (!root) return
+  const frame = root.matches('.lead-os-frame, .call-agenda-panel')
+    ? root
+    : root.querySelector<HTMLElement>('.lead-os-frame, .call-agenda-panel')
+  if (!frame) return
+  requestAnimationFrame(() => frame.dispatchEvent(new Event('liquidglass:refresh')))
+}
+
 /** Vector hacia la barra de tareas para el minimizado «dock» (la ventana vuela hacia ella). */
 export function applyDockVars(el: HTMLElement): void {
   const dock = document.querySelector('.call-agenda-root:not(.is-tucking)') as HTMLElement | null

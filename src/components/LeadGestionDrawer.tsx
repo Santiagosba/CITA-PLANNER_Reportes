@@ -29,9 +29,12 @@ import { useLiquidGlass } from '../hooks/useLiquidGlass'
 import {
   applyDockVars,
   applyScatterVars,
+  applyWinMoveToElement,
   applyWinRectToElement,
+  commitWinRectToElement,
   cursorForSides,
   pulseAgendaCatch,
+  refreshLiquidGlass,
   resizeRectFromPointer,
   sidesFromEdge,
   type Edge,
@@ -122,26 +125,53 @@ function LeadGestionDrawer({
   const onFocusRef = useRef(onFocus)
   const onCloseRef = useRef(onClose)
   const onMinimizeRef = useRef(onMinimize)
+  const onToggleMaximizeRef = useRef(onToggleMaximize)
   const phaseRef = useRef(phase)
-  const maxTweenReadyRef = useRef(false)
+  const maxFromRef = useRef<DOMRect | null>(null)
+  const maxAnimationRef = useRef<Animation | null>(null)
 
   useEffect(() => {
     if (dragRef.current) return
     rectRef.current = rect
   }, [rect])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     maximizedRef.current = maximized
-    if (!maxTweenReadyRef.current) {
-      maxTweenReadyRef.current = true
+    const el = rootRef.current
+    const from = maxFromRef.current
+    maxFromRef.current = null
+    if (!el || !from) return
+    maxAnimationRef.current?.cancel()
+    const to = el.getBoundingClientRect()
+    if (!to.width || !to.height) return
+    if (reducedMotion()) {
+      refreshLiquidGlass(el)
       return
     }
-    const el = rootRef.current
-    if (!el) return
     el.classList.add('is-size-tween')
-    const t = window.setTimeout(() => el.classList.remove('is-size-tween'), 450)
+    refreshLiquidGlass(el)
+    const animation = el.animate(
+      [
+        {
+          transform: `translate3d(${from.left - to.left}px, ${from.top - to.top}px, 0) scale(${from.width / to.width}, ${from.height / to.height})`,
+          transformOrigin: 'top left',
+        },
+        { transform: 'translate3d(0, 0, 0) scale(1)', transformOrigin: 'top left' },
+      ],
+      { duration: 420, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+    )
+    maxAnimationRef.current = animation
+    const finish = () => {
+      if (maxAnimationRef.current === animation) maxAnimationRef.current = null
+      el.classList.remove('is-size-tween')
+      refreshLiquidGlass(el)
+    }
+    animation.addEventListener('finish', finish, { once: true })
+    animation.addEventListener('cancel', finish, { once: true })
     return () => {
-      window.clearTimeout(t)
+      animation.removeEventListener('finish', finish)
+      animation.removeEventListener('cancel', finish)
+      animation.cancel()
       el.classList.remove('is-size-tween')
     }
   }, [maximized])
@@ -161,6 +191,10 @@ function LeadGestionDrawer({
   useEffect(() => {
     onMinimizeRef.current = onMinimize
   }, [onMinimize])
+
+  useEffect(() => {
+    onToggleMaximizeRef.current = onToggleMaximize
+  }, [onToggleMaximize])
 
   useEffect(() => {
     phaseRef.current = phase
@@ -197,6 +231,14 @@ function LeadGestionDrawer({
     applyWinRectToElement(el, next)
   }, [])
 
+  const applyLiveMove = useCallback((origin: WinRect, next: WinRect) => {
+    const el = rootRef.current
+    if (!el) return
+    liveRectRef.current = next
+    rectRef.current = next
+    applyWinMoveToElement(el, origin, next)
+  }, [])
+
   const endGesture = useCallback(() => {
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current)
@@ -207,11 +249,15 @@ function LeadGestionDrawer({
     const finalRect = liveRectRef.current
     dragRef.current = null
     liveRectRef.current = null
+    if (el && finalRect) commitWinRectToElement(el, finalRect)
     el?.classList.remove('is-gesturing', 'is-moving', 'is-resizing')
     el?.style.setProperty('--win-tilt', '0deg')
     document.body.style.userSelect = ''
     document.body.style.cursor = ''
-    if (finalRect) onRectChangeRef.current(finalRect)
+    if (finalRect) {
+      refreshLiquidGlass(el)
+      onRectChangeRef.current(finalRect)
+    }
   }, [])
 
   useEffect(() => {
@@ -224,7 +270,7 @@ function LeadGestionDrawer({
       if (d.mode === 'move') {
         const dx = e.clientX - d.ox
         const dy = e.clientY - d.oy
-        applyLiveRect({
+        applyLiveMove({ x: d.sx, y: d.sy, w: d.sw, h: d.sh }, {
           x: Math.max(0, Math.min(d.sx + dx, window.innerWidth - 120)),
           y: Math.max(0, Math.min(d.sy + dy, window.innerHeight - 56)),
           w: d.sw,
@@ -248,7 +294,6 @@ function LeadGestionDrawer({
 
     const onPointerMove = (e: PointerEvent) => {
       if (!dragRef.current) return
-      e.preventDefault()
       pendingPtrRef.current = e
       if (!rafRef.current) rafRef.current = requestAnimationFrame(flushPointer)
     }
@@ -263,7 +308,7 @@ function LeadGestionDrawer({
       endGesture()
     }
 
-    window.addEventListener('pointermove', onPointerMove, { passive: false })
+    window.addEventListener('pointermove', onPointerMove, { passive: true })
     window.addEventListener('pointerup', onPointerUp)
     window.addEventListener('pointercancel', onPointerUp)
     return () => {
@@ -272,12 +317,7 @@ function LeadGestionDrawer({
       window.removeEventListener('pointercancel', onPointerUp)
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-  }, [applyLiveRect, endGesture])
-
-  useLayoutEffect(() => {
-    if (!dragRef.current || !liveRectRef.current || !rootRef.current) return
-    applyWinRectToElement(rootRef.current, liveRectRef.current)
-  })
+  }, [applyLiveMove, applyLiveRect, endGesture])
 
   const beginGesture = useCallback((mode: 'move' | 'resize') => {
     const el = rootRef.current
@@ -374,6 +414,12 @@ function LeadGestionDrawer({
     }, ms)
   }, [staggerMs])
 
+  const requestToggleMaximize = useCallback(() => {
+    if (phaseRef.current === 'closing' || phaseRef.current === 'minimizing') return
+    maxFromRef.current = rootRef.current?.getBoundingClientRect() ?? null
+    onToggleMaximizeRef.current()
+  }, [])
+
   useEffect(() => {
     if (!minimizeRequest || minimizeRequest === lastMinReqRef.current) return
     lastMinReqRef.current = minimizeRequest
@@ -452,7 +498,7 @@ function LeadGestionDrawer({
               className="lead-traffic zoom"
               title={maximized ? 'Restaurar' : 'Maximizar'}
               aria-label={maximized ? 'Restaurar' : 'Maximizar'}
-              onClick={onToggleMaximize}
+              onClick={requestToggleMaximize}
             />
           </div>
 
@@ -579,13 +625,18 @@ function LeadGestionDrawer({
                   </div>
                   <small>{sla ? 'Prioridad máxima (alerta SLA)' : pendiente ? 'Pendiente de validación' : 'Ya tiene cita'}</small>
                 </section>
-                <section className="lead-info-card">
-                  <span className="lead-info-muted">Sentimiento del cliente</span>
-                  <strong className="lead-sentiment">
-                    <span className="lead-sentiment-dot" />
-                    Neutral
-                  </strong>
-                  <small>Analizado por entonación y palabras clave</small>
+                <section className="lead-info-card lead-sentiment-card">
+                  <div className="lead-sentiment-head">
+                    <span className="lead-info-muted">Sentimiento del cliente</span>
+                    <strong className="lead-sentiment">
+                      <span className="lead-sentiment-dot" />
+                      Neutral
+                    </strong>
+                  </div>
+                  <small className="lead-sentiment-detail">
+                    <Sparkles size={13} aria-hidden />
+                    Analizado por entonación y palabras clave
+                  </small>
                 </section>
               </div>
 

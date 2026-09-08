@@ -20,6 +20,8 @@ export type AppWindow = {
   preMaxRect: WinRect | null
   z: number
   enterFrom: 'spawn' | 'restore'
+  /** Solicitud incremental para animar el minimizado desde la barra. */
+  minimizeRequest: number
 }
 
 export const APP_META: Record<AppId, { label: string; hint: string; minW: number; minH: number; w: number; h: number }> = {
@@ -31,13 +33,15 @@ export const APP_META: Record<AppId, { label: string; hint: string; minW: number
 
 type State = {
   windows: AppWindow[]
+  /** App que está al frente; se limpia al enfocar una ficha o la barra. */
+  activeAppId: AppId | null
   /** La barra de tareas se muestra aunque no haya tareas (botón de cabecera o app minimizada). */
   taskbarPinned: boolean
   /** Espejo de si la barra está desplegada ahora (lo publica el escritorio) para el botón de cabecera. */
   taskbarVisible: boolean
 }
 
-let state: State = { windows: [], taskbarPinned: false, taskbarVisible: false }
+let state: State = { windows: [], activeAppId: null, taskbarPinned: false, taskbarVisible: false }
 const listeners = new Set<() => void>()
 let fallbackZ = 200
 let zProvider: () => number = () => {
@@ -95,39 +99,81 @@ export const apps = {
         state.windows.map((w) =>
           w.id === id ? { ...w, minimized: false, z, enterFrom: w.minimized ? 'restore' : w.enterFrom } : w,
         ),
+        { activeAppId: id },
       )
       return
     }
-    setWindows([
-      ...state.windows,
-      {
-        id,
-        minimized: false,
-        maximized: false,
-        rect: defaultRect(id, state.windows.length),
-        preMaxRect: null,
-        z,
-        enterFrom: 'spawn',
-      },
-    ])
+    setWindows(
+      [
+        ...state.windows,
+        {
+          id,
+          minimized: false,
+          maximized: false,
+          rect: defaultRect(id, state.windows.length),
+          preMaxRect: null,
+          z,
+          enterFrom: 'spawn',
+          minimizeRequest: 0,
+        },
+      ],
+      { activeAppId: id },
+    )
   },
 
   focus(id: AppId) {
     if (!state.windows.some((w) => w.id === id)) return
     const z = zProvider()
-    setWindows(state.windows.map((w) => (w.id === id ? { ...w, z } : w)))
+    setWindows(state.windows.map((w) => (w.id === id ? { ...w, z } : w)), { activeAppId: id })
+  },
+
+  blurActive() {
+    if (state.activeAppId == null) return
+    setWindows(state.windows, { activeAppId: null })
   },
 
   close(id: AppId) {
-    setWindows(state.windows.filter((w) => w.id !== id))
+    setWindows(state.windows.filter((w) => w.id !== id), {
+      activeAppId: state.activeAppId === id ? null : state.activeAppId,
+    })
   },
 
   /** Minimiza a la barra de tareas; la barra se fija para que la app siempre tenga dónde caer. */
   minimize(id: AppId) {
     setWindows(
       state.windows.map((w) => (w.id === id ? { ...w, minimized: true, maximized: false } : w)),
-      { taskbarPinned: true },
+      {
+        taskbarPinned: true,
+        activeAppId: state.activeAppId === id ? null : state.activeAppId,
+      },
     )
+  },
+
+  /**
+   * Comportamiento de una barra de tareas:
+   * - minimizada → restaurar y traer al frente;
+   * - abierta detrás → traer al frente;
+   * - ya activa → minimizar.
+   */
+  toggleFromTaskbar(id: AppId) {
+    const win = state.windows.find((w) => w.id === id)
+    if (!win) {
+      apps.open(id)
+      return
+    }
+    if (win.minimized) {
+      apps.open(id)
+      return
+    }
+    if (state.activeAppId === id) {
+      setWindows(
+        state.windows.map((w) =>
+          w.id === id ? { ...w, minimizeRequest: w.minimizeRequest + 1 } : w,
+        ),
+      )
+      return
+    }
+    apps.focus(id)
   },
 
   pinTaskbar() {
@@ -180,9 +226,11 @@ export const apps = {
 
   /** Restaura todas las apps minimizadas (clic en el fondo con el escritorio recogido). */
   restoreAll() {
-    if (!state.windows.some((w) => w.minimized)) return
+    const hidden = state.windows.filter((w) => w.minimized)
+    if (hidden.length === 0) return
     setWindows(
       state.windows.map((w) => (w.minimized ? { ...w, minimized: false, enterFrom: 'restore', z: zProvider() } : w)),
+      { activeAppId: hidden[hidden.length - 1]?.id ?? null },
     )
   },
 }
@@ -197,4 +245,8 @@ export function useTaskbarPinned(): boolean {
 
 export function useTaskbarVisible(): boolean {
   return useSyncExternalStore(apps.subscribe, () => state.taskbarVisible, () => state.taskbarVisible)
+}
+
+export function useActiveAppId(): AppId | null {
+  return useSyncExternalStore(apps.subscribe, () => state.activeAppId, () => state.activeAppId)
 }

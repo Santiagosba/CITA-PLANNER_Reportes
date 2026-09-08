@@ -13,13 +13,16 @@ import { GripVertical, ListTodo, Phone, PhoneCall, Wrench, X } from 'lucide-reac
 import type { PeticionPendiente } from '../lib/peticionesPendientes'
 import { formatFecha } from '../lib/peticionesPendientes'
 import { useSoftphone } from '../lib/softphone'
-import { APP_META, apps, useApps, useTaskbarPinned, type AppId } from '../lib/apps'
+import { APP_META, apps, useActiveAppId, useApps, useTaskbarPinned, type AppId } from '../lib/apps'
 import { AppIcon } from './AppWindows'
 import { useLiquidGlass } from '../hooks/useLiquidGlass'
 import {
   applyScatterVars,
+  applyWinMoveToElement,
   applyWinRectToElement,
+  commitWinRectToElement,
   cursorForSides,
+  refreshLiquidGlass,
   resizeRectFromPointer,
   sidesFromEdge,
   type Edge,
@@ -139,9 +142,12 @@ export default function GestionBubbleDock({
 }: Props) {
   const [maximized, setMaximized] = useState(false)
   const preMaxRef = useRef<{ pos: Pos; size: Size } | null>(null)
+  const maxFromRef = useRef<DOMRect | null>(null)
+  const maxAnimationRef = useRef<Animation | null>(null)
   const [section, setSection] = useState<TaskbarSection>('tasks')
   const { call: liveCall, status: phoneStatus } = useSoftphone()
   const appWindows = useApps()
+  const activeAppId = useActiveAppId()
   const pinned = useTaskbarPinned()
   // La barra existe si hay tareas o si está fijada (botón de cabecera / app minimizada).
   const present = sessions.length > 0 || pinned
@@ -176,7 +182,9 @@ export default function GestionBubbleDock({
   } | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
-  const glassDefs = useLiquidGlass(panelRef)
+  // La barra puede no existir en el primer render. Reactiva la lente cada vez
+  // que aparece desde cerrado o desde la píldora minimizada.
+  const glassDefs = useLiquidGlass(panelRef, `${mounted}:${deskVisual}`)
   const posRef = useRef(pos)
   const sizeRef = useRef(size)
   const liveRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null)
@@ -194,8 +202,46 @@ export default function GestionBubbleDock({
   }, [size])
 
   const maximizedRef = useRef(maximized)
-  useEffect(() => {
+  useLayoutEffect(() => {
     maximizedRef.current = maximized
+    const el = rootRef.current
+    const from = maxFromRef.current
+    maxFromRef.current = null
+    if (!el || !from) return
+
+    maxAnimationRef.current?.cancel()
+    const to = el.getBoundingClientRect()
+    if (!to.width || !to.height) return
+    if (reducedMotion()) {
+      refreshLiquidGlass(el)
+      return
+    }
+    el.classList.add('is-size-tween')
+    refreshLiquidGlass(el)
+    const animation = el.animate(
+      [
+        {
+          transform: `translate3d(${from.left - to.left}px, ${from.top - to.top}px, 0) scale(${from.width / to.width}, ${from.height / to.height})`,
+          transformOrigin: 'top left',
+        },
+        { transform: 'translate3d(0, 0, 0) scale(1)', transformOrigin: 'top left' },
+      ],
+      { duration: 420, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+    )
+    maxAnimationRef.current = animation
+    const finish = () => {
+      if (maxAnimationRef.current === animation) maxAnimationRef.current = null
+      el.classList.remove('is-size-tween')
+      refreshLiquidGlass(el)
+    }
+    animation.addEventListener('finish', finish, { once: true })
+    animation.addEventListener('cancel', finish, { once: true })
+    return () => {
+      animation.removeEventListener('finish', finish)
+      animation.removeEventListener('cancel', finish)
+      animation.cancel()
+      el.classList.remove('is-size-tween')
+    }
   }, [maximized])
 
   useEffect(() => {
@@ -217,6 +263,7 @@ export default function GestionBubbleDock({
   }, [])
 
   const toggleMaximize = useCallback(() => {
+    maxFromRef.current = rootRef.current?.getBoundingClientRect() ?? null
     if (maximizedRef.current) {
       const prev = preMaxRef.current
       preMaxRef.current = null
@@ -253,6 +300,18 @@ export default function GestionBubbleDock({
     applyWinRectToElement(el, next)
   }, [])
 
+  const applyLiveMove = useCallback(
+    (origin: { x: number; y: number; w: number; h: number }, next: { x: number; y: number; w: number; h: number }) => {
+      const el = rootRef.current
+      if (!el) return
+      liveRef.current = next
+      posRef.current = { x: next.x, y: next.y }
+      sizeRef.current = { w: next.w, h: next.h }
+      applyWinMoveToElement(el, origin, next)
+    },
+    [],
+  )
+
   const endGesture = useCallback(() => {
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current)
@@ -262,7 +321,9 @@ export default function GestionBubbleDock({
     const final = liveRef.current
     dragRef.current = null
     liveRef.current = null
-    rootRef.current?.classList.remove('is-gesturing')
+    const el = rootRef.current
+    if (el && final) commitWinRectToElement(el, final)
+    el?.classList.remove('is-gesturing', 'is-moving', 'is-resizing')
     document.body.style.userSelect = ''
     document.body.style.cursor = ''
     if (!final) return
@@ -271,6 +332,7 @@ export default function GestionBubbleDock({
     setPos(nextPos)
     setSize(nextSize)
     persistLayout(nextPos, nextSize)
+    refreshLiquidGlass(el)
   }, [])
 
   useEffect(() => {
@@ -284,7 +346,10 @@ export default function GestionBubbleDock({
         const dx = e.clientX - d.ox
         const dy = e.clientY - d.oy
         const next = clampPos(d.sx + dx, d.sy + dy, d.sw, d.sh)
-        applyLive({ ...next, w: d.sw, h: d.sh })
+        applyLiveMove(
+          { x: d.sx, y: d.sy, w: d.sw, h: d.sh },
+          { ...next, w: d.sw, h: d.sh },
+        )
         return
       }
 
@@ -303,7 +368,6 @@ export default function GestionBubbleDock({
 
     const onPointerMove = (e: PointerEvent) => {
       if (!dragRef.current) return
-      e.preventDefault()
       pendingPtrRef.current = e
       if (!rafRef.current) rafRef.current = requestAnimationFrame(flushPointer)
     }
@@ -318,7 +382,7 @@ export default function GestionBubbleDock({
       endGesture()
     }
 
-    window.addEventListener('pointermove', onPointerMove, { passive: false })
+    window.addEventListener('pointermove', onPointerMove, { passive: true })
     window.addEventListener('pointerup', onPointerUp)
     window.addEventListener('pointercancel', onPointerUp)
     return () => {
@@ -327,15 +391,10 @@ export default function GestionBubbleDock({
       window.removeEventListener('pointercancel', onPointerUp)
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-  }, [applyLive, endGesture])
+  }, [applyLive, applyLiveMove, endGesture])
 
-  useLayoutEffect(() => {
-    if (!dragRef.current || !liveRef.current || !rootRef.current) return
-    applyWinRectToElement(rootRef.current, liveRef.current)
-  })
-
-  const beginGesture = useCallback(() => {
-    rootRef.current?.classList.add('is-gesturing')
+  const beginGesture = useCallback((mode: 'move' | 'resize') => {
+    rootRef.current?.classList.add('is-gesturing', mode === 'move' ? 'is-moving' : 'is-resizing')
     document.body.style.userSelect = 'none'
   }, [])
 
@@ -436,7 +495,7 @@ export default function GestionBubbleDock({
         sh: s.h,
       }
       liveRef.current = { x: p.x, y: p.y, w: s.w, h: s.h }
-      beginGesture()
+      beginGesture('move')
       document.body.style.cursor = 'move'
     },
     [beginGesture, leaveMaximized],
@@ -463,7 +522,7 @@ export default function GestionBubbleDock({
         sh: s.h,
       }
       liveRef.current = origin
-      beginGesture()
+      beginGesture('resize')
       document.body.style.cursor = cursorForSides(sidesFromEdge(edge))
     },
     [beginGesture, leaveMaximized, onFocus],
@@ -482,6 +541,8 @@ export default function GestionBubbleDock({
       <button
         type="button"
         className="agenda-peek"
+        style={zIndex != null ? { zIndex } : undefined}
+        onPointerDown={(e) => e.stopPropagation()}
         onClick={onUntuck}
         title="Mostrar barra de tareas"
       >
@@ -555,7 +616,10 @@ export default function GestionBubbleDock({
               <ListTodo size={12} />
               Barra de tareas
             </span>
-            <strong>
+            <strong
+              key={`${section}-${section === 'tools' ? appWindows.length : `${sessions.length}-${openCount}`}`}
+              className="taskbar-title-value"
+            >
               {section === 'tools'
                 ? `Herramientas${appWindows.length > 0 ? ` · ${appWindows.length} ${appWindows.length === 1 ? 'abierta' : 'abiertas'}` : ''}`
                 : `${sessions.length}/${MAX_TASKS} tareas${openCount > 0 ? ` · ${openCount} abiertas` : ''}`}
@@ -589,8 +653,8 @@ export default function GestionBubbleDock({
         </div>
 
         {section === 'tools' ? (
-          <div className="taskbar-tools">
-            {TOOLS.map((id) => {
+          <div key="tools" className="taskbar-tools taskbar-section-content">
+            {TOOLS.map((id, index) => {
               const meta = APP_META[id]
               const win = appWindows.find((w) => w.id === id)
               const state = win ? (win.minimized ? 'Minimizada · pulsa para restaurar' : 'Abierta · pulsa para traer al frente') : null
@@ -607,9 +671,20 @@ export default function GestionBubbleDock({
                 <button
                   key={id}
                   type="button"
-                  className={`taskbar-tool-tile lg-surface${win ? (win.minimized ? ' is-minimized' : ' is-open') : ''}`}
-                  onClick={() => apps.open(id)}
-                  title={win ? (win.minimized ? `Restaurar ${meta.label}` : `Traer ${meta.label} al frente`) : `Abrir ${meta.label}`}
+                  className={`taskbar-tool-tile lg-surface${win ? (win.minimized ? ' is-minimized' : ' is-open') : ''}${activeAppId === id ? ' is-active' : ''}`}
+                  style={{ animationDelay: `${index * 38}ms` }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => apps.toggleFromTaskbar(id)}
+                  aria-pressed={activeAppId === id && !win?.minimized}
+                  title={
+                    !win
+                      ? `Abrir ${meta.label}`
+                      : win.minimized
+                        ? `Restaurar ${meta.label}`
+                        : activeAppId === id
+                          ? `Minimizar ${meta.label}`
+                          : `Traer ${meta.label} al frente`
+                  }
                 >
                   <span className={`taskbar-tool-icon is-${id}`} aria-hidden>
                     <AppIcon id={id} size={20} />
@@ -622,19 +697,20 @@ export default function GestionBubbleDock({
             })}
           </div>
         ) : sessions.length === 0 ? (
-          <div className="taskbar-empty">
+          <div key="empty" className="taskbar-empty taskbar-section-content">
             <ListTodo size={22} aria-hidden />
             <strong>Sin tareas abiertas</strong>
             <span>Abre un cliente desde el tablero o la lista y aparecerá aquí.</span>
           </div>
         ) : (
-        <ul className="call-agenda-list custom-scrollbar-light">
-          {sessions.map((session) => {
+        <ul key="tasks" className="call-agenda-list custom-scrollbar-light taskbar-section-content">
+          {sessions.map((session, index) => {
             const { name, phone, detail } = sessionLabel(session.peticion)
             return (
               <li
                 key={session.id}
                 className={`call-agenda-item${session.active ? ' is-active' : ''}${session.minimized ? '' : ' is-open'}`}
+                style={{ animationDelay: `${Math.min(index, 8) * 34}ms` }}
               >
                 <button
                   type="button"
@@ -683,13 +759,22 @@ export default function GestionBubbleDock({
 
         {appWindows.length > 0 ? (
           <div className="taskbar-dock" role="toolbar" aria-label="Apps abiertas">
-            {appWindows.map((w) => (
+            {appWindows.map((w, index) => (
               <button
                 key={w.id}
                 type="button"
-                className={`taskbar-dock-app is-${w.id}${w.minimized ? ' is-minimized' : ''}`}
-                onClick={() => apps.open(w.id)}
-                title={w.minimized ? `Restaurar ${APP_META[w.id].label}` : `Traer ${APP_META[w.id].label} al frente`}
+                className={`taskbar-dock-app is-${w.id}${w.minimized ? ' is-minimized' : ''}${activeAppId === w.id ? ' is-active' : ''}`}
+                style={{ animationDelay: `${index * 32}ms` }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => apps.toggleFromTaskbar(w.id)}
+                aria-pressed={activeAppId === w.id && !w.minimized}
+                title={
+                  w.minimized
+                    ? `Restaurar ${APP_META[w.id].label}`
+                    : activeAppId === w.id
+                      ? `Minimizar ${APP_META[w.id].label}`
+                      : `Traer ${APP_META[w.id].label} al frente`
+                }
                 aria-label={`${APP_META[w.id].label}${w.minimized ? ' (minimizada)' : ''}`}
               >
                 <AppIcon id={w.id} size={15} />

@@ -187,12 +187,12 @@ export default function AppShell({
   }, [])
 
   return (
-    <div className={`dashboard-shell ${isDarkMode ? '' : 'is-light'}`.trim()}>
+    <div className={`dashboard-shell app-shell-enter ${isDarkMode ? '' : 'is-light'}`.trim()}>
       <a href="#main-content" className="skip-link">
         Ir al contenido
       </a>
 
-      <aside className="dashboard-sidebar glass glass-lite" aria-label="Navegación principal">
+      <aside className="dashboard-sidebar glass glass-lite app-sidebar-enter" aria-label="Navegación principal">
         <div className="dashboard-sidebar-brand">
           <div className="dashboard-sidebar-dealer">
             <DealerMark name={workshopName} logoUrl={workshopLogoUrl || licenseLogoUrl} />
@@ -287,7 +287,7 @@ export default function AppShell({
         </div>
       </aside>
 
-      <main id="main-content" className="dashboard-main">
+      <main key={activeRoute} id="main-content" className="dashboard-main app-view-enter">
         {children}
       </main>
     </div>

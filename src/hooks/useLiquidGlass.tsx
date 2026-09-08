@@ -4,25 +4,33 @@ import { useEffect, useId, useRef, type RefObject } from 'react'
  * Liquid glass real para una ventana, sobre el fondo VIVO (sin rasterizar el DOM).
  *
  * Modelo óptico: lente biconvexa de canto redondeado (como el `bevelMode: 0` de
- * las librerías WebGL). El centro es plano (no desvía), y en los últimos `RIM` px
- * la superficie se curva: el fondo se «tira» hacia dentro siguiendo la normal de
- * la forma (rectángulo redondeado real, esquinas incluidas), con aberración
+ * las librerías WebGL). El centro es plano (no desvía), y en los últimos `BEVEL`
+ * px la superficie se curva: el fondo se «tira» hacia dentro siguiendo la normal
+ * de la forma (rectángulo redondeado real, esquinas incluidas), con aberración
  * cromática (R/G/B se desvían distinto) y un brillo Fresnel en el filo.
  *
  * Se genera un mapa de desplazamiento (canvas → PNG, 1/4 de resolución) a la
- * medida del marco y se conecta a un filtro SVG propio de la ventana. El CSS
- * (`.lead-os-frame::after`) lo aplica con `backdrop-filter: var(--lg-filter)`.
+ * medida del marco y se conecta a un filtro SVG propio de la ventana. El CSS lo
+ * aplica en las dos capas con `backdrop-filter: var(--lg-filter) …`: el anillo lo
+ * muestra nítido y el cuerpo lo combina con un blur ligero.
  * También publica `--lg-mx / --lg-my` (puntero en %) para el reflejo del cuerpo.
  */
 
-/** Ancho del anillo refractivo (px). Debe coincidir con `--lg-rim` en CSS. */
-const RIM = 16
+/**
+ * Profundidad de la curvatura (px): hasta dónde entra la lente desde el filo.
+ * Es mayor que el anillo nítido (`--lg-rim`, 16 px) para que la refracción
+ * continúe bajo el cuerpo esmerilado y toda la ventana se comporte como vidrio.
+ */
+const BEVEL = 56
 /** Desvío máximo en el filo (px). */
-const MAX_SHIFT = 15
+const MAX_SHIFT = 16
 /** Aberración cromática: R y B se desvían ±este porcentaje respecto a G. */
 const CHROMA = 0.09
 /** El mapa es suave: se genera a 1/4 de resolución y se estira. */
 const MAP_SCALE = 0.25
+const MAP_CACHE_MAX = 20
+const RESIZE_MAP_INTERVAL = 96
+const mapCache = new Map<string, string>()
 
 /** Perfil del canto: pendiente de una lente circular, suavizada y acotada. */
 function bevelProfile(t: number): number {
@@ -37,6 +45,10 @@ function bevelProfile(t: number): number {
  * las esquinas (no una simple suma de gradientes horizontal + vertical).
  */
 export function buildDisplacementMap(width: number, height: number, cornerRadius: number): string | null {
+  const cacheKey = `${Math.round(width)}x${Math.round(height)}@${cornerRadius.toFixed(1)}`
+  const cached = mapCache.get(cacheKey)
+  if (cached) return cached
+
   const w = Math.max(4, Math.round(width * MAP_SCALE))
   const h = Math.max(4, Math.round(height * MAP_SCALE))
   const canvas = document.createElement('canvas')
@@ -45,7 +57,7 @@ export function buildDisplacementMap(width: number, height: number, cornerRadius
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
 
-  const rim = RIM * MAP_SCALE
+  const rim = BEVEL * MAP_SCALE
   const r = Math.max(0, Math.min(cornerRadius * MAP_SCALE, Math.min(w, h) / 2 - 0.01))
   const hx = w / 2
   const hy = h / 2
@@ -93,7 +105,13 @@ export function buildDisplacementMap(width: number, height: number, cornerRadius
     }
   }
   ctx.putImageData(img, 0, 0)
-  return canvas.toDataURL('image/png')
+  const result = canvas.toDataURL('image/png')
+  mapCache.set(cacheKey, result)
+  if (mapCache.size > MAP_CACHE_MAX) {
+    const oldest = mapCache.keys().next().value
+    if (oldest) mapCache.delete(oldest)
+  }
+  return result
 }
 
 /** Solo Chromium/Firefox aceptan `backdrop-filter: url(#svg)`; Safari lo ignora. */
@@ -106,7 +124,7 @@ const KEEP_R = '1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0'
 const KEEP_G = '0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0'
 const KEEP_B = '0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0'
 
-export function useLiquidGlass(frameRef: RefObject<HTMLElement | null>) {
+export function useLiquidGlass(frameRef: RefObject<HTMLElement | null>, activationKey: unknown = true) {
   const rawId = useId()
   const filterId = 'lg' + rawId.replace(/[^a-zA-Z0-9]/g, '')
   const imgRef = useRef<SVGFEImageElement>(null)
@@ -119,61 +137,93 @@ export function useLiquidGlass(frameRef: RefObject<HTMLElement | null>) {
     if (refract) el.style.setProperty('--lg-filter', `url(#${filterId})`)
 
     let raf = 0
+    let resizeTimer = 0
+    let lastPaintAt = 0
     let lastKey = ''
-    const paint = () => {
+    const paint = (force = false) => {
       raf = 0
       const w = el.clientWidth
       const h = el.clientHeight
       if (!w || !h) return
       const radius = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0
       const key = `${w}x${h}@${radius}`
-      if (key === lastKey) return
+      if (!force && key === lastKey) return
       lastKey = key
       const url = buildDisplacementMap(w, h, radius)
       if (url) imgRef.current?.setAttribute('href', url)
+      lastPaintAt = performance.now()
+    }
+    const requestPaint = () => {
+      const remaining = RESIZE_MAP_INTERVAL - (performance.now() - lastPaintAt)
+      if (remaining <= 0) {
+        if (!raf) raf = requestAnimationFrame(() => paint())
+        return
+      }
+      if (!resizeTimer) {
+        resizeTimer = window.setTimeout(() => {
+          resizeTimer = 0
+          if (!raf) raf = requestAnimationFrame(() => paint())
+        }, remaining)
+      }
+    }
+    const refresh = () => {
+      if (raf) cancelAnimationFrame(raf)
+      if (resizeTimer) window.clearTimeout(resizeTimer)
+      resizeTimer = 0
+      raf = requestAnimationFrame(() => paint(true))
     }
     let ro: ResizeObserver | null = null
     if (refract) {
       paint()
-      ro = new ResizeObserver(() => {
-        if (!raf) raf = requestAnimationFrame(paint)
-      })
+      ro = new ResizeObserver(requestPaint)
       ro.observe(el)
+      el.addEventListener('liquidglass:refresh', refresh)
     }
 
     // Luz que sigue al puntero (reflejo del cuerpo).
     let lightRaf = 0
     let px = 0
     let py = 0
+    let bounds: DOMRect | null = null
+    const onEnter = () => {
+      bounds = el.getBoundingClientRect()
+    }
     const onMove = (e: PointerEvent) => {
+      // El drag ya tiene su propio rAF. Evita aquí una lectura de layout adicional.
+      if (el.closest('.is-gesturing, .is-size-tween')) return
       px = e.clientX
       py = e.clientY
       if (lightRaf) return
       lightRaf = requestAnimationFrame(() => {
         lightRaf = 0
-        const r = el.getBoundingClientRect()
+        const r = bounds ?? el.getBoundingClientRect()
         if (!r.width || !r.height) return
         el.style.setProperty('--lg-mx', `${(((px - r.left) / r.width) * 100).toFixed(1)}%`)
         el.style.setProperty('--lg-my', `${(((py - r.top) / r.height) * 100).toFixed(1)}%`)
       })
     }
     const onLeave = () => {
+      bounds = null
       el.style.removeProperty('--lg-mx')
       el.style.removeProperty('--lg-my')
     }
+    el.addEventListener('pointerenter', onEnter, { passive: true })
     el.addEventListener('pointermove', onMove, { passive: true })
     el.addEventListener('pointerleave', onLeave)
 
     return () => {
       ro?.disconnect()
       if (raf) cancelAnimationFrame(raf)
+      if (resizeTimer) window.clearTimeout(resizeTimer)
       if (lightRaf) cancelAnimationFrame(lightRaf)
+      el.removeEventListener('pointerenter', onEnter)
       el.removeEventListener('pointermove', onMove)
       el.removeEventListener('pointerleave', onLeave)
+      el.removeEventListener('liquidglass:refresh', refresh)
       el.style.removeProperty('--lg-filter')
       onLeave()
     }
-  }, [frameRef, filterId])
+  }, [frameRef, filterId, activationKey])
 
   const scale = MAX_SHIFT * 2
   return (

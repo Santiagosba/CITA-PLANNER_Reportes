@@ -172,21 +172,26 @@ Tokens propios con prefijo `--lgw-*` (no reutilizar `--glass-*`, que ya son los
 tokens de la superficie `.glass`: `--glass-blur` es una longitud y `--glass-sheen`
 un número; mezclarlos invalida las declaraciones).
 
-- `::before` cuerpo esmerilado — `blur(64px) saturate(1.4)`, tinte `--lgw-bg`
-  (86 % blanco / 86 % gris-azul en oscuro: vidrio translúcido, el fondo se ve
-  como una mancha borrosa de color; el contenido siempre se lee), reflejo diagonal
-  `--lgw-sheen` y una luz `--lg-light` que sigue al puntero (`--lg-mx / --lg-my`).
-  Es una capa más pequeña (`inset: var(--lg-rim)`) que tapa el centro del anillo;
-  no se usan máscaras (backdrop-filter + mask es frágil entre navegadores).
-- `::after` anillo refractivo de `--lg-rim` (16 px) — muestra el fondo **sin blur**
-  pero desplazado hacia dentro con `feDisplacementMap` (lente biconvexa: centro
-  plano, canto curvo), con aberración cromática (R/G/B se desvían ±9 %), brillo y
-  saturación (`--lg-rim-fx`) y Fresnel: resplandor que nace en el filo, línea
-  especular arriba y arista en sombra abajo/derecha (`--lg-rim-shadow`).
+- `::after` lente (capa inferior, cubre toda la ventana) — refracta el fondo con
+  `feDisplacementMap` (lente biconvexa: centro plano, la curvatura entra `BEVEL`
+  = 56 px desde el filo), con aberración cromática (R/G/B se desvían ±9 %), brillo
+  y saturación (`--lg-rim-fx`) y Fresnel: resplandor que nace en el filo, línea
+  especular arriba y arista en sombra abajo/derecha (`--lg-rim-shadow`). En los
+  8 px exteriores de las ventanas (`--lg-rim`) se ve nítida; la barra usa 10 px
+  y un filo cian/violeta ligeramente más marcado para que la aberración se lea
+  bien incluso en su tamaño compacto.
+- `::before` cuerpo (capa superior, `inset: var(--lg-rim)`) — solo `blur(14px)` y
+  tinte `--lgw-bg` (60 % blanco / 62 % gris-azul en oscuro): vidrio claro en el que
+  el fondo se ve doblado y suavizado, y el texto de la ventana sigue leyéndose.
+  Reflejo diagonal `--lgw-sheen` y luz `--lg-light` que sigue al puntero
+  (`--lg-mx / --lg-my`). No se usan máscaras (backdrop-filter + mask es frágil).
 - El mapa de desplazamiento lo genera `useLiquidGlass(frameRef)` a la medida de
   cada ventana a partir de la SDF del rectángulo redondeado (esquinas correctas,
   canvas a 1/4 de resolución) y lo inyecta como `<svg class="lg-defs">` dentro del
   marco; el CSS lo recibe en `--lg-filter`. Se rehace al redimensionar.
+- Los paneles con montaje condicional deben pasar una clave de activación:
+  `useLiquidGlass(panelRef, mountedKey)`. Así el filtro se inicializa cuando el
+  nodo reaparece (por ejemplo, al abrir la barra desde su píldora minimizada).
 - Fallbacks: Safari ignora `backdrop-filter: url()` → anillo con tinte y brillo pero
   sin refracción; sin `backdrop-filter` → superficies casi opacas;
   `prefers-reduced-transparency` → menos blur y tinte al 92 %.

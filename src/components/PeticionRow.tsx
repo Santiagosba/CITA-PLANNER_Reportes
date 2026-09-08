@@ -16,6 +16,7 @@ type Props = {
   onGestionEmailChange: (v: string) => void
   onMarkGestionado: (gestionado: boolean) => void
   onOpenLead?: (peticion: PeticionPendiente) => void
+  revealIndex?: number
 }
 
 function PeticionRow({
@@ -29,6 +30,7 @@ function PeticionRow({
   onGestionEmailChange,
   onMarkGestionado,
   onOpenLead,
+  revealIndex = 0,
 }: Props) {
   const pendiente = isPeticionPendiente(p)
   const c = p.cita
@@ -57,7 +59,10 @@ function PeticionRow({
   const showBody = expanded && !openInWindow
 
   return (
-    <li className={`prow glass glass-lite${showBody ? ' is-expanded' : ''}${openInWindow ? ' is-windowed' : ''}`}>
+    <li
+      className={`prow glass glass-lite triage-item-enter${showBody ? ' is-expanded' : ''}${openInWindow ? ' is-windowed' : ''}`}
+      style={{ animationDelay: `${Math.min(revealIndex, 12) * 28}ms` }}
+    >
       <div className="prow-head">
         <button
           type="button"

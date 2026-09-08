@@ -407,6 +407,7 @@ export default function PendingCitasView({
       {error ? <ApiStatusBanner message={error} variant={isApiError ? 'error' : 'warning'} /> : null}
       {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
 
+      <div key={tab} className={`triage-stage is-${tab}`}>
       {tab === 'calendario' ? (
         <CalendarTallerView
           workshop={workshop}
@@ -473,14 +474,18 @@ export default function PendingCitasView({
             </Card>
           ) : (
             <div className="panel-stack">
-              {agendaGroups.map((group) => (
-                <section key={group.label} className="agenda-day-group">
+              {agendaGroups.map((group, groupIndex) => (
+                <section
+                  key={group.label}
+                  className="agenda-day-group triage-group-enter"
+                  style={{ animationDelay: `${Math.min(groupIndex, 5) * 45}ms` }}
+                >
                   <h2 className="agenda-day-label">
                     {group.label}
                     <span>· {group.items.length}</span>
                   </h2>
                   <ul className="prow-list">
-                    {group.items.map((p) => (
+                    {group.items.map((p, itemIndex) => (
                       <PeticionRow
                         key={p.idpeticion}
                         peticion={p}
@@ -493,6 +498,7 @@ export default function PendingCitasView({
                         onGestionEmailChange={setGestionEmail}
                         onMarkGestionado={handleMarkGestionado}
                         onOpenLead={onOpenLead}
+                        revealIndex={itemIndex}
                       />
                     ))}
                   </ul>
@@ -538,7 +544,7 @@ export default function PendingCitasView({
                   </tr>
                 </thead>
                 <tbody>
-                  {reportItems.map((p) => {
+                  {reportItems.map((p, index) => {
                     const c = p.cita
                     const cliente = c ? [c.nombre, c.apellidos].filter(Boolean).join(' ') : null
                     const hecha = Boolean(p.gestionado)
@@ -546,6 +552,7 @@ export default function PendingCitasView({
                       <tr
                         key={p.idpeticion}
                         className={onOpenLead ? 'report-row-clickable' : undefined}
+                        style={{ animationDelay: `${Math.min(index, 12) * 24}ms` }}
                         role={onOpenLead ? 'button' : undefined}
                         tabIndex={onOpenLead ? 0 : undefined}
                         onClick={() => onOpenLead?.(p)}
@@ -579,6 +586,7 @@ export default function PendingCitasView({
           )}
         </div>
       )}
+      </div>
     </div>
   )
 }

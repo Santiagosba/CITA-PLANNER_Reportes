@@ -186,6 +186,7 @@ export default function DashboardShell({
 
   const openLead = useCallback(
     (peticion: PeticionPendiente) => {
+      apps.blurActive()
       setInboundOpen(false)
       setCapacityNotice(null)
       setAgendaTucked(false)
@@ -233,6 +234,7 @@ export default function DashboardShell({
 
   const focusSession = useCallback(
     (id: string) => {
+      apps.blurActive()
       setAgendaTucked(false)
       setActiveId(id)
       const z = bumpZ()
@@ -292,17 +294,21 @@ export default function DashboardShell({
   }, [])
 
   const focusAgenda = useCallback(() => {
+    apps.blurActive()
     setAgendaZ(bumpZ())
   }, [bumpZ])
 
   const untuckAgenda = useCallback(() => {
+    apps.blurActive()
     setAgendaTucked(false)
     setAgendaZ(bumpZ())
   }, [bumpZ])
 
   const tuckAgenda = useCallback(() => {
+    apps.blurActive()
+    setAgendaZ(bumpZ())
     setAgendaTucked(true)
-  }, [])
+  }, [bumpZ])
 
   // Botón de la cabecera (junto a la campana): alterna la barra. Si está
   // desplegada la recoge; si está recogida o no existe, la fija y la trae al frente.
@@ -396,7 +402,7 @@ export default function DashboardShell({
       const hasAgenda = taskbarPresent() && !agendaTuckedRef.current
       if (!hasWindows && !hasAgenda) return
       if (hasWindows) minimizeAllToSides()
-      if (hasAgenda) setAgendaTucked(true)
+      if (hasAgenda) tuckAgenda()
     }
 
     const onPointerDown = (e: PointerEvent) => {
@@ -480,7 +486,7 @@ export default function DashboardShell({
 
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [minimizeAllToSides, restoreDesk])
+  }, [minimizeAllToSides, restoreDesk, tuckAgenda])
 
   const toggleMaximize = useCallback((id: string) => {
     setSessions((prev) =>

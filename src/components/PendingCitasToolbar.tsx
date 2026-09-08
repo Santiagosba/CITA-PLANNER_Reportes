@@ -189,19 +189,31 @@ export default function PendingCitasToolbar({
       <div className="bento-grid is-kpis" aria-label="Resumen del periodo">
         <div className="bento-cell glass glass-lite metric">
           <span>Faltan</span>
-          <strong style={{ color: stats.porHacer > 0 ? 'var(--color-warning)' : 'var(--color-success)' }}>
+          <strong
+            key={`${loading}-${stats.porHacer}`}
+            className="metric-value-refresh"
+            style={{ color: stats.porHacer > 0 ? 'var(--color-warning)' : 'var(--color-success)' }}
+          >
             {loading ? '—' : stats.porHacer}
           </strong>
           <small>{loading ? '…' : stats.porHacer === 0 ? 'Todo al día' : 'Por terminar'}</small>
         </div>
         <div className="bento-cell glass glass-lite metric">
           <span>Hechas</span>
-          <strong style={{ color: 'var(--color-success)' }}>{loading ? '—' : stats.hechas}</strong>
+          <strong
+            key={`${loading}-${stats.hechas}`}
+            className="metric-value-refresh"
+            style={{ color: 'var(--color-success)' }}
+          >
+            {loading ? '—' : stats.hechas}
+          </strong>
           <small>{loading ? '…' : 'Bien cerradas'}</small>
         </div>
         <div className="bento-cell glass glass-lite metric">
           <span>Total</span>
-          <strong>{loading ? '—' : stats.total}</strong>
+          <strong key={`${loading}-${stats.total}`} className="metric-value-refresh">
+            {loading ? '—' : stats.total}
+          </strong>
           <small>{loading ? '…' : dateRange.label}</small>
         </div>
       </div>
