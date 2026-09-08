@@ -29,8 +29,17 @@ function url(path: string, params?: Record<string, string | string[] | undefined
   return q ? `${full}?${q}` : full
 }
 
-const API_DOWN_MSG =
-  'La API SQL no está en marcha. Abre otra terminal, ve a CitaplannerServer y ejecuta npm run dev (o npm run dev:api desde el frontend).'
+/**
+ * Con `VITE_SQL_API_URL` la API es remota, así que pedir `npm run dev` no ayuda:
+ * lo habitual es que esté apagada o que no acepte el origen de esta web (CORS,
+ * que el navegador reporta como un fallo de red indistinguible de una caída).
+ */
+function apiDownMessage(): string {
+  const base = apiBase()
+  return base
+    ? `No se pudo contactar con la API SQL (${base}). Puede estar apagada o rechazando el origen de esta web.`
+    : 'La API SQL no está en marcha. Abre otra terminal, ve a CitaplannerServer y ejecuta npm run dev (o npm run dev:api desde el frontend).'
+}
 
 async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   try {
@@ -40,7 +49,7 @@ async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
     if (token && !token.startsWith('demo-')) headers.set('Authorization', `Bearer ${token}`)
     return await fetch(input, { ...init, headers })
   } catch {
-    throw new SqlServerApiError(API_DOWN_MSG)
+    throw new SqlServerApiError(apiDownMessage(), 'api-down')
   }
 }
 
@@ -53,24 +62,24 @@ async function parseJson<T>(res: Response): Promise<T> {
   try {
     body = (await res.json()) as { error?: string; ok?: boolean } & T
   } catch {
-    throw new SqlServerApiError(
-      res.status === 502 || res.status === 500 || res.status === 503 ? API_DOWN_MSG : `Error API SQL (${res.status})`,
-    )
+    if (res.status === 502 || res.status === 500 || res.status === 503) {
+      throw new SqlServerApiError(apiDownMessage(), 'api-down')
+    }
+    throw new SqlServerApiError(`Error API SQL (${res.status})`)
   }
   if (!res.ok || body.ok === false) {
     const msg = body.error || res.statusText || 'Error API SQL Server'
     if (/falta mssql_password/i.test(msg)) {
       throw new SqlServerApiError(
-        'Falta MSSQL_PASSWORD en CitaplannerServer/.env.local. Rellena la contraseña de SQL Server y reinicia la API.',
+        'La API SQL no tiene configurada la contraseña de SQL Server (MSSQL_PASSWORD).',
+        'api-down',
       )
     }
     if (/inicio de sesi/i.test(msg)) {
-      throw new SqlServerApiError(
-        'Login SQL Server rechazado. Revisa MSSQL_USER y MSSQL_PASSWORD en CitaplannerServer/.env.local.',
-      )
+      throw new SqlServerApiError('Login SQL Server rechazado: revisa MSSQL_USER y MSSQL_PASSWORD.', 'api-down')
     }
     if (res.status === 502 || res.status === 503) {
-      throw new SqlServerApiError(API_DOWN_MSG)
+      throw new SqlServerApiError(apiDownMessage(), 'api-down')
     }
     throw new SqlServerApiError(msg)
   }
@@ -88,10 +97,13 @@ export function isSqlServerFallbackEnabled(): boolean {
 }
 
 export class SqlServerApiError extends Error {
-  /** `session-expired` no debe caer al fallback de Supabase: hay que volver al login. */
-  code?: 'session-expired'
+  /**
+   * `session-expired`: hay que volver al login, no caer al fallback de Supabase.
+   * `api-down`: la API no responde o no puede consultar SQL Server.
+   */
+  code?: 'session-expired' | 'api-down'
 
-  constructor(message: string, code?: 'session-expired') {
+  constructor(message: string, code?: 'session-expired' | 'api-down') {
     super(message)
     this.name = 'SqlServerApiError'
     this.code = code
