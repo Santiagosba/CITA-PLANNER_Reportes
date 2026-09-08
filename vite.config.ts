@@ -1,6 +1,18 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
+/** Destino del proxy /api. sslip.io de Dokploy aún no tiene certificado: forzar HTTP. */
+function sqlApiProxyOrigin(env: Record<string, string>, fallbackPort: string): string {
+  const raw = (env.SQL_API_PROXY_TARGET || env.VITE_SQL_API_URL || `http://localhost:${fallbackPort}`).trim()
+  try {
+    const url = new URL(raw)
+    if (url.hostname.endsWith('.sslip.io')) url.protocol = 'http:'
+    return url.origin
+  } catch {
+    return `http://localhost:${fallbackPort}`
+  }
+}
+
 /** Base path opcional vía `VITE_APP_BASE_PATH` (ej. `/sb`) para reverse proxy / subruta. */
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -11,6 +23,7 @@ export default defineConfig(({ mode }) => {
   const apiPort = (env.VITE_API_PORT || env.API_PORT || '3002').trim()
   const previewPort = Number((env.VITE_PREVIEW_PORT || '4173').trim())
   const crmPort = (env.VITE_CRM_API_PORT || '3000').trim()
+  const sqlProxyTarget = sqlApiProxyOrigin(env, apiPort)
 
   // api-crm y la API SQL no comparten rutas, así que un único origen puede servir
   // la SPA y repartir /api entre las dos. Lo usa `npm run preview` detrás del túnel.
@@ -25,7 +38,7 @@ export default defineConfig(({ mode }) => {
       ws: true,
     },
     '/api': {
-      target: `http://localhost:${apiPort}`,
+      target: sqlProxyTarget,
       changeOrigin: true,
     },
   };

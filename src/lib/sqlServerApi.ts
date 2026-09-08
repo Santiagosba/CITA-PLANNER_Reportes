@@ -1,6 +1,8 @@
 /**
  * Cliente HTTP hacia la API Node (SQL Server aviapi).
- * En dev, Vite proxy redirige /api → localhost:3002 (CitaplannerServer).
+ * Si la URL remota no es usable en el navegador (sslip.io sin certificado,
+ * o HTTP desde una web HTTPS), se llama a /api del mismo origen y el proxy
+ * de Vite/Vercel reenvía a CitaplannerServer.
  */
 
 import type { GestionPatch, PeticionPendiente, PeticionesFilters, TipoPeticionRow } from './peticionesPendientes'
@@ -8,11 +10,25 @@ import type { CitaTaller } from './citasTaller'
 import { supabase } from './supabase'
 import { handleExpiredSession } from './sessionGuard'
 
+function browserCannotCall(raw: string): boolean {
+  try {
+    const target = new URL(raw)
+    if (target.hostname.endsWith('.sslip.io')) return true
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && target.protocol === 'http:') {
+      return true
+    }
+  } catch {
+    return false
+  }
+  return false
+}
+
 function apiBase(): string {
   const colleague = (import.meta.env.VITE_COLLEAGUE_API_URL as string | undefined)?.trim()
   if (colleague) return colleague.replace(/\/+$/, '')
   const raw = (import.meta.env.VITE_SQL_API_URL as string | undefined)?.trim()
-  return raw?.replace(/\/+$/, '') ?? ''
+  if (!raw || browserCannotCall(raw)) return ''
+  return raw.replace(/\/+$/, '')
 }
 
 function url(path: string, params?: Record<string, string | string[] | undefined>): string {
@@ -29,16 +45,11 @@ function url(path: string, params?: Record<string, string | string[] | undefined
   return q ? `${full}?${q}` : full
 }
 
-/**
- * Con `VITE_SQL_API_URL` la API es remota, así que pedir `npm run dev` no ayuda:
- * lo habitual es que esté apagada o que no acepte el origen de esta web (CORS,
- * que el navegador reporta como un fallo de red indistinguible de una caída).
- */
 function apiDownMessage(): string {
   const base = apiBase()
   return base
     ? `No se pudo contactar con la API SQL (${base}). Puede estar apagada o rechazando el origen de esta web.`
-    : 'La API SQL no está en marcha. Abre otra terminal, ve a CitaplannerServer y ejecuta npm run dev (o npm run dev:api desde el frontend).'
+    : 'No se pudo contactar con la API SQL. El servidor puede estar apagado o no responder.'
 }
 
 async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
