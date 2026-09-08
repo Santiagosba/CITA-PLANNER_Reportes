@@ -52,20 +52,33 @@ function apiDownMessage(): string {
     : 'No se pudo contactar con la API SQL. El servidor puede estar apagado o no responder.'
 }
 
+function applySqlAuth(headers: Headers, token: string | undefined) {
+  if (!token || token.startsWith('demo-')) return
+  headers.set('Authorization', `Bearer ${token}`)
+  // Vercel a veces no reenvía Authorization hacia un origen HTTP.
+  headers.set('X-Supabase-Auth', token)
+}
+
 async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
-  try {
+  const run = async () => {
     const headers = new Headers(init?.headers)
     const { data } = await supabase.auth.getSession()
-    const token = data.session?.access_token
-    if (token && !token.startsWith('demo-')) headers.set('Authorization', `Bearer ${token}`)
-    return await fetch(input, { ...init, headers })
+    applySqlAuth(headers, data.session?.access_token)
+    return fetch(input, { ...init, headers })
+  }
+  try {
+    let res = await run()
+    if (res.status === 401 && (await handleExpiredSession())) {
+      res = await run()
+    }
+    return res
   } catch {
     throw new SqlServerApiError(apiDownMessage(), 'api-down')
   }
 }
 
 async function parseJson<T>(res: Response): Promise<T> {
-  if (res.status === 401 && !(await handleExpiredSession())) {
+  if (res.status === 401) {
     throw new SqlServerApiError('Tu sesión ha caducado. Vuelve a entrar.', 'session-expired')
   }
 
