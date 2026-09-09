@@ -177,6 +177,8 @@ function ensureTranscriptionSync() {
 
   if (call.transcription === 'pending') patchCall({ transcription: 'linking' })
   armTranscriptionTimeout(callId)
+  // No esperar al detalle: el SDK ya tiene ids y POST /transcription/start existe.
+  requestLiveTranscription(call)
 
   void (async () => {
     for (let attempt = 0; attempt < LEG_LINK_MAX_ATTEMPTS; attempt++) {
@@ -457,6 +459,9 @@ function syncTelnyxIds(call: Call) {
   const sessionId = ids?.telnyxSessionId || current.sessionId
   if (callControlId !== current.callControlId || sessionId !== current.sessionId) {
     patchCall({ callControlId, sessionId })
+    if (state.call?.phase === 'active' || state.call?.phase === 'held') {
+      requestLiveTranscription(state.call)
+    }
   }
 }
 

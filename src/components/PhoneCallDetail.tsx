@@ -15,7 +15,14 @@ import {
   Timer,
   User,
 } from 'lucide-react'
-import { CrmApiError, fetchCallDetail, isCrmApiConfigured, type CallDetail } from '../lib/crmApi'
+import {
+  CrmApiError,
+  fetchCallDetail,
+  fetchCustomerCalls,
+  fetchRecordingUrl,
+  isCrmApiConfigured,
+  type CallDetail,
+} from '../lib/crmApi'
 import {
   estadoLabel,
   fmtDateTime,
@@ -124,10 +131,57 @@ export default function PhoneCallDetail({ call, onBack, onCall }: Props) {
         }
       } catch (e) {
         if (cancelled) return
+        // api-crm desplegado no tiene GET /api/calls/log/:id, pero sí
+        // GET /api/calls/:id/recording y el historial por teléfono.
+        if (e instanceof CrmApiError && (e.endpointMissing || e.status === 404)) {
+          try {
+            const [url, history] = await Promise.all([
+              fetchRecordingUrl(logId).catch(() => ''),
+              fetchCustomerCalls(call.number).catch(() => []),
+            ])
+            if (cancelled) return
+            const item = history.find((h) => h.id === logId || h.softphoneLogId === logId)
+            const notes = item?.resumen || null
+            setDetail({
+              id: logId,
+              telefono_destino: call.direction === 'outgoing' ? call.number : null,
+              telefono_origen: call.direction === 'incoming' ? call.number : null,
+              direccion: call.direction,
+              estado: call.answered ? 'completed' : 'missed',
+              fecha_inicio: new Date(call.endedAt - call.durationSec * 1000).toISOString(),
+              fecha_respuesta: call.answered ? new Date(call.endedAt - call.durationSec * 1000).toISOString() : null,
+              fecha_fin: new Date(call.endedAt).toISOString(),
+              duracion_seg: item?.duracionSeg ?? call.durationSec,
+              hangup_cause: call.hangupCause ?? null,
+              notas: notes,
+              notas_titular: item?.titular ?? null,
+              tags: [],
+              agente: item?.agente ?? null,
+              cliente: item?.cliente ?? null,
+              call_control_id: null,
+              call_session_id: null,
+              recording: {
+                available: Boolean(url) || Boolean(item?.hasRecording),
+                url: url || null,
+                duration_sec: item?.duracionSeg ?? call.durationSec,
+              },
+              cost: null,
+              cost_pending: false,
+            })
+            setError(url || notes ? null : 'La grabación se está enlazando. Abre esta ficha de nuevo en unos segundos.')
+            const withinWindow = Date.now() - call.endedAt < COST_POLL_WINDOW_MS
+            if (!url && call.answered && withinWindow) {
+              pollRef.current = window.setTimeout(() => void load(true), COST_POLL_MS)
+            }
+            return
+          } catch {
+            /* cae al mensaje de abajo */
+          }
+        }
         setError(
           e instanceof CrmApiError
             ? e.endpointMissing
-              ? 'La llamada está guardada en api-crm, pero la versión desplegada no expone su detalle (grabación y coste). Hay que actualizar api-crm.avigo.es.'
+              ? 'La llamada está guardada en api-crm, pero no se pudo leer la grabación. Vuelve a entrar y ábrela de nuevo.'
               : e.status === 404
                 ? 'Esta llamada no está en api-crm (se marcó sin registro).'
                 : e.message
