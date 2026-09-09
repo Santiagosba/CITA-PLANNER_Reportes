@@ -13423,6 +13423,10 @@ body > .os-desk-layer.dashboard-shell {
   animation: app-view-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.dashboard-main > .app-view-enter {
+  min-width: 0;
+}
+
 .app-view-enter > .dashboard-page > * {
   animation: app-content-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }

@@ -288,7 +288,7 @@ export default function AppShell({
         </div>
       </aside>
 
-      <main key={activeRoute} id="main-content" className="dashboard-main app-view-enter">
+      <main id="main-content" className="dashboard-main">
         {children}
       </main>
     </div>

@@ -447,6 +447,13 @@ export default function DashboardShell({
         return
       }
 
+      // El contenido de los paneles no restaura ventanas: si no, al cambiar
+      // de apartado o pulsar el fondo del dashboard saltaban otra vez.
+      if (t.closest('.dashboard-main')) {
+        if (hasOpenWindows()) hideDeskWindows()
+        return
+      }
+
       // Apartados «importantes»: controles y elementos que abren o navegan
       // (tarjetas kanban, filas, eventos, botones…). Se dejan pasar sin tocar
       // el escritorio. Los contenedores (cabecera, paneles, fondo) no cuentan:
@@ -583,6 +590,16 @@ export default function DashboardShell({
     [asesor.email, closeSession, sessions],
   )
 
+  const goToSection = useCallback(
+    (route: DashboardShellRoute) => {
+      hideDeskWindows()
+      if (route === 'pending-citas') setTriageTab('kanban')
+      if (route === 'reportes') setTriageTab('tabla')
+      setShellRoute(route)
+    },
+    [hideDeskWindows],
+  )
+
   const agendaSessions = useMemo<AgendaSessionItem[]>(
     () =>
       sessions.map((s) => ({
@@ -595,18 +612,14 @@ export default function DashboardShell({
   )
 
   return (
+    <>
     <AppShell
       workshopName={workshop.name}
       workshopLogoUrl={workshop.logo}
       licenseLogoUrl={licenseLogoUrl}
       productName={getAppProductName()}
       activeRoute={shellRoute}
-      onNavigate={(route) => {
-        hideDeskWindows()
-        if (route === 'pending-citas') setTriageTab('kanban')
-        if (route === 'reportes') setTriageTab('tabla')
-        setShellRoute(route)
-      }}
+      onNavigate={goToSection}
       onLogout={onLogout}
       onChangeWorkshop={onClearWorkshop}
       onNewInbound={() => setInboundOpen(true)}
@@ -624,20 +637,24 @@ export default function DashboardShell({
         onToggleTheme={onToggleTheme}
         onOpenLead={openLead}
         onOpenTriage={(opts) => {
+          hideDeskWindows()
           setTriageSlaOnly(Boolean(opts?.slaOnly))
           setTriageTab('kanban')
           setShellRoute('pending-citas')
         }}
         onSynced={() => setGestionBump((n) => n + 1)}
       />
+      <div key={shellRoute} className="app-view-enter">
       {shellRoute === 'dashboard-general' ? (
         <DashboardGeneralView
           workshop={workshop}
           onOpenTriage={() => {
+            hideDeskWindows()
             setTriageTab('kanban')
             setShellRoute('pending-citas')
           }}
           onOpenCalendar={() => {
+            hideDeskWindows()
             setTriageTab('calendario')
             setShellRoute('pending-citas')
           }}
@@ -669,6 +686,8 @@ export default function DashboardShell({
           onOpenLead={openLead}
         />
       )}
+      </div>
+    </AppShell>
 
       {typeof document !== 'undefined'
         ? createPortal(
@@ -761,6 +780,6 @@ export default function DashboardShell({
             document.body,
           )
         : null}
-    </AppShell>
+    </>
   )
 }
