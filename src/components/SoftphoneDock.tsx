@@ -168,16 +168,15 @@ export function SoftphoneStatusChip() {
   const { status, callerId, call } = useSoftphone()
   const phoneOpen = useApps().some((w) => w.id === 'phone' && !w.minimized)
   if (status === 'off') return null
-  const label =
-    call
-      ? 'En llamada'
-      : status === 'ready'
-        ? callerId
-          ? `Teléfono listo · ${callerId}`
-          : 'Teléfono listo'
-        : status === 'connecting'
-          ? 'Conectando teléfono…'
-          : 'Teléfono sin conexión'
+  const title = call
+    ? 'En llamada'
+    : status === 'ready'
+      ? 'Teléfono listo'
+      : status === 'connecting'
+        ? 'Conectando…'
+        : 'Sin conexión'
+  const meta = call ? callerId || null : status === 'ready' ? callerId || null : status === 'error' ? 'Pulsa para reintentar' : null
+  const fullLabel = meta ? `${title} · ${meta}` : title
   // En llamada también se abre: el teclado envía tonos (DTMF).
   const interactive = status === 'error' || status === 'ready'
   return (
@@ -189,13 +188,17 @@ export function SoftphoneStatusChip() {
           if (status === 'error') void softphone.connect()
           else if (interactive) apps.open('phone')
         }}
-        title={status === 'error' ? 'Reintentar conexión' : status === 'ready' ? 'Abrir teléfono' : label}
+        title={status === 'error' ? 'Reintentar conexión' : status === 'ready' ? 'Abrir teléfono' : fullLabel}
+        aria-label={fullLabel}
         aria-pressed={status === 'ready' ? phoneOpen : undefined}
         disabled={!interactive}
       >
         <span className="softphone-chip-dot" aria-hidden />
-        <span className="softphone-chip-text">{label}</span>
-        {status === 'error' ? <RefreshCw size={12} aria-hidden /> : <Phone size={12} aria-hidden />}
+        <span className="softphone-chip-copy">
+          <span className="softphone-chip-text">{title}</span>
+          {meta ? <span className="softphone-chip-meta">{meta}</span> : null}
+        </span>
+        {status === 'error' ? <RefreshCw size={16} aria-hidden /> : <Phone size={16} aria-hidden />}
       </button>
     </div>
   )

@@ -1474,8 +1474,20 @@ html.dark .login-asesor-card {
     border-right: 0;
   }
 
-  .dashboard-sidebar-brand,
+  .dashboard-sidebar-brand {
+    display: none;
+  }
+
   .dashboard-sidebar-footer {
+    display: flex;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    gap: 0;
+  }
+
+  .dashboard-sidebar-footer > :not(.softphone-chip-wrap) {
     display: none;
   }
 
@@ -3383,9 +3395,46 @@ html.dark .hex-loader-aura,
     display: none;
   }
 
-  .dashboard-shell .dashboard-sidebar-brand,
-  .dashboard-shell .dashboard-sidebar-footer {
+  .dashboard-shell .dashboard-sidebar-brand {
     display: none;
+  }
+
+  .dashboard-shell .dashboard-sidebar-footer {
+    display: flex;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    gap: 0;
+  }
+
+  .dashboard-shell .dashboard-sidebar-footer > :not(.softphone-chip-wrap) {
+    display: none;
+  }
+
+  .dashboard-shell .softphone-chip-wrap {
+    width: auto;
+  }
+
+  .dashboard-shell .softphone-chip {
+    width: 48px;
+    min-width: 48px;
+    height: 48px;
+    min-height: 48px;
+    margin: 0;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+    border-radius: 50%;
+  }
+
+  .dashboard-shell .softphone-chip-copy,
+  .dashboard-shell .softphone-chip-dot {
+    display: none;
+  }
+
+  .dashboard-shell .softphone-chip.is-call {
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.35);
   }
 
   /* Botón inbound compacto (icono) en la barra */
@@ -8524,18 +8573,26 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
 }
 
 /* Chip de estado del teléfono en el sidebar */
+.softphone-chip-wrap {
+  width: 100%;
+  min-width: 0;
+  position: relative;
+}
+
 .softphone-chip {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  margin: 0 4px 6px;
-  padding: 0 12px;
-  border-radius: var(--radius-pill);
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--tap-target);
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(15, 17, 21, 0.1);
   background: rgba(255, 255, 255, 0.7);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   text-align: left;
   cursor: default;
@@ -8564,8 +8621,26 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   color: #b91c1c;
 }
 
-.softphone-chip-wrap {
-  position: relative;
+.softphone-chip-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.softphone-chip-meta {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.softphone-chip svg {
+  flex: 0 0 auto;
 }
 
 /* El chip marca cuándo la app Teléfono está abierta en el escritorio. */
@@ -10916,9 +10991,12 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
 }
 
 .softphone-chip-text {
-  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
+  color: var(--fog-strong);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
