@@ -149,6 +149,19 @@ export const apps = {
     )
   },
 
+  /** Recoge de golpe teléfono, notas y el resto de apps (apartados del panel). */
+  minimizeAll() {
+    const anyOpen = state.windows.some((w) => !w.minimized)
+    if (!anyOpen) {
+      if (state.activeAppId != null) setWindows(state.windows, { activeAppId: null })
+      return
+    }
+    setWindows(
+      state.windows.map((w) => (w.minimized ? w : { ...w, minimized: true, maximized: false })),
+      { taskbarPinned: true, activeAppId: null },
+    )
+  },
+
   /**
    * Comportamiento de una barra de tareas:
    * - minimizada → restaurar y traer al frente;

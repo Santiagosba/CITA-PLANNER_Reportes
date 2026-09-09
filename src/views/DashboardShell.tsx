@@ -275,6 +275,17 @@ export default function DashboardShell({
     setSideMinWave((n) => n + 1)
   }, [])
 
+  /** Apartado del panel: el contenido pasa al frente y se recogen fichas y apps. */
+  const hideDeskWindows = useCallback(() => {
+    apps.minimizeAll()
+    setSessions((prev) => {
+      if (prev.every((s) => s.minimized)) return prev
+      return prev.map((s) => (s.minimized ? s : { ...s, minimized: true, maximized: false }))
+    })
+    setActiveId(null)
+    setAgendaTucked(true)
+  }, [])
+
   const restoreDesk = useCallback(() => {
     setAgendaTucked(false)
     apps.restoreAll()
@@ -424,10 +435,15 @@ export default function DashboardShell({
       // El chip del teléfono abre su app: no toca el escritorio.
       if (t.closest('.softphone-chip')) return
 
-      // Sidebar (Dashboard, triage, etc.): primer clic guarda, segundo restaura
+      // Apartados del panel (Dashboard, triage, Laura…): siempre recoger
+      // ventanas para que la vista quede delante. Nunca restaurar aquí:
+      // el segundo clic volvía a abrir el teléfono encima.
+      if (t.closest('.dashboard-nav')) {
+        hideDeskWindows()
+        return
+      }
       if (t.closest('.dashboard-sidebar')) {
-        if (hasOpenWindows()) tuckDesk()
-        else if (hasMinimizedDesk()) restoreDesk()
+        if (hasOpenWindows()) hideDeskWindows()
         return
       }
 
@@ -486,7 +502,7 @@ export default function DashboardShell({
 
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [minimizeAllToSides, restoreDesk, tuckAgenda])
+  }, [hideDeskWindows, minimizeAllToSides, restoreDesk, tuckAgenda])
 
   const toggleMaximize = useCallback((id: string) => {
     setSessions((prev) =>
@@ -586,6 +602,7 @@ export default function DashboardShell({
       productName={getAppProductName()}
       activeRoute={shellRoute}
       onNavigate={(route) => {
+        hideDeskWindows()
         if (route === 'pending-citas') setTriageTab('kanban')
         if (route === 'reportes') setTriageTab('tabla')
         setShellRoute(route)

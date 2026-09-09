@@ -30,6 +30,8 @@ interface ImportMetaEnv {
   readonly VITE_CRM_API_URL?: string
   /** `1` cuando api-crm se sirve tras el mismo origen que la SPA (proxy /api/call*, /socket.io). */
   readonly VITE_CRM_API_SAME_ORIGIN?: string
+  /** DID Telnyx de reserva si api-crm no devuelve caller ID (sin esto la llamada no suena). */
+  readonly VITE_TELNYX_DEFAULT_CALLER_ID?: string
   /** Contraseña de las cuentas reales `*@taller.demo`. Sin definir → no se muestran asesores de prueba. */
   readonly VITE_DEMO_ASESOR_PASSWORD?: string
 }

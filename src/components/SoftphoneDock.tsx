@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { estimatedCallCost, softphone, useSoftphone, type ActiveCall, type FinishedCall, type TranscriptLine } from '../lib/softphone'
 import { useSoftphoneLevels } from '../lib/audioLevels'
-import { fmtMoney } from '../lib/callFormat'
+import { fmtMoney, hangupLabel } from '../lib/callFormat'
 import { apps, useApps } from '../lib/apps'
 import SoundWave from './SoundWave'
 
@@ -123,7 +123,11 @@ function AfterCallCard({ call, onClose }: { call: FinishedCall; onClose: () => v
         <div className="softphone-copy">
           <strong>{call.label}</strong>
           <span>
-            {call.answered ? `Llamada atendida · ${fmtDuration(call.durationSec * 1000)}` : 'Sin respuesta'}
+            {call.answered
+              ? `Llamada atendida · ${fmtDuration(call.durationSec * 1000)}`
+              : call.hangupCause
+                ? hangupLabel(call.hangupCause)
+                : 'Sin respuesta'}
             {saved.length > 0 ? ` · ${saved.join(' · ')}` : ''}
           </span>
         </div>

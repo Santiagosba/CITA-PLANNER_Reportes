@@ -415,6 +415,10 @@ function LeadGestionDrawer({
   useEffect(() => {
     if (!minimizeRequest || minimizeRequest === lastMinReqRef.current) return
     lastMinReqRef.current = minimizeRequest
+    if (phaseRef.current === 'minimizing' || phaseRef.current === 'closing') {
+      onMinimizeRef.current()
+      return
+    }
     requestMinimize(minimizeStyle)
   }, [minimizeRequest, minimizeStyle, requestMinimize])
 

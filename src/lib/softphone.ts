@@ -237,6 +237,28 @@ export function toDialNumber(raw: string): string {
   return digits
 }
 
+/**
+ * Caller ID que Telnyx acepta al marcar. Un móvil (6xx/7xx) no es un DID de la
+ * cuenta: si se manda como `callerNumber`, la pata PSTN se corta al instante.
+ */
+export function usableCallerId(raw: string | null | undefined): string | null {
+  if (!raw?.trim()) return null
+  const n = toDialNumber(raw.trim())
+  if (!n.startsWith('+')) return null
+  const digits = n.replace(/\D/g, '')
+  if (/^34[67]\d{8}$/.test(digits) || /^[67]\d{8}$/.test(digits)) return null
+  return n
+}
+
+function fallbackCallerId(): string | null {
+  const fromEnv = (import.meta.env.VITE_TELNYX_DEFAULT_CALLER_ID as string | undefined)?.trim()
+  return usableCallerId(fromEnv || '+34930451547')
+}
+
+function resolveCallerId(fromApi: string | null | undefined): string | null {
+  return usableCallerId(fromApi) || fallbackCallerId()
+}
+
 /** Últimos 9 dígitos, para comparar teléfonos con/sin prefijo. */
 export function phoneTail(raw: string | null | undefined): string {
   const digits = String(raw || '').replace(/\D/g, '')
@@ -321,6 +343,15 @@ function finishCall(cause?: string) {
   const history = [finished, ...state.history].slice(0, HISTORY_MAX)
   saveHistory(history)
   setState({ call: null, lastCall: finished, history })
+
+  if (!answered && current.direction === 'outgoing') {
+    const reason = String(cause || '').toLowerCase()
+    if (!reason || reason === 'local_hangup' || reason === 'originator_cancel') {
+      showToast('La llamada no llegó al móvil. Revisa que Telnyx tenga un número de salida (DID).', 8000)
+    } else if (/reject|forbidden|403|unallocated|invalid/.test(reason)) {
+      showToast('Telnyx rechazó la llamada. El número de salida tiene que ser un DID de la cuenta.', 8000)
+    }
+  }
 }
 
 function stateName(call: Call): string {
@@ -485,8 +516,8 @@ async function doConnect(): Promise<void> {
   }
 
   fetchOutboundCli()
-    .then((cli) => setState({ callerId: cli.from }))
-    .catch(() => setState({ callerId: null }))
+    .then((cli) => setState({ callerId: resolveCallerId(cli.from) }))
+    .catch(() => setState({ callerId: fallbackCallerId() }))
 
   registerCrmSocketUser(creds.crmUserId)
   unsubscribeTranscription?.()
@@ -581,6 +612,20 @@ export const softphone = {
       return true
     }
 
+    const from = resolveCallerId(state.callerId)
+    if (from && phoneTail(from) === phoneTail(number)) {
+      showToast('Ese es el número de salida. Prueba a llamar a otro móvil.', 7000)
+      return true
+    }
+    if (!from) {
+      showToast(
+        'No hay número de salida Telnyx. Sin un DID la llamada no puede sonar en el móvil.',
+        8000,
+      )
+      return true
+    }
+    if (from !== state.callerId) setState({ callerId: from })
+
     const micProblem = await microphoneProblem()
     if (micProblem) {
       showToast(micProblem, 7000)
@@ -589,7 +634,7 @@ export const softphone = {
 
     const call = client.newCall({
       destinationNumber: number,
-      callerNumber: state.callerId || undefined,
+      callerNumber: from,
       audio: true,
       video: false,
       remoteElement: REMOTE_AUDIO_ID,
