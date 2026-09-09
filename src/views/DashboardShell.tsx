@@ -427,11 +427,9 @@ export default function DashboardShell({
     }
 
     const tuckDesk = () => {
-      const hasWindows = hasOpenWindows()
-      const hasAgenda = taskbarPresent() && !agendaTuckedRef.current
-      if (!hasWindows && !hasAgenda) return
-      if (hasWindows) minimizeAllToSides()
-      if (hasAgenda) tuckAgenda()
+      if (!hasOpenWindows()) return
+      minimizeAllToSides()
+      apps.minimizeAll()
     }
 
     const onPointerDown = (e: PointerEvent) => {
@@ -453,17 +451,8 @@ export default function DashboardShell({
       // El chip del teléfono abre su app: no toca el escritorio.
       if (t.closest('.softphone-chip')) return
 
-      // Sidebar y contenido del panel: no recoger ni restaurar. El cambio de
-      // apartado ya llama a hideDeskWindows; un clic en el texto no debe
-      // hacer desaparecer las fichas ni esconder la barra.
-      if (t.closest('.dashboard-nav, .dashboard-sidebar, .dashboard-main')) {
-        return
-      }
-
-      // Apartados «importantes»: controles y elementos que abren o navegan
-      // (tarjetas kanban, filas, eventos, botones…). Se dejan pasar sin tocar
-      // el escritorio. Los contenedores (cabecera, paneles, fondo) no cuentan:
-      // pulsar en su superficie libre minimiza todo, como en un escritorio.
+      // Acciones de verdad: no recoger ni restaurar. El fondo (huecos del
+      // panel, cabecera, sidebar) sí: un clic recoge, el siguiente las saca.
       if (
         t.closest(
           [
@@ -483,6 +472,7 @@ export default function DashboardShell({
             '[role="switch"]',
             '[contenteditable]',
             '.ops-feed-row',
+            '.ops-kpi',
             '.report-row-clickable',
             '.prow',
             '.prow-toggle',
@@ -499,6 +489,10 @@ export default function DashboardShell({
             '.is-clickable',
             '.kanban-card',
             '.kanban-card-slot',
+            '.list-row',
+            '.role-check',
+            '.role-task-row',
+            '.dashboard-nav-item',
           ].join(', '),
         )
       ) {
@@ -515,7 +509,7 @@ export default function DashboardShell({
 
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [minimizeAllToSides, restoreDesk, tuckAgenda])
+  }, [minimizeAllToSides, restoreDesk])
 
   const toggleMaximize = useCallback((id: string) => {
     setSessions((prev) =>
