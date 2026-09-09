@@ -11,11 +11,35 @@ import { handleExpiredSession } from './sessionGuard'
 
 export class CrmApiError extends Error {
   status: number
-  constructor(message: string, status = 0) {
+  /**
+   * `true` cuando el 404 lo devuelve Express por ruta inexistente (HTML, sin
+   * `{ error }`), es decir, el api-crm desplegado es más antiguo que este
+   * frontend y no tiene el endpoint. Distinto de «registro no encontrado».
+   */
+  endpointMissing: boolean
+  constructor(message: string, status = 0, endpointMissing = false) {
     super(message)
     this.name = 'CrmApiError'
     this.status = status
+    this.endpointMissing = endpointMissing
   }
+}
+
+export function isEndpointMissing(e: unknown): boolean {
+  return e instanceof CrmApiError && e.endpointMissing
+}
+
+export const CRM_OUTDATED_MESSAGE =
+  'El api-crm desplegado no tiene este endpoint (versión antigua). Hay que actualizar api-crm.avigo.es.'
+
+/**
+ * Endpoints que ya sabemos que no existen en el api-crm desplegado. Evita
+ * repetir peticiones (y 404 en consola) durante la sesión.
+ */
+const unsupportedEndpoints = new Set<string>()
+
+export function isCrmEndpointUnsupported(key: string): boolean {
+  return unsupportedEndpoints.has(key)
 }
 
 function isLoopbackHost(hostname: string): boolean {
@@ -79,11 +103,32 @@ export async function crmAccessToken(): Promise<string | null> {
   }
 }
 
-async function crmFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+/** Id del usuario autenticado en Supabase (coincide con `aviold.usuarios.idusuario` en operadores vinculados). */
+export async function crmAuthUserId(): Promise<string | null> {
+  try {
+    const { data } = await supabase.auth.getSession()
+    const id = data?.session?.user?.id
+    return id && !id.startsWith('demo-') ? id : null
+  } catch {
+    return null
+  }
+}
+
+type CrmFetchOptions = RequestInit & {
+  /** Clave estable del endpoint (sin ids) para recordar que la API desplegada no lo tiene. */
+  endpointKey?: string
+}
+
+async function crmFetch<T>(path: string, init: CrmFetchOptions = {}): Promise<T> {
   const base = crmApiBase()
   if (!base) throw new CrmApiError('Falta VITE_CRM_API_URL (URL de api-crm) en el .env del frontend.')
 
-  const headers = new Headers(init.headers)
+  const { endpointKey, ...requestInit } = init
+  if (endpointKey && unsupportedEndpoints.has(endpointKey)) {
+    throw new CrmApiError(CRM_OUTDATED_MESSAGE, 404, true)
+  }
+
+  const headers = new Headers(requestInit.headers)
   if (!headers.has('Content-Type') && init.body) headers.set('Content-Type', 'application/json')
   const token = await crmAccessToken()
   if (token) headers.set('Authorization', `Bearer ${token}`)
@@ -91,7 +136,7 @@ async function crmFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   let res: Response
   try {
     res = await fetch(`${base}${path.startsWith('/') ? path : `/${path}`}`, {
-      ...init,
+      ...requestInit,
       headers,
       credentials: 'include',
     })
@@ -112,7 +157,14 @@ async function crmFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     }
     const apiError =
       body && typeof body === 'object' && 'error' in body ? String((body as { error: unknown }).error) : ''
-    throw new CrmApiError(apiError || `Error api-crm (${res.status})`, res.status)
+    // Express responde a rutas inexistentes con HTML («Cannot GET …»), nunca con `{ error }`.
+    const endpointMissing = res.status === 404 && !apiError
+    if (endpointMissing && endpointKey) unsupportedEndpoints.add(endpointKey)
+    throw new CrmApiError(
+      apiError || (endpointMissing ? CRM_OUTDATED_MESSAGE : `Error api-crm (${res.status})`),
+      res.status,
+      endpointMissing,
+    )
   }
   return body as T
 }
@@ -125,9 +177,15 @@ export type WebrtcCredentials = {
   crmUserId?: string
 }
 
-/** SIP del operador para `@telnyx/webrtc` (`GET /api/webrtc/credentials`). */
-export function fetchWebrtcCredentials(): Promise<WebrtcCredentials> {
-  return crmFetch<WebrtcCredentials>('/api/webrtc/credentials')
+/**
+ * SIP del operador para `@telnyx/webrtc` (`GET /api/webrtc/credentials`).
+ * Mandamos `idUsuario` explícito (como la app móvil): las versiones antiguas de
+ * api-crm resuelven el operador por ese parámetro y devuelven `crmUserId`.
+ */
+export async function fetchWebrtcCredentials(): Promise<WebrtcCredentials> {
+  const authId = await crmAuthUserId()
+  const qs = authId ? `?${new URLSearchParams({ idUsuario: authId }).toString()}` : ''
+  return crmFetch<WebrtcCredentials>(`/api/webrtc/credentials${qs}`)
 }
 
 export type OutboundCli = {
@@ -150,11 +208,16 @@ export type CallLogStart = {
   idcliente?: string | null
 }
 
-/** Abre la fila en `aviold.llamadas_softphone` (`POST /api/calls/log`). */
-export function logCallStart(payload: CallLogStart): Promise<{ id: string }> {
+/**
+ * Abre la fila en `aviold.llamadas_softphone` (`POST /api/calls/log`).
+ * La versión actual de api-crm ignora `idusuario` (lo saca del token); las
+ * antiguas lo necesitan para asociar la llamada al operador.
+ */
+export async function logCallStart(payload: CallLogStart): Promise<{ id: string }> {
+  const authId = await crmAuthUserId()
   return crmFetch<{ id: string }>('/api/calls/log', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(authId ? { ...payload, idusuario: authId, idUsuario: authId } : payload),
   })
 }
 
@@ -251,9 +314,13 @@ export type CallDetail = {
   cost_pending: boolean
 }
 
+export const CALL_DETAIL_ENDPOINT = 'GET /api/calls/log/:id'
+
 /** Detalle completo de una llamada del softphone (`GET /api/calls/log/:id`). */
 export function fetchCallDetail(callId: string): Promise<CallDetail> {
-  return crmFetch<CallDetail>(`/api/calls/log/${encodeURIComponent(callId)}`)
+  return crmFetch<CallDetail>(`/api/calls/log/${encodeURIComponent(callId)}`, {
+    endpointKey: CALL_DETAIL_ENDPOINT,
+  })
 }
 
 export type RateEstimate = {
@@ -266,7 +333,9 @@ export type RateEstimate = {
 export async function fetchRateEstimate(to: string): Promise<RateEstimate | null> {
   const qs = new URLSearchParams({ to })
   try {
-    const res = await crmFetch<{ estimate: RateEstimate | null }>(`/api/calls/rate-estimate?${qs.toString()}`)
+    const res = await crmFetch<{ estimate: RateEstimate | null }>(`/api/calls/rate-estimate?${qs.toString()}`, {
+      endpointKey: 'GET /api/calls/rate-estimate',
+    })
     return res.estimate ?? null
   } catch (e) {
     if (e instanceof CrmApiError && (e.status === 404 || e.status === 0)) return null
@@ -321,7 +390,7 @@ export function fetchCallCostStats(range?: { from?: string; to?: string }): Prom
   if (range?.from) qs.set('from', range.from)
   if (range?.to) qs.set('to', range.to)
   const suffix = qs.toString() ? `?${qs.toString()}` : ''
-  return crmFetch<CallCostStats>(`/api/calls/cost-stats${suffix}`)
+  return crmFetch<CallCostStats>(`/api/calls/cost-stats${suffix}`, { endpointKey: 'GET /api/calls/cost-stats' })
 }
 
 /** Cuelga por Call Control si conocemos el `call_control_id` (`POST /api/call/hangup`). */

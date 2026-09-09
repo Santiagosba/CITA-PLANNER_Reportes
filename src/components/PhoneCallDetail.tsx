@@ -126,9 +126,11 @@ export default function PhoneCallDetail({ call, onBack, onCall }: Props) {
         if (cancelled) return
         setError(
           e instanceof CrmApiError
-            ? e.status === 404
-              ? 'Esta llamada no está en api-crm (se marcó sin registro).'
-              : e.message
+            ? e.endpointMissing
+              ? 'La llamada está guardada en api-crm, pero la versión desplegada no expone su detalle (grabación y coste). Hay que actualizar api-crm.avigo.es.'
+              : e.status === 404
+                ? 'Esta llamada no está en api-crm (se marcó sin registro).'
+                : e.message
             : 'No se pudo cargar el detalle.',
         )
       } finally {

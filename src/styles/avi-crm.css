@@ -8264,7 +8264,8 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
 }
 
 .softphone-tx-status.is-denied,
-.softphone-tx-status.is-unavailable {
+.softphone-tx-status.is-unavailable,
+.softphone-tx-status.is-unsupported {
   color: #b45309;
 }
 

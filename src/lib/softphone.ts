@@ -21,7 +21,9 @@ import { useSyncExternalStore } from 'react'
 import type { TelnyxRTC as TelnyxClient, Call, INotification } from '@telnyx/webrtc'
 import {
   CrmApiError,
+  crmAuthUserId,
   fetchCallDetail,
+  isEndpointMissing,
   fetchOutboundCli,
   fetchRateEstimate,
   fetchWebrtcCredentials,
@@ -53,8 +55,11 @@ export type TranscriptSpeaker = 'asesor' | 'cliente'
  *    vincular en el CRM) y no manda los eventos.
  *  - `unavailable`: contestada hace rato y no ha llegado nada (streaming caído
  *    o sin `STREAM_WS_URL` en api-crm).
+ *  - `unsupported`: el api-crm desplegado es antiguo (sin `GET /api/calls/log/:id`)
+ *    y no puede enlazar la pata Telnyx; solo llegará algo si el socket ya
+ *    enruta por usuario.
  */
-export type TranscriptionStatus = 'pending' | 'linking' | 'live' | 'denied' | 'unavailable'
+export type TranscriptionStatus = 'pending' | 'linking' | 'live' | 'denied' | 'unavailable' | 'unsupported'
 
 export type TranscriptLine = {
   id: string
@@ -195,6 +200,15 @@ function ensureTranscriptionSync() {
           }
           return
         }
+        if (isEndpointMissing(e)) {
+          // api-crm antiguo: no hay detalle de llamada. Nos quedamos con los
+          // ids del SDK y avisamos en la UI; no insistimos.
+          if (state.call?.id === callId && state.call.transcription === 'linking') {
+            patchCall({ transcription: 'unsupported' })
+          }
+          requestLiveTranscription(state.call)
+          return
+        }
       }
       await new Promise((r) => setTimeout(r, LEG_LINK_POLL_MS))
     }
@@ -229,6 +243,8 @@ export function transcriptionLabel(call: ActiveCall): string {
       return 'Sin permiso para transcribir'
     case 'unavailable':
       return 'Transcripción no disponible'
+    case 'unsupported':
+      return 'api-crm desactualizado'
     default:
       return 'Transcripción al contestar'
   }
@@ -678,7 +694,10 @@ async function doConnect(): Promise<void> {
     .then((cli) => setState({ callerId: resolveCallerId(cli.from) }))
     .catch(() => setState({ callerId: fallbackCallerId() }))
 
-  registerCrmSocketUser(creds.crmUserId)
+  // Versiones antiguas de api-crm enrutan `call_transcription` por `user:<id>`
+  // según el `register_user` del cliente; si no devuelve crmUserId usamos el
+  // id de Supabase (coincide con `aviold.usuarios.idusuario` al vincular).
+  registerCrmSocketUser(creds.crmUserId || (await crmAuthUserId()))
   unsubscribeTranscription?.()
   unsubscribeTranscription = onCrmTranscription(onTranscription)
 

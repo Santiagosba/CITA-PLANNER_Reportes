@@ -94,6 +94,8 @@ function transcriptEmptyText(call: ActiveCall): string {
       return 'api-crm no reconoce esta llamada como tuya: no se puede transcribir. Pide que vinculen tu usuario al CRM.'
     case 'unavailable':
       return 'La transcripción no ha arrancado. La grabación sigue disponible al colgar.'
+    case 'unsupported':
+      return 'El api-crm desplegado es antiguo y no expone el detalle de la llamada; hay que actualizarlo para transcribir en vivo.'
     case 'live':
     case 'linking':
       return 'Escuchando… la transcripción aparece en cuanto haya conversación.'
