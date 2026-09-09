@@ -25,6 +25,7 @@ import {
 } from '../lib/softphone'
 import { useSoftphoneLevels } from '../lib/audioLevels'
 import { fmtMoney, hangupLabel } from '../lib/callFormat'
+import { canSeeTelnyxCosts } from '../lib/crmRoles'
 import { apps, useApps } from '../lib/apps'
 import SoundWave from './SoundWave'
 
@@ -226,7 +227,8 @@ export default function SoftphoneDock() {
   const inConversation = call?.phase === 'active' || call?.phase === 'held'
   const levels = useSoftphoneLevels(Boolean(call && inConversation))
   const now = Date.now()
-  const liveCost = call ? estimatedCallCost(call, now) : null
+  const showCosts = canSeeTelnyxCosts()
+  const liveCost = showCosts && call ? estimatedCallCost(call, now) : null
   const lastLine = call?.transcript.length ? call.transcript[call.transcript.length - 1] : null
 
   return (
@@ -284,7 +286,9 @@ export default function SoftphoneDock() {
           <SoundWave compact levels={levels} label="Intensidad de la llamada en curso" />
 
           <div className="softphone-live-meta">
-            <span>{liveCost ? fmtMoney(liveCost.amount, liveCost.currency) : 'Coste al colgar'}</span>
+            {showCosts ? (
+              <span>{liveCost ? fmtMoney(liveCost.amount, liveCost.currency) : 'Coste al colgar'}</span>
+            ) : null}
             <span>{call.recording ? 'Grabando' : inConversation ? 'Conectando grabación…' : 'Sin grabar aún'}</span>
             <span className={`softphone-tx-status is-${call.transcription}`}>{transcriptionLabel(call)}</span>
           </div>

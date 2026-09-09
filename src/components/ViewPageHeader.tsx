@@ -4,9 +4,11 @@ import { OPEN_TASKBAR_EVENT, useTaskbarVisible } from '../lib/apps'
 import { headerNoticeItems, searchPeticionesAi } from '../lib/aiHeaderSearch'
 import { resolveDateRange } from '../lib/dateRangePresets'
 import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
+import TicketClientBlock from './TicketClientBlock'
 import { isSlaCritico } from '../lib/tallerStations'
 import { invalidateOperationalData, useOperationalData } from '../hooks/useOperationalData'
 import type { DashboardShellRoute } from './Sidebar'
+import type { CrmAppRole } from '../lib/crmRoles'
 import type { Workshop } from '../types'
 import VehiclePlate from './ui/VehiclePlate'
 
@@ -17,6 +19,7 @@ type Props = {
   triageTab?: TriageTab
   workshop: Workshop
   botName: string
+  appRole?: CrmAppRole
   isDarkMode: boolean
   onToggleTheme: () => void
   onOpenLead: (peticion: PeticionPendiente) => void
@@ -24,7 +27,12 @@ type Props = {
   onSynced: () => void
 }
 
-function pageCopy(route: DashboardShellRoute, triageTab: TriageTab | undefined, botName: string) {
+function pageCopy(
+  route: DashboardShellRoute,
+  triageTab: TriageTab | undefined,
+  botName: string,
+  appRole: CrmAppRole | undefined,
+) {
   if (route === 'pending-citas' && triageTab === 'calendario') {
     return {
       title: 'Calendario',
@@ -49,10 +57,15 @@ function pageCopy(route: DashboardShellRoute, triageTab: TriageTab | undefined, 
         subtitle: 'Llamadas y tareas del chatbot: cuántas están hechas y cuántas faltan.',
       }
     case 'equipos':
-      return {
-        title: 'Equipos',
-        subtitle: 'Crea equipos de asesores y asígnales tipos de tarea y tableros.',
-      }
+      return appRole === 'asesor'
+        ? {
+            title: 'Mi equipo',
+            subtitle: 'Tus compañeros y el grupo con el que compartes tickets.',
+          }
+        : {
+            title: 'Equipos',
+            subtitle: 'Crea equipos de asesores y asígnales tipos de tarea y tableros.',
+          }
     case 'asignar-tarea':
       return {
         title: 'Asignar tarea',
@@ -96,17 +109,12 @@ function pageCopy(route: DashboardShellRoute, triageTab: TriageTab | undefined, 
   }
 }
 
-function leadTitle(item: PeticionPendiente): string {
-  const cita = item.cita
-  const name = cita ? [cita.nombre, cita.apellidos].filter(Boolean).join(' ') : ''
-  return name || item.caller || 'Cliente sin identificar'
-}
-
 export default function ViewPageHeader({
   route,
   triageTab,
   workshop,
   botName,
+  appRole,
   isDarkMode,
   onToggleTheme,
   onOpenLead,
@@ -114,8 +122,12 @@ export default function ViewPageHeader({
   onSynced,
 }: Props) {
   const range = resolveDateRange('mes', '', '')
+  const allRange = resolveDateRange('todas', '', '')
   const { items, loading, refresh } = useOperationalData(workshop, range)
-  const copy = pageCopy(route, triageTab, botName)
+  const [query, setQuery] = useState('')
+  const searchRange = query.trim() ? allRange : range
+  const { items: searchPool, loading: searchLoading } = useOperationalData(workshop, searchRange)
+  const copy = pageCopy(route, triageTab, botName, appRole)
 
   const slaItems = useMemo(
     () =>
@@ -127,7 +139,6 @@ export default function ViewPageHeader({
   )
   const slaCount = slaItems.length
 
-  const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [noticesOpen, setNoticesOpen] = useState(false)
   const taskbarVisible = useTaskbarVisible()
@@ -135,7 +146,7 @@ export default function ViewPageHeader({
   const searchRef = useRef<HTMLDivElement>(null)
   const noticesRef = useRef<HTMLDivElement>(null)
 
-  const hits = useMemo(() => searchPeticionesAi(items, query), [items, query])
+  const hits = useMemo(() => searchPeticionesAi(searchPool, query), [searchPool, query])
   const notices = useMemo(() => headerNoticeItems(items), [items])
 
   useEffect(() => {
@@ -208,7 +219,7 @@ export default function ViewPageHeader({
               className="view-page-search-input"
               type="search"
               value={query}
-              placeholder="Buscar matrícula, cliente o avería..."
+              placeholder="Buscar cliente, teléfono, matrícula o avería…"
               onChange={(e) => {
                 setQuery(e.target.value)
                 setSearchOpen(true)
@@ -224,7 +235,9 @@ export default function ViewPageHeader({
                 <Sparkles size={14} aria-hidden />
                 Laura interpreta «{query.trim()}»
               </p>
-              {hits.length === 0 ? (
+              {searchLoading && hits.length === 0 ? (
+                <p className="section-subtitle view-page-popover-empty">Buscando en todas las consultas…</p>
+              ) : hits.length === 0 ? (
                 <p className="section-subtitle view-page-popover-empty">No hay coincidencias en este taller.</p>
               ) : (
                 <ul className="view-page-popover-list custom-scrollbar-light">
@@ -232,7 +245,7 @@ export default function ViewPageHeader({
                     <li key={hit.item.idpeticion}>
                       <button type="button" className="view-page-popover-row" onClick={() => openHit(hit.item)}>
                         <span className="view-page-popover-row-top">
-                          <strong>{leadTitle(hit.item)}</strong>
+                          <TicketClientBlock peticion={hit.item} size="sm" />
                           <span className="badge tone-muted">{hit.reason}</span>
                         </span>
                         <span className="view-page-popover-row-meta">
@@ -313,7 +326,7 @@ export default function ViewPageHeader({
                       <li key={item.idpeticion}>
                         <button type="button" className="view-page-popover-row" onClick={() => openHit(item)}>
                           <span className="view-page-popover-row-top">
-                            <strong>{leadTitle(item)}</strong>
+                            <TicketClientBlock peticion={item} size="sm" />
                             <span className={`badge ${sla ? 'tone-negative' : 'tone-warning'}`}>
                               {sla ? 'SLA crítico' : isPeticionPendiente(item) ? 'Pendiente' : 'Aviso'}
                             </span>

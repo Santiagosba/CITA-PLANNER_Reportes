@@ -23,6 +23,8 @@ import TodayTasksView from './TodayTasksView'
 import { mapSessionUserToCrmUser, type Workshop } from '../types'
 import { isGlobalAviAdmin } from '../lib/operationsConnect'
 import {
+  bindCrmAppRole,
+  canSeeTelnyxCosts,
   crmAppRoleLabel,
   defaultRouteForRole,
   resolveCrmAppRole,
@@ -182,6 +184,13 @@ export default function DashboardShell({
   // primera ficha y sube al frente cuando se pulsa.
   const [agendaZ, setAgendaZ] = useState(99)
   const canEditHubBranding = isGlobalAviAdmin({ user: sessionUser })
+  bindCrmAppRole(appRole)
+  const showCallCosts = canSeeTelnyxCosts(appRole)
+
+  useEffect(() => {
+    bindCrmAppRole(appRole)
+    return () => bindCrmAppRole(null)
+  }, [appRole])
 
   useEffect(() => {
     if (!routeAllowedForRole(shellRoute, appRole)) {
@@ -635,6 +644,7 @@ export default function DashboardShell({
         triageTab={shellRoute === 'reportes' ? 'tabla' : triageTab}
         workshop={workshop}
         botName={botName}
+        appRole={appRole}
         isDarkMode={isDarkMode}
         onToggleTheme={onToggleTheme}
         onOpenLead={openLead}
@@ -650,6 +660,7 @@ export default function DashboardShell({
       {shellRoute === 'dashboard-general' ? (
         <DashboardGeneralView
           workshop={workshop}
+          currentUser={currentUser}
           onOpenTriage={() => {
             hideDeskWindows()
             setTriageTab('kanban')
@@ -664,7 +675,11 @@ export default function DashboardShell({
           refreshToken={gestionBump}
         />
       ) : shellRoute === 'equipos' ? (
-        <TeamsManagerView workshop={workshop} currentUser={currentUser} />
+        <TeamsManagerView
+          workshop={workshop}
+          currentUser={currentUser}
+          readOnly={appRole === 'asesor'}
+        />
       ) : shellRoute === 'asignar-tarea' ? (
         <AssignTaskView workshop={workshop} currentUser={currentUser} />
       ) : shellRoute === 'stats-equipo' ? (
@@ -672,9 +687,14 @@ export default function DashboardShell({
       ) : shellRoute === 'tareas-hoy' ? (
         <TodayTasksView workshop={workshop} currentUser={currentUser} onOpenLead={openLead} />
       ) : shellRoute === 'boards' ? (
-        <BoardsManagerView workshop={workshop} onOpenLead={openLead} refreshToken={gestionBump} />
+        <BoardsManagerView
+          workshop={workshop}
+          currentUser={currentUser}
+          onOpenLead={openLead}
+          refreshToken={gestionBump}
+        />
       ) : shellRoute === 'laura' ? (
-        <LauraIntelligenceView workshopName={workshop.name} />
+        <LauraIntelligenceView workshopName={workshop.name} showCallCosts={showCallCosts} />
       ) : shellRoute === 'bot-identity' ? (
         <BotIdentityView />
       ) : shellRoute === 'configuration' ? (
@@ -689,6 +709,7 @@ export default function DashboardShell({
       ) : (
         <PendingCitasView
           workshop={workshop}
+          currentUser={currentUser}
           isDarkMode={isDarkMode}
           initialTab={shellRoute === 'reportes' ? 'tabla' : triageTab}
           initialSlaOnly={triageSlaOnly}

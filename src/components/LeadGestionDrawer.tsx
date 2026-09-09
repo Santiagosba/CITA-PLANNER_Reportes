@@ -23,7 +23,11 @@ import VehiclePlate from './ui/VehiclePlate'
 import { LeadCallHistory, LeadCallTranscript } from './LeadCallHistory'
 import { useCustomerCalls } from '../hooks/useCustomerCalls'
 import type { CustomerCallItem } from '../lib/crmApi'
+import { peticionToHistoryItem } from '../lib/interactionLabels'
 import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
+import { ticketClientLabel, ticketClientPhone, ticketVehicleLabel } from '../lib/ticketClient'
+import { scoreTicketUrgency } from '../lib/ticketUrgency'
+import TicketClientBlock from './TicketClientBlock'
 import { isSlaCritico } from '../lib/tallerStations'
 import { useLiquidGlass } from '../hooks/useLiquidGlass'
 import {
@@ -204,16 +208,17 @@ function LeadGestionDrawer({
   }, [phase])
 
   const c = p.cita
-  const cliente = c ? [c.nombre, c.apellidos].filter(Boolean).join(' ') : ''
-  const titulo = c
-    ? [c.marca, c.modelo].filter(Boolean).join(' ') || cliente || 'Vehículo sin datos'
-    : cliente || p.caller || 'Consulta sin nombre'
-  const telRaw = p.caller?.replace(/\s/g, '') ?? ''
+  const cliente = ticketClientLabel(p)
+  const phone = ticketClientPhone(p)
+  const vehicle = ticketVehicleLabel(p)
+  const titulo = cliente
+  const telRaw = phone.replace(/\s/g, '')
   const telHref = telRaw ? `tel:${telRaw}` : null
   const waHref = telRaw ? `https://wa.me/${telRaw.replace(/^\+/, '')}` : null
   const pendiente = isPeticionPendiente(p)
   const sla = isSlaCritico(p.fechainicio) || isSlaCritico(c?.fecha)
-  const urgency = sla ? 82 : pendiente ? 55 : 28
+  const urgencyScore = scoreTicketUrgency(p)
+  const urgency = urgencyScore.score
 
   const applyLiveRect = useCallback((next: WinRect) => {
     const el = rootRef.current
@@ -508,6 +513,7 @@ function LeadGestionDrawer({
                 {c?.fecha ? <span className="badge tone-muted">{formatFecha(c.fecha)}</span> : null}
               </div>
               <p className="lead-modal-sub">
+                {vehicle ? `${vehicle} · ` : ''}
                 {p.tipopeticion || 'Sin tipo'} · Consulta {formatFecha(p.fechainicio)}
               </p>
             </div>
@@ -523,19 +529,16 @@ function LeadGestionDrawer({
         <div className="lead-modal-client">
           <div className="lead-modal-client-id">
             <span className="lead-drawer-avatar" aria-hidden>
-              <User size={14} />
+              <User size={18} />
             </span>
-            <div className="lead-modal-client-text">
-              <strong>{cliente || p.caller || 'Cliente sin nombre'}</strong>
-              <span className="font-mono">{p.caller || 'Sin teléfono'}</span>
-            </div>
+            <TicketClientBlock peticion={p} size="lg" />
           </div>
           <div className="lead-modal-contact">
             {telHref ? (
               <a
                 href={telHref}
                 className="confirm-action lead-contact-btn"
-                data-call-label={cliente || p.caller || undefined}
+                data-call-label={cliente}
                 data-call-peticion={p.idpeticion}
                 title="Llamar por Telnyx desde el CRM"
               >
@@ -555,6 +558,7 @@ function LeadGestionDrawer({
         <LeadCallHistory
           phone={telRaw}
           calls={calls}
+          extraItems={[peticionToHistoryItem(p)]}
           selectedId={selectedCall?.id ?? null}
           onSelect={(item) => {
             setSelectedCall(item)
@@ -619,7 +623,9 @@ function LeadGestionDrawer({
                   <div className="progress-bar" role="progressbar" aria-valuenow={urgency} aria-valuemin={0} aria-valuemax={100}>
                     <div className="progress-bar-fill" style={{ width: `${urgency}%` }} />
                   </div>
-                  <small>{sla ? 'Prioridad máxima (alerta SLA)' : pendiente ? 'Pendiente de validación' : 'Ya tiene cita'}</small>
+                  <small>
+                    {urgencyScore.reasons[0] || (sla ? 'Prioridad máxima (alerta SLA)' : pendiente ? 'Pendiente de validación' : 'Ya tiene cita')}
+                  </small>
                 </section>
                 <section className="lead-info-card lead-sentiment-card">
                   <div className="lead-sentiment-head">

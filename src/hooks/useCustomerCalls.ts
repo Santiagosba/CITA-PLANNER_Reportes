@@ -29,7 +29,7 @@ export function useCustomerCalls(phone: string | null | undefined) {
       setState({
         items: [],
         loading: false,
-        error: e instanceof CrmApiError ? e.message : 'No se pudo cargar el historial de llamadas.',
+        error: e instanceof CrmApiError ? e.message : 'No se pudo cargar el historial del cliente.',
       })
     }
   }, [enabled, phone])

@@ -23,8 +23,13 @@ import ApiStatusBanner from '../components/ApiStatusBanner'
 import { HexLoaderScreen } from '../components/ui/HexLoader'
 import VehiclePlate from '../components/ui/VehiclePlate'
 import { resolveDateRange } from '../lib/dateRangePresets'
-import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
+import { formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
+import { defaultBoardPriority, scoreManualUrgency, scoreTicketUrgency } from '../lib/ticketUrgency'
+import TicketClientBlock from '../components/TicketClientBlock'
 import { useOperationalData } from '../hooks/useOperationalData'
+import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
+import { buildOwnerScopeContext, matchesOwnerScope, type OwnerScope } from '../lib/ownerScope'
+import OwnerScopeFilter from '../components/OwnerScopeFilter'
 import type { Workshop } from '../types'
 
 type DepartmentId = 'mechanics' | 'bodywork' | 'insurance' | 'parts' | 'sales'
@@ -124,12 +129,13 @@ const LIFT_PX = 6
 
 type Props = {
   workshop: Workshop
+  currentUser: { name: string; email: string }
   onOpenLead?: (peticion: PeticionPendiente) => void
   refreshToken?: number
 }
 
 function priorityKey(workshopId: string) {
-  return `avi_board_priority_${workshopId}`
+  return `avi_board_priority_v2_${workshopId}`
 }
 
 function manualKey(workshopId: string) {
@@ -171,12 +177,7 @@ function detectDepartment(item: PeticionPendiente): DepartmentId {
 }
 
 function defaultPriority(item: PeticionPendiente): PriorityId {
-  if (!isPeticionPendiente(item)) return 'hecho'
-  if (item.gestionado) return 'media'
-  const text = `${item.tipopeticion || ''} ${item.descripcion || ''}`.toLowerCase()
-  if (/urgent|aver[ií]a|siniestro|remolc|no arranca|parado/.test(text)) return 'urgente'
-  if (/cita|mec[aá]nic|revisi[oó]n|perit/.test(text)) return 'alta'
-  return 'media'
+  return defaultBoardPriority(item)
 }
 
 function badgeTone(tone: PriorityColumn['tone']): string {
@@ -202,6 +203,17 @@ function cardTime(card: BoardCard): string {
   return card.kind === 'peticion' ? card.item.fechainicio ?? '' : card.entry.createdAt
 }
 
+function cardUrgency(card: BoardCard): number {
+  if (card.kind === 'manual') {
+    return scoreManualUrgency({
+      title: card.entry.title,
+      note: card.entry.note,
+      createdAt: card.entry.createdAt,
+    }).score
+  }
+  return scoreTicketUrgency(card.item).score
+}
+
 function applyOrder(cards: BoardCard[], order: string[] | undefined): BoardCard[] {
   if (!cards.length) return []
   const byId = new Map(cards.map((card) => [cardId(card), card]))
@@ -214,7 +226,11 @@ function applyOrder(cards: BoardCard[], order: string[] | undefined): BoardCard[
     seen.add(id)
   }
   const rest = cards.filter((card) => !seen.has(cardId(card)))
-  rest.sort((a, b) => String(cardTime(b)).localeCompare(String(cardTime(a))))
+  rest.sort((a, b) => {
+    const delta = cardUrgency(b) - cardUrgency(a)
+    if (delta !== 0) return delta
+    return String(cardTime(b)).localeCompare(String(cardTime(a)))
+  })
   return [...next, ...rest]
 }
 
@@ -450,11 +466,14 @@ const BoardTicket = memo(function BoardTicket({
           <span className="ops-feed-placeholder">MANUAL</span>
           <span className={`badge ${tone}`}>{column.label}</span>
         </div>
-        <strong>{entry.title}</strong>
-        {entry.phone ? <span className="kanban-card-meta">{entry.phone}</span> : null}
+        <div className="ticket-client is-md">
+          <p className="ticket-client-name">{entry.title}</p>
+          <p className="ticket-client-phone">{entry.phone || 'Sin teléfono'}</p>
+        </div>
         {entry.note ? <p className="kanban-card-desc">{entry.note}</p> : null}
         <footer>
           <time>{formatFecha(entry.createdAt)}</time>
+          <span>Urgencia {scoreManualUrgency({ title: entry.title, note: entry.note, createdAt: entry.createdAt }).score}</span>
         </footer>
       </article>
     )
@@ -462,9 +481,8 @@ const BoardTicket = memo(function BoardTicket({
 
   const item = card.item
   const cita = item.cita
-  const customer = cita ? [cita.nombre, cita.apellidos].filter(Boolean).join(' ') : ''
-  const title = customer || item.caller || 'Cliente sin identificar'
   const vehicle = cita ? [cita.marca, cita.modelo].filter(Boolean).join(' ') : ''
+  const urgency = scoreTicketUrgency(item)
 
   return (
     <article
@@ -487,23 +505,37 @@ const BoardTicket = memo(function BoardTicket({
         )}
         <span className={`badge ${tone}`}>{column.label}</span>
       </div>
-      <strong>{title}</strong>
-      <span className="kanban-card-meta">
-        {item.tipopeticion || 'Sin tipo'}
-        {item.caller ? ` · ${item.caller}` : ''}
-      </span>
+      <TicketClientBlock peticion={item} size="md" />
+      <span className="kanban-card-meta">{item.tipopeticion || 'Sin tipo'}</span>
       {vehicle ? <span className="kanban-card-meta">{vehicle}</span> : null}
       {item.descripcion ? <p className="kanban-card-desc">{item.descripcion}</p> : null}
       <footer>
         <time>{formatFecha(item.fechainicio)}</time>
+        <span title={urgency.reasons.join(' · ') || 'Fórmula de urgencia'}>Urgencia {urgency.score}</span>
       </footer>
     </article>
   )
 })
 
-export default function BoardsManagerView({ workshop, onOpenLead, refreshToken = 0 }: Props) {
+export default function BoardsManagerView({
+  workshop,
+  currentUser,
+  onOpenLead,
+  refreshToken = 0,
+}: Props) {
   const range = resolveDateRange('mes', '', '')
   const { items, loading, error, sourceNotice, refresh } = useOperationalData(workshop, range)
+  const workshopKey = workshop.containerIdTaller || workshop.id
+  const { workspace } = useAdvisorWorkspace(workshopKey, currentUser, true)
+  const [ownerScope, setOwnerScope] = useState<OwnerScope>('todas')
+  const ownerCtx = useMemo(
+    () => buildOwnerScopeContext(workspace, currentUser.email),
+    [workspace, currentUser.email],
+  )
+  const scopedItems = useMemo(
+    () => items.filter((item) => matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx)),
+    [items, ownerScope, ownerCtx],
+  )
 
   useEffect(() => {
     if (refreshToken > 0) void refresh()
@@ -567,9 +599,9 @@ export default function BoardsManagerView({ workshop, onOpenLead, refreshToken =
       parts: [],
       sales: [],
     }
-    for (const item of items) map[detectDepartment(item)].push(item)
+    for (const item of scopedItems) map[detectDepartment(item)].push(item)
     return map
-  }, [items])
+  }, [scopedItems])
 
   const active = DEPARTMENTS.find((department) => department.id === activeDepartment)!
   const ActiveIcon = active.icon
@@ -585,10 +617,13 @@ export default function BoardsManagerView({ workshop, onOpenLead, refreshToken =
     for (const department of DEPARTMENTS) {
       counts[department.id] =
         grouped[department.id].length +
-        manualEntries.filter((entry) => entry.departmentId === department.id).length
+        manualEntries.filter(
+          (entry) =>
+            entry.departmentId === department.id && matchesOwnerScope(null, ownerScope, ownerCtx),
+        ).length
     }
     return counts
-  }, [grouped, manualEntries])
+  }, [grouped, manualEntries, ownerScope, ownerCtx])
 
   const columns = useMemo(() => {
     const buckets: Record<PriorityId, BoardCard[]> = {
@@ -606,6 +641,7 @@ export default function BoardsManagerView({ workshop, onOpenLead, refreshToken =
 
     for (const entry of manualEntries) {
       if (entry.departmentId !== activeDepartment) continue
+      if (!matchesOwnerScope(null, ownerScope, ownerCtx)) continue
       buckets[entry.priority].push({ kind: 'manual', entry })
     }
 
@@ -614,7 +650,7 @@ export default function BoardsManagerView({ workshop, onOpenLead, refreshToken =
     }
 
     return buckets
-  }, [grouped, activeDepartment, priorities, manualEntries, orders])
+  }, [grouped, activeDepartment, priorities, manualEntries, orders, ownerScope, ownerCtx])
 
   useEffect(() => {
     columnsRef.current = columns
@@ -935,6 +971,7 @@ export default function BoardsManagerView({ workshop, onOpenLead, refreshToken =
           <p className="section-eyebrow">Tablero especializado</p>
           <h2 className="ops-card-title">{active.label}</h2>
           <p className="section-subtitle">{active.description}</p>
+          <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} />
         </div>
         <button type="button" className="client-submit" onClick={openNewEntry}>
           <Plus size={16} />

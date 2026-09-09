@@ -4,6 +4,8 @@ import ActionButton, { type ActionStatus } from './ui/ActionButton'
 import VehiclePlate from './ui/VehiclePlate'
 import { formatAgendaTime } from '../lib/agendaGrouping'
 import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
+import { ticketClientLabel, ticketClientPhone } from '../lib/ticketClient'
+import TicketClientBlock from './TicketClientBlock'
 
 type Props = {
   peticion: PeticionPendiente
@@ -34,15 +36,15 @@ function PeticionRow({
 }: Props) {
   const pendiente = isPeticionPendiente(p)
   const c = p.cita
-  const cliente = c ? [c.nombre, c.apellidos].filter(Boolean).join(' ') : ''
-  const titulo = cliente || p.caller || 'Consulta sin nombre'
+  const cliente = ticketClientLabel(p)
+  const phone = ticketClientPhone(p)
+  const titulo = cliente
   const vehiculo = c ? [c.marca, c.modelo].filter(Boolean).join(' ') : ''
-  const tel = p.caller?.replace(/\s/g, '') ?? ''
+  const tel = phone.replace(/\s/g, '')
   const telHref = tel ? `tel:${tel}` : null
 
   // Datos que el asesor necesita ver de un vistazo para llamar con contexto
   const facts: { label: string; value: ReactNode }[] = []
-  if (p.caller) facts.push({ label: 'Tel', value: p.caller })
   facts.push({ label: 'Tipo', value: p.tipopeticion ?? 'Sin tipo' })
   facts.push({ label: 'Consulta', value: formatFecha(p.fechainicio) })
   if (c?.matricula) {
@@ -81,7 +83,9 @@ function PeticionRow({
           <span className={`prow-marker ${pendiente ? 'is-pending' : 'is-done'}`} aria-hidden />
           <span className="prow-info">
             <span className="prow-headline">
-              <span className="prow-name">{titulo}</span>
+              <span className="prow-name">
+                <TicketClientBlock peticion={p} size="md" />
+              </span>
               <span className={`badge ${pendiente ? 'tone-warning' : 'tone-positive'}`}>
                 {pendiente ? 'Sin cita' : 'Con cita'}
               </span>
@@ -110,7 +114,7 @@ function PeticionRow({
           <a
             href={telHref}
             className="prow-call confirm-action"
-            aria-label={`Llamar a ${p.caller}`}
+            aria-label={`Llamar a ${titulo}`}
             data-call-label={titulo}
             data-call-peticion={p.idpeticion}
           >
@@ -123,8 +127,8 @@ function PeticionRow({
       {showBody ? (
         <div id={`prow-body-${p.idpeticion}`} className="prow-body">
           <dl className="prow-detail-grid">
-            <Detail label="Teléfono" value={p.caller} />
-            <Detail label="Cliente" value={cliente || '—'} />
+            <Detail label="Cliente" value={cliente} />
+            <Detail label="Teléfono" value={phone || '—'} />
             <Detail label="Tipo de consulta" value={p.tipopeticion} />
             <Detail label="Fecha de la consulta" value={formatFecha(p.fechainicio)} />
             <Detail label="Cita en calendario" value={formatFecha(p.cita?.fecha) || 'Todavía no'} />

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Coins, FileText, Grid3x3, Mic, MicOff, Pause, Phone, PhoneIncoming, PhoneOff, Play, Timer } from 'lucide-react'
 import { estimatedCallCost, softphone, transcriptionLabel, type ActiveCall } from '../lib/softphone'
+import { canSeeTelnyxCosts } from '../lib/crmRoles'
 import { useSoftphoneLevels } from '../lib/audioLevels'
 import { fmtMoney, fmtSeconds } from '../lib/callFormat'
 import { TranscriptLines } from './PhoneCallDetail'
@@ -101,7 +102,8 @@ export default function PhoneLiveCall({ call, callerId }: Props) {
   const inConversation = call.phase === 'active' || call.phase === 'held'
   const levels = useSoftphoneLevels(inConversation)
   const elapsed = call.answeredAt ? (now - call.answeredAt) / 1000 : (now - call.startedAt) / 1000
-  const cost = estimatedCallCost(call, now)
+  const showCosts = canSeeTelnyxCosts()
+  const cost = showCosts ? estimatedCallCost(call, now) : null
   const Icon = call.direction === 'incoming' ? PhoneIncoming : Phone
 
   return (
@@ -132,6 +134,7 @@ export default function PhoneLiveCall({ call, callerId }: Props) {
           <span className="phone-stat-label">{call.answeredAt ? 'Hablando' : 'Esperando'}</span>
           <strong className="phone-stat-value font-mono">{fmtSeconds(elapsed)}</strong>
         </div>
+        {showCosts ? (
         <div className="phone-stat">
           <span className="phone-stat-icon" aria-hidden>
             <Coins size={14} />
@@ -149,6 +152,7 @@ export default function PhoneLiveCall({ call, callerId }: Props) {
             <span className="phone-stat-sub">Real al colgar</span>
           )}
         </div>
+        ) : null}
         <div className={`phone-stat${call.recording ? ' tone-rec' : ''}`}>
           <span className="phone-stat-icon" aria-hidden>
             <Mic size={14} />

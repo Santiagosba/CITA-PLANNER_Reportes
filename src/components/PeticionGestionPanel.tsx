@@ -4,6 +4,7 @@ import { ArrowRight, Inbox, Phone } from 'lucide-react'
 import ActionButton, { type ActionStatus } from './ui/ActionButton'
 import VehiclePlate from './ui/VehiclePlate'
 import { formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
+import { ticketClientLabel } from '../lib/ticketClient'
 
 const STEPS = [
   { id: 1, label: 'Revisar' },
@@ -50,9 +51,7 @@ export default function PeticionGestionPanel({
     )
   }
 
-  const c = p.cita
-  const cliente = c ? [c.nombre, c.apellidos].filter(Boolean).join(' ') : null
-  const titulo = cliente || p.caller || 'Consulta sin nombre'
+  const titulo = ticketClientLabel(p)
   const tel = p.caller?.replace(/\s/g, '') ?? ''
   const telHref = tel ? `tel:${tel}` : null
 

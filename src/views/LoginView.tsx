@@ -121,7 +121,7 @@ export default function LoginView({
                 </span>
                 <span className="login-asesor-copy">
                   <strong>Entrar como Ana (asesora)</strong>
-                  <small>Tareas de hoy</small>
+                  <small>Dashboard, triage y tu equipo</small>
                 </span>
               </button>
             </div>

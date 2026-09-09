@@ -71,7 +71,7 @@ function HistoryRow({
   if (call.transcript.length > 0) extras.push('transcripción')
   return (
     <li className={`phone-history-row${missed ? ' is-missed' : ''}${selected ? ' is-selected' : ''}`}>
-      <button type="button" className="phone-history-main" onClick={onOpen} title="Ver grabación, transcripción y coste" aria-expanded={selected}>
+      <button type="button" className="phone-history-main" onClick={onOpen} title="Ver grabación y transcripción" aria-expanded={selected}>
         <span className="phone-history-icon" aria-hidden>
           <Icon size={14} />
         </span>
@@ -191,7 +191,7 @@ export default function SoftphonePad({ onCalled, initialTab = 'keypad', roomy = 
   }, [call])
 
   // Al colgar una llamada atendida, abrimos su ficha para ver cómo llegan
-  // grabación, transcripción y coste.
+  // grabación y transcripción.
   const lastSeenRef = useRef(0)
   useEffect(() => {
     if (!lastCall || lastCall.endedAt === lastSeenRef.current) return

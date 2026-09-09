@@ -4,6 +4,7 @@ import Card from '../components/ui/Card'
 import ApiStatusBanner from '../components/ApiStatusBanner'
 import { resolveDateRange } from '../lib/dateRangePresets'
 import { formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
+import { ticketClientLabel } from '../lib/ticketClient'
 import {
   boardsForTeam,
   catalogName,
@@ -202,8 +203,7 @@ export default function AssignTaskView({ workshop, currentUser }: Props) {
                 <option value="">Ninguna</option>
                 {pendingPeticiones.map((item: PeticionPendiente) => (
                   <option key={item.idpeticion} value={item.idpeticion}>
-                    {(item.cita ? [item.cita.nombre, item.cita.apellidos].filter(Boolean).join(' ') : item.caller) ||
-                      'Consulta'}{' '}
+                    {ticketClientLabel(item)}{' '}
                     · {item.tipopeticion || 'Sin tipo'} · {formatFecha(item.fechainicio)}
                   </option>
                 ))}

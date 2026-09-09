@@ -63,10 +63,15 @@ const PRECISION = [
 
 type Props = {
   workshopName: string
+  showCallCosts?: boolean
 }
 
-export default function LauraIntelligenceView({ workshopName }: Props) {
+export default function LauraIntelligenceView({ workshopName, showCallCosts = false }: Props) {
   const [tab, setTab] = useState<LauraTab>('rendimiento')
+
+  useEffect(() => {
+    if (!showCallCosts && tab === 'costes') setTab('rendimiento')
+  }, [showCallCosts, tab])
 
   return (
     <div className="dashboard-page laura-page">
@@ -103,6 +108,7 @@ export default function LauraIntelligenceView({ workshopName }: Props) {
           <Timer size={16} aria-hidden />
           Tiempos &amp; SLA DMS
         </button>
+        {showCallCosts ? (
         <button
           type="button"
           role="tab"
@@ -113,6 +119,7 @@ export default function LauraIntelligenceView({ workshopName }: Props) {
           <Coins size={16} aria-hidden />
           Costes de llamadas
         </button>
+        ) : null}
       </div>
 
       {tab === 'rendimiento' || tab === 'sla' ? (
@@ -205,7 +212,7 @@ export default function LauraIntelligenceView({ workshopName }: Props) {
         </>
       ) : null}
 
-      {tab === 'costes' ? <LauraCallCosts /> : null}
+      {tab === 'costes' && showCallCosts ? <LauraCallCosts /> : null}
 
       {tab === 'sla' ? (
         <>

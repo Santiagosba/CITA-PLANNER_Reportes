@@ -56,12 +56,32 @@ export const ADMIN_SHELL_ROUTES: DashboardShellRoute[] = [
   'configuration',
 ]
 
-export const ASESOR_SHELL_ROUTES: DashboardShellRoute[] = ['tareas-hoy', 'configuration']
+export const ASESOR_SHELL_ROUTES: DashboardShellRoute[] = [
+  'dashboard-general',
+  'pending-citas',
+  'equipos',
+  'tareas-hoy',
+  'boards',
+  'laura',
+  'configuration',
+]
 
 export function defaultRouteForRole(role: CrmAppRole): DashboardShellRoute {
-  return role === 'admin' ? 'dashboard-general' : 'tareas-hoy'
+  return 'dashboard-general'
 }
 
 export function routeAllowedForRole(route: DashboardShellRoute, role: CrmAppRole): boolean {
   return role === 'admin' ? ADMIN_SHELL_ROUTES.includes(route) : ASESOR_SHELL_ROUTES.includes(route)
+}
+
+/** Rol activo en el escritorio; el teléfono lo usa para ocultar costes Telnyx. */
+let boundCrmAppRole: CrmAppRole | null = null
+
+export function bindCrmAppRole(role: CrmAppRole | null): void {
+  boundCrmAppRole = role
+}
+
+export function canSeeTelnyxCosts(role?: CrmAppRole | null): boolean {
+  const resolved = role ?? boundCrmAppRole ?? readLocalPreview()?.role ?? null
+  return resolved === 'admin'
 }

@@ -33,6 +33,7 @@ import {
   productLabel,
 } from '../lib/callFormat'
 import type { FinishedCall, TranscriptLine } from '../lib/softphone'
+import { canSeeTelnyxCosts } from '../lib/crmRoles'
 
 /** Mientras Telnyx no publica el coste, volvemos a preguntar cada 20 s (máx. 15 min tras colgar). */
 const COST_POLL_MS = 20_000
@@ -98,6 +99,7 @@ function Stat({ icon, label, value, tone }: { icon: React.ReactNode; label: stri
  * llamada no llegó a registrarse allí, se muestra lo que hay en local.
  */
 export default function PhoneCallDetail({ call, onBack, onCall }: Props) {
+  const showCosts = canSeeTelnyxCosts()
   const [detail, setDetail] = useState<CallDetail | null>(null)
   const [loading, setLoading] = useState(Boolean(call.logId))
   const [error, setError] = useState<string | null>(null)
@@ -125,7 +127,8 @@ export default function PhoneCallDetail({ call, onBack, onCall }: Props) {
         setDetail(next)
         setError(null)
         const withinWindow = Date.now() - call.endedAt < COST_POLL_WINDOW_MS
-        if ((next.cost_pending || (!next.recording.available && withinWindow)) && withinWindow) {
+        const waitCost = showCosts && next.cost_pending
+        if (withinWindow && (waitCost || !next.recording.available)) {
           pollRef.current = window.setTimeout(() => void load(true), COST_POLL_MS)
         }
       } catch (e) {
@@ -195,7 +198,7 @@ export default function PhoneCallDetail({ call, onBack, onCall }: Props) {
       cancelled = true
       window.clearTimeout(pollRef.current)
     }
-  }, [call.logId, call.endedAt, enabled])
+  }, [call.logId, call.endedAt, enabled, showCosts])
 
   const missed = detail ? !detail.fecha_respuesta && !['completed', 'answered'].includes(String(detail.estado)) : !call.answered
   const Icon = missed ? PhoneMissed : call.direction === 'incoming' ? PhoneIncoming : PhoneOutgoing
@@ -240,6 +243,7 @@ export default function PhoneCallDetail({ call, onBack, onCall }: Props) {
           value={fmtSeconds(duration)}
           tone={missed ? 'missed' : 'ok'}
         />
+        {showCosts ? (
         <Stat
           icon={<Coins size={14} />}
           label="Coste"
@@ -255,6 +259,7 @@ export default function PhoneCallDetail({ call, onBack, onCall }: Props) {
             )
           }
         />
+        ) : null}
         <Stat
           icon={missed ? <PhoneMissed size={14} /> : <Phone size={14} />}
           label="Resultado"
@@ -297,6 +302,7 @@ export default function PhoneCallDetail({ call, onBack, onCall }: Props) {
           ) : null}
         </article>
 
+        {showCosts ? (
         <article className="phone-detail-card lg-surface">
           <h4>
             <Coins size={13} aria-hidden /> Coste Telnyx
@@ -343,6 +349,7 @@ export default function PhoneCallDetail({ call, onBack, onCall }: Props) {
             <p className="phone-pad-hint phone-detail-empty">Sin datos de coste para esta llamada.</p>
           )}
         </article>
+        ) : null}
       </div>
 
       <article className="phone-detail-card lg-surface phone-detail-transcript">

@@ -1,9 +1,11 @@
-import { Download } from 'lucide-react'
+import { Download, Search } from 'lucide-react'
 import { CALENDAR_SCALE_OPTIONS, type CalendarScale } from '../lib/calendarScale'
 import { type DateRangePreset, type ResolvedDateRange } from '../lib/dateRangePresets'
 import { CHANNEL_OPTIONS } from '../lib/tallerStations'
 import type { PeticionesStats } from '../lib/peticionesPendientes'
+import type { OwnerScope } from '../lib/ownerScope'
 import Button from './ui/Button'
+import OwnerScopeFilter from './OwnerScopeFilter'
 
 export type EstadoFilter = 'todas' | 'faltan' | 'hechas'
 
@@ -28,6 +30,10 @@ type Props = {
   channel: string
   slaOnly: boolean
   estado: EstadoFilter
+  ownerScope: OwnerScope
+  onOwnerScopeChange: (scope: OwnerScope) => void
+  search: string
+  onSearchChange: (value: string) => void
   onPresetChange: (preset: DateRangePreset) => void
   onCustomFromChange: (v: string) => void
   onCustomToChange: (v: string) => void
@@ -53,6 +59,10 @@ export default function PendingCitasToolbar({
   channel,
   slaOnly,
   estado,
+  ownerScope,
+  onOwnerScopeChange,
+  search,
+  onSearchChange,
   onPresetChange,
   onCustomFromChange,
   onCustomToChange,
@@ -106,6 +116,21 @@ export default function PendingCitasToolbar({
             </button>
           </div>
         </div>
+        <OwnerScopeFilter value={ownerScope} onChange={onOwnerScopeChange} />
+        <label className="filter-field queue-filter-search">
+          <span className="filter-field-label">Buscar</span>
+          <span className="relative">
+            <Search size={16} className="field-input-icon" aria-hidden />
+            <input
+              type="search"
+              className="field-input"
+              value={search}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="Cliente, teléfono, matrícula…"
+              autoComplete="off"
+            />
+          </span>
+        </label>
         <label className="filter-field">
           <span className="filter-field-label">Canal</span>
           <select className="field-select" value={channel} onChange={(e) => onChannelChange(e.target.value)}>

@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { FileText, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, Play, RefreshCw } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { FileText, Mail, MessageSquare, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, Play, RefreshCw } from 'lucide-react'
 import { CrmApiError, fetchRecordingUrl, type CustomerCallItem } from '../lib/crmApi'
 import { formatFecha } from '../lib/peticionesPendientes'
 import { hasStoredTranscript, splitStoredNotes } from '../lib/callFormat'
+import { channelLabel, channelTone, closeLabels } from '../lib/interactionLabels'
 import { phoneTail, useSoftphone, type TranscriptLine } from '../lib/softphone'
 import type { useCustomerCalls } from '../hooks/useCustomerCalls'
 
@@ -23,11 +24,21 @@ type HistoryProps = {
   phone: string
   calls: CallsState
   selectedId: string | null
+  extraItems?: CustomerCallItem[]
   onSelect: (item: CustomerCallItem) => void
 }
 
+function channelIcon(item: CustomerCallItem) {
+  if (item.tipo === 'whatsapp' || item.tipo === 'sms') return <MessageSquare size={14} />
+  if (item.tipo === 'email') return <Mail size={14} />
+  const missed = item.nocontesta || !item.completada
+  if (missed && item.tipo === 'llamada') return <PhoneMissed size={14} />
+  if (item.entrante) return <PhoneIncoming size={14} />
+  return <Phone size={14} />
+}
+
 /** Lista de llamadas con este teléfono: grabación (play) y acceso a la transcripción. */
-export function LeadCallHistory({ phone, calls, selectedId, onSelect }: HistoryProps) {
+export function LeadCallHistory({ phone, calls, selectedId, extraItems = [], onSelect }: HistoryProps) {
   const { call } = useSoftphone()
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
@@ -35,6 +46,17 @@ export function LeadCallHistory({ phone, calls, selectedId, onSelect }: HistoryP
   const [loadingId, setLoadingId] = useState<string | null>(null)
 
   const live = call && phoneTail(call.number) === phoneTail(phone) ? call : null
+  const items = useMemo(() => {
+    const seen = new Set<string>()
+    const merged: CustomerCallItem[] = []
+    for (const item of [...calls.items, ...extraItems]) {
+      if (!item?.id || seen.has(item.id)) continue
+      seen.add(item.id)
+      merged.push(item)
+    }
+    merged.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+    return merged
+  }, [calls.items, extraItems])
 
   const play = async (item: CustomerCallItem) => {
     if (playingId === item.id) {
@@ -85,7 +107,7 @@ export function LeadCallHistory({ phone, calls, selectedId, onSelect }: HistoryP
               ? live.recording
                 ? 'Grabando la llamada en curso'
                 : 'Llamada en curso'
-              : `Llamadas con este cliente · ${calls.items.length}`}
+              : `Historial del cliente · ${items.length}`}
           </span>
         </div>
         <button
@@ -101,31 +123,40 @@ export function LeadCallHistory({ phone, calls, selectedId, onSelect }: HistoryP
 
       {calls.error ? <p className="lead-voice-hint lead-calls-error">{calls.error}</p> : null}
 
-      {!calls.loading && !calls.error && calls.items.length === 0 ? (
+      {!calls.loading && !calls.error && items.length === 0 ? (
         <p className="lead-voice-hint">
           <Phone size={12} />
-          Aún no hay llamadas. Pulsa «Llamar»: la conversación se graba y se transcribe sola.
+          Aún no hay llamadas ni mensajes con este cliente.
         </p>
       ) : null}
 
-      {calls.items.length > 0 ? (
+      {items.length > 0 ? (
         <ul className="lead-calls-list">
-          {calls.items.map((item) => {
-            const missed = item.nocontesta || !item.completada
+          {items.map((item) => {
+            const missed = item.tipo === 'llamada' && (item.nocontesta || !item.completada)
             const selected = selectedId === item.id
+            const closes = closeLabels(item)
             return (
               <li key={item.id} className={`lead-calls-row ${selected ? 'is-selected' : ''}`}>
-                <span className={`lead-calls-icon ${missed ? 'is-missed' : ''}`} aria-hidden>
-                  {missed ? <PhoneMissed size={14} /> : item.entrante ? <PhoneIncoming size={14} /> : <Phone size={14} />}
+                <span className={`lead-calls-icon is-${item.tipo || 'llamada'}${missed ? ' is-missed' : ''}`} aria-hidden>
+                  {channelIcon(item)}
                 </span>
                 <button type="button" className="lead-calls-main" onClick={() => onSelect(item)}>
                   <span className="lead-calls-top">
                     <strong>{formatFecha(item.fecha)}</strong>
-                    <span className="font-mono">{fmtSecs(item.duracionSeg)}</span>
+                    {item.tipo === 'llamada' ? <span className="font-mono">{fmtSecs(item.duracionSeg)}</span> : null}
+                  </span>
+                  <span className="lead-calls-tags">
+                    <span className={`badge ${channelTone(item.tipo)}`}>{channelLabel(item.tipo)}</span>
+                    {item.entrante ? <span className="badge tone-muted">Entrante</span> : null}
+                    {closes.map((tag) => (
+                      <span key={tag.text} className={`badge ${tag.tone}`}>
+                        {tag.text}
+                      </span>
+                    ))}
                   </span>
                   <span className="lead-calls-sub">
-                    {item.agente || 'Asesor'}
-                    {missed ? ' · Sin respuesta' : ''}
+                    {item.agente || item.titular || 'Sin detalle'}
                     {hasTranscript(item) ? ' · Transcripción' : ''}
                   </span>
                 </button>

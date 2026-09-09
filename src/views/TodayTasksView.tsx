@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { CalendarCheck2, CheckCircle2 } from 'lucide-react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
 import { HexLoaderScreen } from '../components/ui/HexLoader'
@@ -7,11 +7,19 @@ import { resolveDateRange } from '../lib/dateRangePresets'
 import { type PeticionPendiente } from '../lib/peticionesPendientes'
 import {
   catalogName,
+  isTaskDueOnOrBefore,
   localTodayIso,
-  tasksForAdvisorDay,
+  personById,
 } from '../lib/advisorWorkspace'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
 import { useOperationalData } from '../hooks/useOperationalData'
+import {
+  buildOwnerScopeContext,
+  matchesTaskOwnerScope,
+  ownerScopeEmptyCopy,
+  type OwnerScope,
+} from '../lib/ownerScope'
+import OwnerScopeFilter from '../components/OwnerScopeFilter'
 import type { Workshop } from '../types'
 
 type Props = {
@@ -26,10 +34,20 @@ export default function TodayTasksView({ workshop, currentUser, onOpenLead }: Pr
   const today = localTodayIso()
   const range = resolveDateRange('mes', '', '')
   const { items, loading, error, sourceNotice } = useOperationalData(workshop, range)
+  const [ownerScope, setOwnerScope] = useState<OwnerScope>('mias')
+  const ownerCtx = useMemo(
+    () => buildOwnerScopeContext(workspace, currentUser.email),
+    [workspace, currentUser.email],
+  )
 
   const tasks = useMemo(
-    () => tasksForAdvisorDay(workspace, currentUser.email, today),
-    [workspace, currentUser.email, today],
+    () =>
+      workspace.tasks.filter((task) => {
+        if (!matchesTaskOwnerScope(task, ownerScope, workspace, ownerCtx)) return false
+        if (task.status === 'hecho') return task.dueDate === today
+        return isTaskDueOnOrBefore(task, today)
+      }),
+    [workspace, ownerScope, ownerCtx, today],
   )
   const pending = tasks.filter((task) => task.status === 'pendiente')
   const done = tasks.filter((task) => task.status === 'hecho')
@@ -59,7 +77,7 @@ export default function TodayTasksView({ workshop, currentUser, onOpenLead }: Pr
         <article className="metric glass glass-lite">
           <span className="ops-kpi-label">Total</span>
           <strong>{tasks.length}</strong>
-          <span className="ops-kpi-helper">Tu bandeja del día</span>
+          <span className="ops-kpi-helper">Según el dueño elegido</span>
         </article>
       </section>
 
@@ -68,19 +86,28 @@ export default function TodayTasksView({ workshop, currentUser, onOpenLead }: Pr
           <div>
             <p className="section-eyebrow">Bandeja</p>
             <h2 className="ops-card-title">Tareas de hoy</h2>
-            <p className="section-subtitle">Lo que te ha asignado el admin para este día.</p>
+            <p className="section-subtitle">Las tuyas, las del grupo, las de compañeros o las que no tienen dueño.</p>
           </div>
           <CalendarCheck2 size={22} aria-hidden style={{ color: 'var(--color-brand)' }} />
+        </div>
+
+        <div className="elevator-filters glass glass-lite" style={{ marginBottom: 'var(--space-4)' }}>
+          <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Tareas" />
         </div>
 
         {loading && tasks.length === 0 ? (
           <HexLoaderScreen size="md" label="Cargando tus tareas…" />
         ) : tasks.length === 0 ? (
-          <p className="section-subtitle">Hoy no tienes tareas. Cuando el admin te asigne una, saldrá aquí.</p>
+          <p className="section-subtitle">
+            {ownerScope === 'mias'
+              ? 'Hoy no tienes tareas. Cuando el admin te asigne una, saldrá aquí.'
+              : ownerScopeEmptyCopy(ownerScope)}
+          </p>
         ) : (
           <ul className="role-list">
             {tasks.map((task) => {
               const overdue = task.status === 'pendiente' && task.dueDate < today
+              const owner = personById(workspace, task.assigneeId)
               return (
                 <li key={task.id} className="role-task-row glass glass-lite">
                   <div>
@@ -88,6 +115,7 @@ export default function TodayTasksView({ workshop, currentUser, onOpenLead }: Pr
                     <p className="list-row-meta">
                       {catalogName(workspace.taskTypes, task.taskTypeId)}
                       {task.boardId ? ` · ${catalogName(workspace.boards, task.boardId)}` : ''}
+                      {` · ${owner?.name || 'Sin dueño'}`}
                       {overdue ? ' · Atrasada' : ` · ${task.dueDate}`}
                     </p>
                     {task.notes ? <p className="section-subtitle">{task.notes}</p> : null}

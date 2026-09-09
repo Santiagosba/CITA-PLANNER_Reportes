@@ -1,5 +1,5 @@
 ---
-description: Roles CRM — admin gestiona equipos/tableros/tareas; asesor ve Tareas de hoy
+description: Roles CRM — admin gestiona equipos/tableros/tareas; asesor opera sin ver costes
 alwaysApply: true
 ---
 
@@ -17,21 +17,24 @@ Puede:
 - Definir y asignar a cada equipo sus **tipos de tareas** y **tableros**
 - Ver **estadísticas de trabajo** de sus empleados
 - **Asignar tareas** a asesores concretos
+- Ver **costes Telnyx** (softphone, ficha de llamada y pestaña de Laura)
 
-No es el escritorio operativo del asesor. Gestor de tableros, equipo y métricas van aquí.
+Gestor de tableros, equipo y métricas van aquí. No es solo el escritorio operativo.
 
 ## Asesor
 
 Puede:
 
-- Ver **Tareas de hoy** (su bandeja del día: las que el admin le asignó + las suyas del periodo)
-
-No crea equipos, no configura tipos/tableros de otros, no ve estadísticas del resto del equipo.
+- Ver **Dashboard general**, **Triage**, **Gestor de tableros** y **Asistente IA**
+- Ver **su equipo o compañeros** (solo lectura: no crea equipos ni asigna tipos/tableros)
+- Ver **Tareas de hoy** y filtrar tickets/tareas: **mías**, **del grupo**, **de otros compañeros**, **sin dueño**
+- No ve **costes Telnyx** ni estadísticas del resto del equipo
+- No crea equipos, no configura tipos/tableros de otros, no asigna tareas de admin
 
 ## Al implementar
 
 - Nav y rutas según rol: admin ≠ asesor
 - Una tarea asignada por el admin aparece en Tareas de hoy del asesor
 - Tableros y tipos de tarea se filtran por el equipo del usuario
-- Stats de empleados: solo admin, sobre **todas** las filas del periodo (sin `TOP`/`LIMIT`)
-- Textos en español llano: «Tareas de hoy», «Asignar tarea», «Equipo»
+- Stats de empleados y costes Telnyx: solo admin, sobre **todas** las filas del periodo (sin `TOP`/`LIMIT`)
+- Textos en español llano: «Tareas de hoy», «Asignar tarea», «Equipo», «Sin dueño»

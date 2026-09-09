@@ -256,19 +256,21 @@ export type CustomerCallItem = {
   duracionSeg: number | null
   tipo: 'llamada' | 'sms' | 'whatsapp' | 'email'
   entrante?: boolean
+  /** Códigos de cierre (cita, no contesta, gestionado…). */
+  tags?: string[]
   hasRecording?: boolean
   softphoneLogId?: string | null
   esCallbot?: boolean
 }
 
 /**
- * Llamadas previas con un teléfono (`GET /api/calls/customer-history`).
- * La API acota a 100 como máximo; pedimos ese tope.
+ * Historial del cliente (`GET /api/calls/customer-history`): llamadas, WhatsApp, SMS y email.
+ * La API acota a 100 por petición; pedimos ese tope y devolvemos todas las filas.
  */
 export async function fetchCustomerCalls(phone: string): Promise<CustomerCallItem[]> {
   const qs = new URLSearchParams({ phone, limit: '100' })
   const res = await crmFetch<{ items: CustomerCallItem[] }>(`/api/calls/customer-history?${qs.toString()}`)
-  return (res.items || []).filter((item) => item.tipo === 'llamada' || !item.tipo)
+  return res.items || []
 }
 
 export type CallCostBreakdownItem = {

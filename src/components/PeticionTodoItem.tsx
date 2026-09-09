@@ -5,6 +5,7 @@ import ActionButton, { type ActionStatus } from './ui/ActionButton'
 import VehiclePlate from './ui/VehiclePlate'
 import { formatAgendaTime } from '../lib/agendaGrouping'
 import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
+import { ticketClientLabel } from '../lib/ticketClient'
 
 const STEPS = [
   { id: 1, label: 'Revisar' },
@@ -38,8 +39,7 @@ export default function PeticionTodoItem({
   const [step, setStep] = useState(1)
   const pendiente = isPeticionPendiente(p)
   const c = p.cita
-  const cliente = c ? [c.nombre, c.apellidos].filter(Boolean).join(' ') : null
-  const titulo = cliente || p.caller || 'Consulta sin nombre'
+  const titulo = ticketClientLabel(p)
   const tel = p.caller?.replace(/\s/g, '') ?? ''
   const telHref = tel ? `tel:${tel}` : null
 

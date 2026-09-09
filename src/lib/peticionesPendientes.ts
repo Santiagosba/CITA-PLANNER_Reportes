@@ -6,10 +6,12 @@ import { supabaseAviOld } from './supabase'
 import { fetchAllSupabasePages } from './supabaseFetchAll'
 import type { Workshop } from '../types'
 import { fetchContainerRow, fetchLicenciaModuleTalleres } from './licenciaGrupo'
+import { personFromCitaFields, phoneMatchKey, ticketClientName } from './ticketClient'
 import {
   isSqlServerPeticionesSource,
   isSqlServerFallbackEnabled,
   SqlServerApiError,
+  sqlFetchCitas,
   sqlFetchPendingPeticiones,
   sqlFetchTiposPeticion,
   sqlResolveTallerIds,
@@ -89,6 +91,8 @@ export type CitaResumen = {
   fecha: string | null
   nombre: string | null
   apellidos: string | null
+  razonSocial?: string | null
+  contacto?: string | null
   telefono: string | null
   movil: string | null
   email: string | null
@@ -114,6 +118,8 @@ export type PeticionPendiente = {
   gestionobservaciones: string | null
   idcita: string | null
   cita: CitaResumen | null
+  /** Identidad de Citas cruzada por teléfono; no implica cita vinculada. */
+  clienteNombre?: string | null
 }
 
 export type PeticionesFilters = {
@@ -156,7 +162,7 @@ const PETICION_SELECT =
   'idpeticion,idtaller,descripcion,idtipopeticion,fechainicio,fechafin,fechacreacion,caller,gestionado,gestionemail,gestionfecha,gestionobservaciones,idcita'
 
 const CITA_SELECT =
-  'idcita,fecha,nombre,apellidos,telefono,movil,email,matricula,marca,modelo,asunto'
+  'idcita,fecha,nombre,apellidos,razonsocial,contacto,telefono,movil,email,matricula,marca,modelo,asunto'
 
 export type ResolvedTallerIds = {
   ids: string[]
@@ -261,20 +267,9 @@ async function fetchCitasByIds(ids: string[]): Promise<Map<string, CitaResumen>>
         console.warn('[peticionesPendientes] citas no accesibles:', error.message)
         return map
       }
-      for (const row of (data ?? []) as CitaResumen[]) {
-        map.set(String(row.idcita).toLowerCase(), {
-          ...row,
-          idcita: String(row.idcita).toLowerCase(),
-          matricula: emptyToNull(row.matricula),
-          nombre: emptyToNull(row.nombre),
-          apellidos: emptyToNull(row.apellidos),
-          telefono: emptyToNull(row.telefono),
-          movil: emptyToNull(row.movil),
-          email: emptyToNull(row.email),
-          marca: emptyToNull(row.marca),
-          modelo: emptyToNull(row.modelo),
-          asunto: emptyToNull(row.asunto),
-        })
+      for (const row of (data ?? []) as Record<string, unknown>[]) {
+        const cita = normalizeCitaResumen(row)
+        map.set(cita.idcita, cita)
       }
     } catch (e) {
       console.warn('[peticionesPendientes] error cargando citas:', e)
@@ -288,6 +283,104 @@ function emptyToNull(v: unknown): string | null {
   if (v == null) return null
   const s = String(v).trim()
   return s || null
+}
+
+function normalizeCitaResumen(row: Record<string, unknown>): CitaResumen {
+  return {
+    idcita: String(row.idcita ?? '').toLowerCase(),
+    fecha: (row.fecha as string | null) ?? null,
+    nombre: emptyToNull(row.nombre),
+    apellidos: emptyToNull(row.apellidos),
+    razonSocial: emptyToNull(row.razonSocial ?? row.razonsocial),
+    contacto: emptyToNull(row.contacto),
+    telefono: emptyToNull(row.telefono),
+    movil: emptyToNull(row.movil),
+    email: emptyToNull(row.email),
+    matricula: emptyToNull(row.matricula),
+    marca: emptyToNull(row.marca),
+    modelo: emptyToNull(row.modelo),
+    asunto: emptyToNull(row.asunto),
+  }
+}
+
+function shiftIsoDays(iso: string | undefined, days: number): string | undefined {
+  if (!iso) return undefined
+  const date = new Date(`${iso}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return iso
+  date.setDate(date.getDate() + days)
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+async function fetchCitasForNameMatch(
+  tallerIds: string[],
+  range: { from?: string; to?: string },
+): Promise<CitaResumen[]> {
+  const from = shiftIsoDays(range.from, -365) ?? range.from
+  const to = range.to
+  try {
+    if (isSqlServerPeticionesSource() && !sqlServerLoginBlocked) {
+      const rows = await sqlFetchCitas(tallerIds, { from, to })
+      return rows.map((row) => ({
+        idcita: String(row.idcita).toLowerCase(),
+        fecha: row.fecha,
+        nombre: row.nombre,
+        apellidos: row.apellidos,
+        razonSocial: row.razonSocial,
+        contacto: row.contacto,
+        telefono: row.telefono,
+        movil: row.movil,
+        email: row.email,
+        matricula: row.matricula,
+        marca: row.marca,
+        modelo: row.modelo,
+        asunto: row.asunto,
+      }))
+    }
+  } catch (e) {
+    console.warn('[peticionesPendientes] citas para cruzar nombres (SQL):', e)
+  }
+
+  return []
+}
+
+/** El calendario ya tiene nombre en Citas; el ticket ChatBot a menudo no. Cruzamos por teléfono. */
+export function attachClientNamesFromCitas(
+  peticiones: PeticionPendiente[],
+  citas: CitaResumen[],
+): PeticionPendiente[] {
+  const byPhone = new Map<string, CitaResumen>()
+  for (const cita of citas) {
+    if (!personFromCitaFields(cita)) continue
+    for (const key of [phoneMatchKey(cita.movil), phoneMatchKey(cita.telefono)]) {
+      if (!key) continue
+      const prev = byPhone.get(key)
+      if (!prev || String(cita.fecha || '') > String(prev.fecha || '')) byPhone.set(key, cita)
+    }
+  }
+
+  return peticiones.map((item) => {
+    if (ticketClientName(item)) return item
+    const key = phoneMatchKey(item.caller)
+    const hit = key ? byPhone.get(key) : undefined
+    if (!hit) return item
+    const nombre = personFromCitaFields(hit)
+    return {
+      ...item,
+      clienteNombre: nombre,
+      cita: item.cita
+        ? {
+            ...item.cita,
+            nombre: item.cita.nombre || hit.nombre,
+            apellidos: item.cita.apellidos || hit.apellidos,
+            razonSocial: item.cita.razonSocial || hit.razonSocial,
+            contacto: item.cita.contacto || hit.contacto,
+          }
+        : item.cita,
+    }
+  })
 }
 
 function mapPeticionRow(
@@ -325,15 +418,19 @@ export async function fetchPendingPeticiones(
     .filter(Boolean)
   if (!ids.length) return []
 
-  return withSqlFallback(
+  const rows = await withSqlFallback(
     'peticiones',
     async () => {
-      let rows = await sqlFetchPendingPeticiones(ids, filters)
-      if (filters.soloConCita) rows = rows.filter((p) => Boolean(p.idcita))
-      return rows
+      let next = await sqlFetchPendingPeticiones(ids, filters)
+      if (filters.soloConCita) next = next.filter((p) => Boolean(p.idcita))
+      return next
     },
     async () => fetchPendingPeticionesFromSupabase(ids, filters),
   )
+  const missingNames = rows.some((item) => !ticketClientName(item) && phoneMatchKey(item.caller))
+  if (!missingNames) return rows
+  const citas = await fetchCitasForNameMatch(ids, { from: filters.from, to: filters.to })
+  return attachClientNamesFromCitas(rows, citas)
 }
 
 async function fetchPendingPeticionesFromSupabase(
@@ -450,7 +547,7 @@ export function buildPeticionesCsv(items: PeticionPendiente[], tallerNombre: str
   const lines = [headers.join(',')]
   for (const p of items) {
     const c = p.cita
-    const cliente = c ? [c.nombre, c.apellidos].filter(Boolean).join(' ') : ''
+    const cliente = ticketClientName(p)
     const vehiculo = c ? [c.marca, c.modelo].filter(Boolean).join(' ') : ''
     lines.push(
       [

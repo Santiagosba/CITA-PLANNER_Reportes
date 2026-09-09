@@ -3,6 +3,10 @@ import { Plus, Trash2, Users } from 'lucide-react'
 import Card from '../components/ui/Card'
 import {
   catalogName,
+  normalizeEmail,
+  personByEmail,
+  personById,
+  teamForPerson,
   type AdvisorTeam,
 } from '../lib/advisorWorkspace'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
@@ -11,13 +15,18 @@ import type { Workshop } from '../types'
 type Props = {
   workshop: Workshop
   currentUser: { name: string; email: string }
+  readOnly?: boolean
 }
 
-export default function TeamsManagerView({ workshop, currentUser }: Props) {
+export default function TeamsManagerView({ workshop, currentUser, readOnly = false }: Props) {
   const workshopId = workshop.containerIdTaller || workshop.id
   const { workspace, addTeam, updateTeam, deleteTeam, addAdvisor, addTaskType, addBoard } =
-    useAdvisorWorkspace(workshopId, currentUser)
-  const [selectedId, setSelectedId] = useState<string | null>(workspace.teams[0]?.id ?? null)
+    useAdvisorWorkspace(workshopId, currentUser, readOnly)
+  const myTeamId = useMemo(() => {
+    const me = personByEmail(workspace, currentUser.email)
+    return me ? teamForPerson(workspace, me.id)?.id ?? null : null
+  }, [workspace, currentUser.email])
+  const [selectedId, setSelectedId] = useState<string | null>(myTeamId ?? workspace.teams[0]?.id ?? null)
   const [teamName, setTeamName] = useState('')
   const [personName, setPersonName] = useState('')
   const [personEmail, setPersonEmail] = useState('')
@@ -71,8 +80,12 @@ export default function TeamsManagerView({ workshop, currentUser }: Props) {
       <div className="role-desk-grid">
         <Card className="role-desk-col">
           <p className="section-eyebrow">Taller</p>
-          <h2 className="ops-card-title">Equipos de asesores</h2>
-          <p className="section-subtitle">Crea equipos y elige quién entra en cada uno.</p>
+          <h2 className="ops-card-title">{readOnly ? 'Equipos del taller' : 'Equipos de asesores'}</h2>
+          <p className="section-subtitle">
+            {readOnly
+              ? 'Tu grupo y el resto de compañeros. Solo puedes consultarlos.'
+              : 'Crea equipos y elige quién entra en cada uno.'}
+          </p>
 
           <ul className="role-list">
             {workspace.teams.map((team) => (
@@ -91,6 +104,7 @@ export default function TeamsManagerView({ workshop, currentUser }: Props) {
             ))}
           </ul>
 
+          {readOnly ? null : (
           <form className="role-inline-form" onSubmit={onCreateTeam}>
             <label className="field-label" htmlFor="new-team-name">
               Nuevo equipo
@@ -107,6 +121,7 @@ export default function TeamsManagerView({ workshop, currentUser }: Props) {
               Crear equipo
             </button>
           </form>
+          )}
         </Card>
 
         <Card className="role-desk-col">
@@ -117,90 +132,162 @@ export default function TeamsManagerView({ workshop, currentUser }: Props) {
                   <p className="section-eyebrow">Equipo</p>
                   <h2 className="ops-card-title">{selected.name}</h2>
                 </div>
-                <button
-                  type="button"
-                  className="ghost-button"
-                  onClick={() => {
-                    deleteTeam(selected.id)
-                    setSelectedId(workspace.teams.find((team) => team.id !== selected.id)?.id ?? null)
-                  }}
-                >
-                  <Trash2 size={16} aria-hidden />
-                  Borrar
-                </button>
+                {readOnly ? (
+                  selected.id === myTeamId ? (
+                    <span className="badge tone-positive">Tu grupo</span>
+                  ) : (
+                    <span className="badge tone-muted">Otro grupo</span>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => {
+                      deleteTeam(selected.id)
+                      setSelectedId(workspace.teams.find((team) => team.id !== selected.id)?.id ?? null)
+                    }}
+                  >
+                    <Trash2 size={16} aria-hidden />
+                    Borrar
+                  </button>
+                )}
               </div>
 
-              <label className="field-label" htmlFor="team-name">
-                Nombre
-              </label>
-              <input
-                id="team-name"
-                className="field-input"
-                value={selected.name}
-                onChange={(event) => updateTeam(selected.id, { name: event.target.value })}
-              />
+              {readOnly ? null : (
+                <>
+                  <label className="field-label" htmlFor="team-name">
+                    Nombre
+                  </label>
+                  <input
+                    id="team-name"
+                    className="field-input"
+                    value={selected.name}
+                    onChange={(event) => updateTeam(selected.id, { name: event.target.value })}
+                  />
+                </>
+              )}
 
               <h3 className="role-subhead">Asesores del equipo</h3>
-              <ul className="role-check-list">
-                {workspace.people.map((person) => (
-                  <li key={person.id}>
-                    <label className="role-check">
-                      <input
-                        type="checkbox"
-                        checked={selected.memberIds.includes(person.id)}
-                        onChange={() => toggleMember(person.id)}
-                      />
-                      <span>
-                        <strong>{person.name}</strong>
-                        <small>{person.email}</small>
-                      </span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
+              {readOnly ? (
+                <ul className="role-list">
+                  {selected.memberIds.map((memberId) => {
+                    const person = personById(workspace, memberId)
+                    if (!person) return null
+                    const isMe = normalizeEmail(person.email) === normalizeEmail(currentUser.email)
+                    return (
+                      <li key={person.id} className="role-task-row glass glass-lite">
+                        <div>
+                          <p className="list-row-title">{person.name}</p>
+                          <p className="list-row-meta">{person.email}</p>
+                        </div>
+                        {isMe ? <span className="badge tone-positive">Tú</span> : null}
+                      </li>
+                    )
+                  })}
+                </ul>
+              ) : (
+                <ul className="role-check-list">
+                  {workspace.people.map((person) => (
+                    <li key={person.id}>
+                      <label className="role-check">
+                        <input
+                          type="checkbox"
+                          checked={selected.memberIds.includes(person.id)}
+                          onChange={() => toggleMember(person.id)}
+                        />
+                        <span>
+                          <strong>{person.name}</strong>
+                          <small>{person.email}</small>
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
               <h3 className="role-subhead">Tipos de tarea</h3>
-              <ul className="role-check-list">
-                {workspace.taskTypes.map((item) => (
-                  <li key={item.id}>
-                    <label className="role-check">
-                      <input
-                        type="checkbox"
-                        checked={selected.taskTypeIds.includes(item.id)}
-                        onChange={() => toggleType(item.id)}
-                      />
-                      <span>{item.name}</span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
+              {readOnly ? (
+                <p className="section-subtitle">
+                  {selected.taskTypeIds.map((id) => catalogName(workspace.taskTypes, id)).join(', ') || 'Ningún tipo'}
+                </p>
+              ) : (
+                <ul className="role-check-list">
+                  {workspace.taskTypes.map((item) => (
+                    <li key={item.id}>
+                      <label className="role-check">
+                        <input
+                          type="checkbox"
+                          checked={selected.taskTypeIds.includes(item.id)}
+                          onChange={() => toggleType(item.id)}
+                        />
+                        <span>{item.name}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
               <h3 className="role-subhead">Tableros</h3>
-              <ul className="role-check-list">
-                {workspace.boards.map((item) => (
-                  <li key={item.id}>
-                    <label className="role-check">
-                      <input
-                        type="checkbox"
-                        checked={selected.boardIds.includes(item.id)}
-                        onChange={() => toggleBoard(item.id)}
-                      />
-                      <span>{item.name}</span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
+              {readOnly ? (
+                <p className="section-subtitle">
+                  {selected.boardIds.map((id) => catalogName(workspace.boards, id)).join(', ') || 'Ningún tablero'}
+                </p>
+              ) : (
+                <ul className="role-check-list">
+                  {workspace.boards.map((item) => (
+                    <li key={item.id}>
+                      <label className="role-check">
+                        <input
+                          type="checkbox"
+                          checked={selected.boardIds.includes(item.id)}
+                          onChange={() => toggleBoard(item.id)}
+                        />
+                        <span>{item.name}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </>
           ) : (
-            <p className="section-subtitle">Crea un equipo para empezar.</p>
+            <p className="section-subtitle">
+              {readOnly ? 'Todavía no hay equipos en este taller.' : 'Crea un equipo para empezar.'}
+            </p>
           )}
         </Card>
 
         <Card className="role-desk-col">
-          <p className="section-eyebrow">Plantilla</p>
-          <h2 className="ops-card-title">Asesores y catálogo</h2>
-          <p className="section-subtitle">Añade gente y nuevos tipos o tableros para todos los equipos.</p>
+          <p className="section-eyebrow">{readOnly ? 'Taller' : 'Plantilla'}</p>
+          <h2 className="ops-card-title">{readOnly ? 'Compañeros' : 'Asesores y catálogo'}</h2>
+          <p className="section-subtitle">
+            {readOnly
+              ? 'Toda la gente del taller, también de otros grupos.'
+              : 'Añade gente y nuevos tipos o tableros para todos los equipos.'}
+          </p>
 
+          {readOnly ? (
+            <ul className="role-list">
+              {workspace.people.map((person) => {
+                const isMe = normalizeEmail(person.email) === normalizeEmail(currentUser.email)
+                const team = teamForPerson(workspace, person.id)
+                return (
+                  <li key={person.id} className="role-task-row glass glass-lite">
+                    <div>
+                      <p className="list-row-title">{person.name}</p>
+                      <p className="list-row-meta">
+                        {person.email}
+                        {team ? ` · ${team.name}` : ''}
+                      </p>
+                    </div>
+                    {isMe ? <span className="badge tone-positive">Tú</span> : null}
+                  </li>
+                )
+              })}
+            </ul>
+          ) : null}
+
+          {readOnly ? null : (
+          <>
           <form className="role-stack-form" onSubmit={onAddAdvisor}>
             <label className="field-label" htmlFor="advisor-name">
               Nuevo asesor
@@ -276,6 +363,8 @@ export default function TeamsManagerView({ workshop, currentUser }: Props) {
               Este equipo usa {selected.taskTypeIds.map((id) => catalogName(workspace.taskTypes, id)).join(', ') || 'ningún tipo'}.
             </p>
           ) : null}
+          </>
+          )}
         </Card>
       </div>
     </div>

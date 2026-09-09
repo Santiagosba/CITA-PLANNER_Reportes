@@ -1,4 +1,5 @@
 import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
+import { ticketClientLabel, ticketClientPhone } from '../lib/ticketClient'
 
 type Props = {
   peticion: PeticionPendiente
@@ -8,9 +9,8 @@ type Props = {
 
 export default function PeticionCard({ peticion: p, active, onClick }: Props) {
   const pendiente = isPeticionPendiente(p)
-  const c = p.cita
-  const cliente = c ? [c.nombre, c.apellidos].filter(Boolean).join(' ') : null
-  const titulo = cliente || p.caller || 'Sin teléfono'
+  const titulo = ticketClientLabel(p)
+  const phone = ticketClientPhone(p)
 
   const Tag = onClick ? 'button' : 'div'
 
@@ -24,7 +24,7 @@ export default function PeticionCard({ peticion: p, active, onClick }: Props) {
         <div className="min-w-0 text-left">
           <p className="list-row-title truncate">{titulo}</p>
           <p className="list-row-meta mt-0.5 truncate">{p.tipopeticion ?? 'Consulta general'}</p>
-          {p.caller ? <p className="list-row-meta mt-1">Tel: {p.caller}</p> : null}
+          {phone ? <p className="list-row-meta mt-1">Tel: {phone}</p> : null}
         </div>
         <div className="shrink-0 text-right">
           <span className={`badge ${pendiente ? 'tone-warning' : 'tone-positive'}`}>

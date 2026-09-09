@@ -35,7 +35,12 @@ const ADMIN_NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] 
 ]
 
 const ASESOR_NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] = [
+  { id: 'dashboard-general', label: 'Dashboard general', icon: LayoutDashboard },
+  { id: 'pending-citas', label: 'Triage operativo', icon: ClipboardList },
   { id: 'tareas-hoy', label: 'Tareas de hoy', icon: CalendarCheck2 },
+  { id: 'equipos', label: 'Mi equipo', icon: Users },
+  { id: 'boards', label: 'Gestor de tableros', icon: Columns3 },
+  { id: 'laura', label: 'Asistente de IA Laura', icon: Sparkles },
 ]
 
 /** Pieza extruida: apila capas del mismo vector en Z para darle grosor 3D real. */

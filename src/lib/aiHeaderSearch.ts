@@ -1,5 +1,6 @@
 import { isPeticionPendiente, type PeticionPendiente } from './peticionesPendientes'
 import { isSlaCritico } from './tallerStations'
+import { ticketClientName, ticketClientPhone } from './ticketClient'
 
 export type AiSearchHit = {
   item: PeticionPendiente
@@ -7,12 +8,32 @@ export type AiSearchHit = {
   reason: string
 }
 
+const STOPWORDS = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'un', 'una', 'y', 'o', 'en', 'con', 'por', 'para', 'al'])
+
+function fold(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+}
+
+function digits(value: string): string {
+  return value.replace(/\D/g, '')
+}
+
+function plateKey(value: string): string {
+  return value.replace(/[\s.-]/g, '').toUpperCase()
+}
+
 function haystack(item: PeticionPendiente): string {
   const cita = item.cita
   return [
+    ticketClientName(item),
     item.descripcion,
     item.tipopeticion,
     item.caller,
+    item.gestionemail,
+    item.gestionobservaciones,
     cita?.nombre,
     cita?.apellidos,
     cita?.matricula,
@@ -21,38 +42,56 @@ function haystack(item: PeticionPendiente): string {
     cita?.asunto,
     cita?.telefono,
     cita?.movil,
+    cita?.email,
   ]
     .filter(Boolean)
     .join(' ')
-    .toLowerCase()
 }
 
-function plateKey(value: string): string {
-  return value.replace(/[\s.-]/g, '').toUpperCase()
-}
-
-/** Interpreta la búsqueda como lo haría Laura: matrícula, cliente, avería o un aviso (SLA, urgente…). */
+/** Interpreta la búsqueda como Laura: nombre, teléfono, matrícula, avería o aviso. */
 export function searchPeticionesAi(items: PeticionPendiente[], raw: string): AiSearchHit[] {
   const query = raw.trim()
   if (!query) return []
 
-  const lower = query.toLowerCase()
+  const folded = fold(query)
   const compact = plateKey(query)
-  const tokens = lower.split(/\s+/).filter((token) => token.length > 1)
-  const wantSla = /sla|cr[ií]tico|critico|15\s*min/.test(lower)
-  const wantUrgent = /urgent|aver[ií]a|no arranca|parado|remolc|siniestro/.test(lower)
-  const wantOpen = /faltan|pendiente|sin gestionar|abiert/.test(lower)
-  const looksPlate = /^[0-9]{4}[BCDFGHJKLMNPRSTVWXYZ]{3}$/i.test(compact) || /^[A-Z]{1,2}[0-9]{4}[A-Z]{2,3}$/i.test(compact)
+  const phoneQ = digits(query)
+  const tokens = folded
+    .split(/[\s,;./+-]+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 1 && !STOPWORDS.has(token))
+  const wantSla = /sla|cr[ií]tico|critico|15\s*min/.test(folded)
+  const wantUrgent = /urgent|aver[ií]a|averia|no arranca|parado|remolc|siniestro/.test(folded)
+  const wantOpen = /faltan|pendiente|sin gestionar|abiert/.test(folded)
+  const looksPlate =
+    /^[0-9]{4}[BCDFGHJKLMNPRSTVWXYZ]{3}$/i.test(compact) || /^[A-Z]{1,2}[0-9]{4}[A-Z]{2,3}$/i.test(compact)
 
   const hits: AiSearchHit[] = []
 
   for (const item of items) {
-    const text = haystack(item)
+    const text = fold(haystack(item))
+    const name = fold(ticketClientName(item))
+    const phone = digits(ticketClientPhone(item))
     const plate = plateKey(item.cita?.matricula || '')
     const pending = isPeticionPendiente(item)
     const sla = !item.gestionado && (isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha))
     let score = 0
     let reason = 'Coincidencia'
+
+    if (name) {
+      if (name === folded) {
+        score += 130
+        reason = 'Cliente'
+      } else if (name.includes(folded) || (folded.length >= 3 && folded.includes(name))) {
+        score += 110
+        reason = 'Cliente'
+      }
+    }
+
+    if (phoneQ.length >= 3 && phone.includes(phoneQ)) {
+      score += phoneQ.length >= 6 ? 120 : 70
+      if (reason === 'Coincidencia') reason = 'Teléfono'
+    }
 
     if (looksPlate && plate && (plate === compact || plate.includes(compact))) {
       score += 120
@@ -68,20 +107,32 @@ export function searchPeticionesAi(items: PeticionPendiente[], raw: string): AiS
     }
     if (wantUrgent && /urgent|aver|siniestro|no arranca|parado|remolc/.test(text)) {
       score += 50
-      reason = 'Urgente / avería'
+      if (reason === 'Coincidencia') reason = 'Urgente / avería'
     }
     if (wantOpen && pending) {
       score += 25
-      reason = 'Pendiente'
+      if (reason === 'Coincidencia') reason = 'Pendiente'
     }
 
+    let tokensHit = 0
     for (const token of tokens) {
-      if (text.includes(token)) score += token.length >= 4 ? 18 : 10
+      if (name.includes(token)) {
+        score += 24
+        tokensHit += 1
+        if (reason === 'Coincidencia') reason = 'Cliente'
+        continue
+      }
+      if (text.includes(token)) {
+        score += token.length >= 4 ? 16 : 9
+        tokensHit += 1
+      }
     }
+    if (tokens.length > 1 && tokensHit === tokens.length) score += 20
+
+    if (folded.length >= 3 && text.includes(folded)) score += 12
 
     if (score <= 0) continue
-    if (reason === 'Coincidencia' && item.cita?.nombre && text.includes(lower)) reason = 'Cliente'
-    else if (reason === 'Coincidencia' && item.descripcion && item.descripcion.toLowerCase().includes(lower)) {
+    if (reason === 'Coincidencia' && item.descripcion && fold(item.descripcion).includes(folded)) {
       reason = 'Avería'
     }
 
@@ -90,6 +141,11 @@ export function searchPeticionesAi(items: PeticionPendiente[], raw: string): AiS
 
   hits.sort((a, b) => b.score - a.score || String(b.item.fechainicio).localeCompare(String(a.item.fechainicio)))
   return hits
+}
+
+export function matchesTicketSearch(item: PeticionPendiente, raw: string): boolean {
+  if (!raw.trim()) return true
+  return searchPeticionesAi([item], raw).length > 0
 }
 
 export function headerNoticeItems(items: PeticionPendiente[]): PeticionPendiente[] {

@@ -1,6 +1,7 @@
 import { Phone } from 'lucide-react'
 import { formatAgendaTime } from '../lib/agendaGrouping'
 import { isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
+import { ticketClientLabel } from '../lib/ticketClient'
 
 type Props = {
   peticion: PeticionPendiente
@@ -10,9 +11,7 @@ type Props = {
 
 export default function PeticionQueueRow({ peticion: p, active, onSelect }: Props) {
   const pendiente = isPeticionPendiente(p)
-  const c = p.cita
-  const cliente = c ? [c.nombre, c.apellidos].filter(Boolean).join(' ') : null
-  const titulo = cliente || p.caller || 'Consulta sin nombre'
+  const titulo = ticketClientLabel(p)
   const tel = p.caller?.replace(/\s/g, '') ?? ''
   const telHref = tel ? `tel:${tel}` : null
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Coins, FileText, Mic, Phone, RefreshCw, Timer } from 'lucide-react'
 import Card from './ui/Card'
 import { CrmApiError, fetchCallCostStats, isCrmApiConfigured, type CallCostStats } from '../lib/crmApi'
+import { canSeeTelnyxCosts } from '../lib/crmRoles'
 import { fmtMoney, fmtSeconds } from '../lib/callFormat'
 
 function monthRange(): { from: string; to: string; label: string } {
@@ -29,6 +30,12 @@ export default function LauraCallCosts() {
   const window = useMemo(() => (range === 'month' ? monthRange() : last30()), [range])
 
   useEffect(() => {
+    if (!canSeeTelnyxCosts()) {
+      setLoading(false)
+      setError(null)
+      setStats(null)
+      return
+    }
     if (!isCrmApiConfigured()) {
       setLoading(false)
       setError('Falta VITE_CRM_API_URL para leer los costes de api-crm.')

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ArrowRight, CalendarCheck2, ClipboardList, Wrench } from 'lucide-react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
 import { HexLoaderScreen } from '../components/ui/HexLoader'
@@ -8,10 +8,15 @@ import { resolveDateRange } from '../lib/dateRangePresets'
 import { computePeticionesStats, formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
 import { isSlaCritico } from '../lib/tallerStations'
 import { useOperationalData } from '../hooks/useOperationalData'
+import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
+import { buildOwnerScopeContext, matchesOwnerScope, ownerScopeEmptyCopy, type OwnerScope } from '../lib/ownerScope'
+import OwnerScopeFilter from '../components/OwnerScopeFilter'
+import TicketClientBlock from '../components/TicketClientBlock'
 import type { Workshop } from '../types'
 
 type Props = {
   workshop: Workshop
+  currentUser: { name: string; email: string }
   onOpenTriage: () => void
   onOpenCalendar: () => void
   onOpenLead?: (peticion: PeticionPendiente) => void
@@ -20,6 +25,7 @@ type Props = {
 
 export default function DashboardGeneralView({
   workshop,
+  currentUser,
   onOpenTriage,
   onOpenCalendar,
   onOpenLead,
@@ -27,30 +33,45 @@ export default function DashboardGeneralView({
 }: Props) {
   const range = resolveDateRange('mes', '', '')
   const { items, loading, error, sourceNotice, refresh } = useOperationalData(workshop, range)
+  const workshopId = workshop.containerIdTaller || workshop.id
+  const { workspace } = useAdvisorWorkspace(workshopId, currentUser, true)
+  const [ownerScope, setOwnerScope] = useState<OwnerScope>('todas')
+  const ownerCtx = useMemo(
+    () => buildOwnerScopeContext(workspace, currentUser.email),
+    [workspace, currentUser.email],
+  )
+  const scopedItems = useMemo(
+    () => items.filter((item) => matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx)),
+    [items, ownerScope, ownerCtx],
+  )
 
   useEffect(() => {
     if (refreshToken > 0) void refresh()
   }, [refreshToken, refresh])
 
-  const stats = useMemo(() => computePeticionesStats(items), [items])
+  const stats = useMemo(() => computePeticionesStats(scopedItems), [scopedItems])
   const citasCount = useMemo(
-    () => items.reduce((n, item) => n + (item.cita?.fecha ? 1 : 0), 0),
-    [items],
+    () => scopedItems.reduce((n, item) => n + (item.cita?.fecha ? 1 : 0), 0),
+    [scopedItems],
   )
   const slaCount = useMemo(
     () =>
-      items.reduce((n, item) => {
+      scopedItems.reduce((n, item) => {
         if (item.gestionado) return n
         if (isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha)) return n + 1
         return n
       }, 0),
-    [items],
+    [scopedItems],
   )
 
   return (
     <div className="dashboard-page operational-dashboard">
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
       {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
+
+      <div className="elevator-filters glass glass-lite">
+        <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Tickets" />
+      </div>
 
       {!loading && slaCount > 0 ? (
         <aside className="ops-sla-alert glass glass-lite" role="alert" aria-live="polite">
@@ -114,15 +135,14 @@ export default function DashboardGeneralView({
           <div className="ops-feed-scroll custom-scrollbar-light">
             {loading ? (
               <HexLoaderScreen size="md" label="Cargando actividad…" />
-            ) : items.length === 0 ? (
-              <p className="section-subtitle ops-empty">No hay actividad en este periodo.</p>
+            ) : scopedItems.length === 0 ? (
+              <p className="section-subtitle ops-empty">
+                {items.length > 0 ? ownerScopeEmptyCopy(ownerScope) : 'No hay actividad en este periodo.'}
+              </p>
             ) : (
               <ul className="ops-feed-list">
-                {items.map((item) => {
+                {scopedItems.map((item) => {
                   const cita = item.cita
-                  const cliente = cita
-                    ? [cita.nombre, cita.apellidos].filter(Boolean).join(' ')
-                    : ''
                   return (
                     <li
                       key={item.idpeticion}
@@ -147,8 +167,8 @@ export default function DashboardGeneralView({
                           <span className="ops-feed-placeholder is-muted">SIN CITA</span>
                         )}
                         <div>
-                          <strong>{cliente || item.caller || 'Consulta sin nombre'}</strong>
-                          <span>{item.tipopeticion || 'Sin tipo'} · {item.caller || 'Sin teléfono'}</span>
+                          <TicketClientBlock peticion={item} size="sm" />
+                          <span>{item.tipopeticion || 'Sin tipo'}</span>
                         </div>
                       </div>
                       <span className={`badge ${item.gestionado ? 'tone-positive' : 'tone-warning'}`}>

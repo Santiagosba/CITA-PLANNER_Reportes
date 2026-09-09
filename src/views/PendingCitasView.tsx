@@ -33,6 +33,10 @@ import {
   type TipoPeticionRow,
 } from '../lib/peticionesPendientes'
 import { isSlaCritico, matchesChannelText } from '../lib/tallerStations'
+import { matchesTicketSearch } from '../lib/aiHeaderSearch'
+import TicketClientBlock from '../components/TicketClientBlock'
+import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
+import { buildOwnerScopeContext, matchesOwnerScope, ownerScopeEmptyCopy, type OwnerScope } from '../lib/ownerScope'
 import {
   COPY_FALLBACK_NOTICE,
   loadPeticionesCopy,
@@ -44,6 +48,7 @@ import { invalidateOperationalData } from '../hooks/useOperationalData'
 
 type Props = {
   workshop: Workshop
+  currentUser: { name: string; email: string }
   isDarkMode?: boolean
   initialTab?: TabId
   initialSlaOnly?: boolean
@@ -55,6 +60,7 @@ type TabId = 'kanban' | 'tabla' | 'calendario'
 
 export default function PendingCitasView({
   workshop,
+  currentUser,
   initialTab = 'kanban',
   initialSlaOnly = false,
   onOpenLead,
@@ -76,10 +82,16 @@ export default function PendingCitasView({
   const [datePreset, setDatePreset] = useState<DateRangePreset>('mes')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
-  const [debouncedCaller, setDebouncedCaller] = useState('')
   const [channel, setChannel] = useState('voz-wa')
   const [slaOnly, setSlaOnly] = useState(initialSlaOnly)
   const [estado, setEstado] = useState<EstadoFilter>('faltan')
+  const [ownerScope, setOwnerScope] = useState<OwnerScope>('todas')
+  const workshopId = workshop.containerIdTaller || workshop.id
+  const { workspace } = useAdvisorWorkspace(workshopId, currentUser, true)
+  const ownerCtx = useMemo(
+    () => buildOwnerScopeContext(workspace, currentUser.email),
+    [workspace, currentUser.email],
+  )
   const [agendaDay, setAgendaDay] = useState(() => {
     const now = new Date()
     now.setHours(0, 0, 0, 0)
@@ -95,13 +107,6 @@ export default function PendingCitasView({
     setSlaOnly(initialSlaOnly)
   }, [initialSlaOnly])
 
-  // Buscador de teléfono: espera a que el asesor deje de teclear (evita 1 petición por tecla)
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedCaller(callerFilter.trim()), 350)
-    return () => clearTimeout(t)
-  }, [callerFilter])
-
-  const effectiveCaller = debouncedCaller || undefined
   const dateRange = useMemo(
     () => resolveDateRange(datePreset, customFrom, customTo),
     [datePreset, customFrom, customTo],
@@ -148,7 +153,6 @@ export default function PendingCitasView({
         return
       }
       const rows = await fetchPendingPeticiones(resolved.ids, {
-        caller: effectiveCaller,
         tipoPeticionId: tipoFilter === '' ? null : tipoFilter,
         from: dateRange.from,
         to: dateRange.to,
@@ -178,7 +182,7 @@ export default function PendingCitasView({
     } finally {
       setLoading(false)
     }
-  }, [getResolvedTallerIds, effectiveCaller, tipoFilter, dateRange.from, dateRange.to, workshop])
+  }, [getResolvedTallerIds, tipoFilter, dateRange.from, dateRange.to, workshop])
 
   useEffect(() => {
     void load()
@@ -193,9 +197,11 @@ export default function PendingCitasView({
       const text = `${p.tipopeticion || ''} ${p.descripcion || ''} ${p.cita?.marca || ''} ${p.cita?.modelo || ''} ${p.cita?.asunto || ''}`
       if (!matchesChannelText(text, channel)) return false
       if (slaOnly && !isSlaCritico(p.fechainicio) && !isSlaCritico(p.cita?.fecha)) return false
+      if (!matchesOwnerScope(p.gestionemail, ownerScope, ownerCtx)) return false
+      if (!matchesTicketSearch(p, callerFilter)) return false
       return true
     },
-    [channel, slaOnly],
+    [channel, slaOnly, ownerScope, ownerCtx, callerFilter],
   )
 
   const scopedItems = useMemo(() => items.filter(matchesScopeFilters), [items, matchesScopeFilters])
@@ -282,6 +288,8 @@ export default function PendingCitasView({
           fecha: cita.fecha,
           nombre: cita.nombre,
           apellidos: cita.apellidos,
+          razonSocial: cita.razonSocial,
+          contacto: cita.contacto,
           matricula: cita.matricula,
           marca: cita.marca,
           modelo: cita.modelo,
@@ -358,6 +366,10 @@ export default function PendingCitasView({
         channel={channel}
         slaOnly={slaOnly}
         estado={estado}
+        ownerScope={ownerScope}
+        onOwnerScopeChange={setOwnerScope}
+        search={callerFilter}
+        onSearchChange={setCallerFilter}
         onPresetChange={handlePresetChange}
         onCustomFromChange={setCustomFrom}
         onCustomToChange={setCustomTo}
@@ -424,12 +436,12 @@ export default function PendingCitasView({
         <div className="queue-full">
           <div className="queue-filterbar glass glass-lite card-pad-sm">
             <label className="queue-filter-search">
-              <span className="field-label">Buscar teléfono</span>
+              <span className="field-label">Buscar</span>
               <div className="relative">
                 <Search size={18} className="field-input-icon" aria-hidden />
                 <input
                   type="text"
-                  placeholder="612 345 678"
+                  placeholder="Cliente, teléfono, matrícula o avería"
                   value={callerFilter}
                   onChange={(e) => setCallerFilter(e.target.value)}
                   className="field-input"
@@ -459,16 +471,20 @@ export default function PendingCitasView({
             <Card className="glass glass-lite agenda-empty">
               <p className="section-title" style={{ fontSize: 'var(--font-lg)' }}>
                 {items.length > 0
-                  ? estado === 'hechas'
-                    ? 'Aún no hay consultas hechas'
-                    : 'Nada pendiente'
+                  ? ownerScope !== 'todas'
+                    ? ownerScopeEmptyCopy(ownerScope)
+                    : estado === 'hechas'
+                      ? 'Aún no hay consultas hechas'
+                      : 'Nada pendiente'
                   : 'Sin consultas en este periodo'}
               </p>
               <p className="section-subtitle mt-2">
                 {items.length > 0
-                  ? estado === 'hechas'
-                    ? `Faltan ${stats.porHacer} por terminar.`
-                    : `Hay ${stats.hechas} hechas. Cambia el filtro a «Hechas» o «Todas» para verlas.`
+                  ? ownerScope !== 'todas'
+                    ? 'Prueba «Todas» o cambia el dueño.'
+                    : estado === 'hechas'
+                      ? `Faltan ${stats.porHacer} por terminar.`
+                      : `Hay ${stats.hechas} hechas. Cambia el filtro a «Hechas» o «Todas» para verlas.`
                   : 'Prueba «Ver todo» o amplía el rango de fechas.'}
               </p>
             </Card>
@@ -535,7 +551,7 @@ export default function PendingCitasView({
               <table className="report-table">
                 <thead>
                   <tr>
-                    <th>Cliente / Teléfono</th>
+                    <th>Cliente</th>
                     <th>Matrícula</th>
                     <th>Tipo</th>
                     <th>Consulta</th>
@@ -546,7 +562,6 @@ export default function PendingCitasView({
                 <tbody>
                   {reportItems.map((p, index) => {
                     const c = p.cita
-                    const cliente = c ? [c.nombre, c.apellidos].filter(Boolean).join(' ') : null
                     const hecha = Boolean(p.gestionado)
                     return (
                       <tr
@@ -565,8 +580,7 @@ export default function PendingCitasView({
                         }}
                       >
                         <td>
-                          <strong>{cliente || p.caller || '—'}</strong>
-                          {p.caller && cliente ? <div className="text-[var(--muted)]">{p.caller}</div> : null}
+                          <TicketClientBlock peticion={p} size="sm" />
                         </td>
                         <td>{c?.matricula ? <VehiclePlate value={c.matricula} compact /> : '—'}</td>
                         <td>{p.tipopeticion ?? '—'}</td>
