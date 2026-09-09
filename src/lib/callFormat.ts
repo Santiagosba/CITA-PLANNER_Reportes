@@ -81,29 +81,52 @@ export function estadoLabel(estado: string | null | undefined, answered: boolean
   }
 }
 
+const TRANSCRIPT_HEADING = /^transcripci[oó]n de la llamada$/i
+const SUMMARY_HEADING = /^(resumen|titular)\b/i
+const SPEAKER_LINE = /^(Asesor|Cliente):\s*(.*)$/i
+
+/** Separa el diálogo (Asesor/Cliente) del párrafo de resumen que api-crm puede añadir. */
+export function splitStoredNotes(text: string | null | undefined): {
+  lines: TranscriptLine[]
+  summary: string | null
+} {
+  if (!text?.trim()) return { lines: [], summary: null }
+  const lines: TranscriptLine[] = []
+  const summaryParts: string[] = []
+  let inSummary = false
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim()
+    if (!line || TRANSCRIPT_HEADING.test(line)) continue
+    if (SUMMARY_HEADING.test(line) && lines.length > 0) {
+      inSummary = true
+      const rest = line.replace(SUMMARY_HEADING, '').replace(/^[:.\s-]+/, '').trim()
+      if (rest) summaryParts.push(rest)
+      continue
+    }
+    const match = SPEAKER_LINE.exec(line)
+    if (match && !inSummary) {
+      lines.push({
+        id: `s${lines.length}`,
+        speaker: match[1].toLowerCase() === 'asesor' ? 'asesor' : 'cliente',
+        text: match[2],
+        final: true,
+        at: '',
+      })
+      continue
+    }
+    if (lines.length === 0 || inSummary) summaryParts.push(line)
+  }
+  const summary = summaryParts.join(' ').replace(/\s+/g, ' ').trim()
+  return { lines, summary: summary || null }
+}
+
 /** Convierte las notas guardadas («Asesor: … / Cliente: …») en líneas de transcripción. */
 export function parseStoredTranscript(text: string | null | undefined): TranscriptLine[] {
-  if (!text) return []
-  const out: TranscriptLine[] = []
-  const rows = text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line && !/^transcripci[oó]n de la llamada$/i.test(line))
-  rows.forEach((line, index) => {
-    const match = /^(Asesor|Cliente):\s*(.*)$/i.exec(line)
-    out.push({
-      id: `s${index}`,
-      speaker: match ? (match[1].toLowerCase() === 'asesor' ? 'asesor' : 'cliente') : 'cliente',
-      text: match ? match[2] : line,
-      final: true,
-      at: '',
-    })
-  })
-  return out
+  return splitStoredNotes(text).lines
 }
 
 export function hasStoredTranscript(text: string | null | undefined): boolean {
-  return /transcripci[oó]n/i.test(text || '') && /(Asesor|Cliente):/i.test(text || '')
+  return splitStoredNotes(text).lines.length > 0
 }
 
 const PRODUCT_LABELS: Record<string, string> = {

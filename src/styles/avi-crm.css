@@ -7288,6 +7288,13 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   margin: 0;
 }
 
+.lead-transcript-summary {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  color: var(--muted);
+}
+
 .lead-modal-footer {
   flex-shrink: 0;
   display: flex;

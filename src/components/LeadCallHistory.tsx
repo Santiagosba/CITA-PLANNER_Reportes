@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { FileText, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, Play, RefreshCw } from 'lucide-react'
 import { CrmApiError, fetchRecordingUrl, type CustomerCallItem } from '../lib/crmApi'
 import { formatFecha } from '../lib/peticionesPendientes'
+import { hasStoredTranscript, splitStoredNotes } from '../lib/callFormat'
 import { phoneTail, useSoftphone, type TranscriptLine } from '../lib/softphone'
 import type { useCustomerCalls } from '../hooks/useCustomerCalls'
 
@@ -15,7 +16,7 @@ function fmtSecs(total: number | null | undefined): string {
 }
 
 function hasTranscript(item: CustomerCallItem): boolean {
-  return /transcripci[oó]n/i.test(item.resumen || '')
+  return hasStoredTranscript(item.resumen) || splitStoredNotes(item.resumen).summary != null
 }
 
 type HistoryProps = {
@@ -194,23 +195,19 @@ function LiveLines({ lines }: { lines: TranscriptLine[] }) {
   )
 }
 
-function StoredLines({ text }: { text: string }) {
-  const lines = text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line && !/^transcripci[oó]n de la llamada$/i.test(line))
+function StoredNotes({ text }: { text: string }) {
+  const { lines, summary } = splitStoredNotes(text)
+  if (lines.length === 0 && !summary) {
+    return <p className="lead-voice-hint">Esta llamada no tiene transcripción guardada.</p>
+  }
   return (
     <div className="lead-transcript">
-      {lines.map((line, index) => {
-        const match = /^(Asesor|Cliente):\s*(.*)$/.exec(line)
-        return match ? (
-          <p key={index}>
-            <strong>{match[1]}:</strong> {match[2]}
-          </p>
-        ) : (
-          <p key={index}>{line}</p>
-        )
-      })}
+      {lines.map((line) => (
+        <p key={line.id}>
+          <strong>{line.speaker === 'asesor' ? 'Asesor:' : 'Cliente:'}</strong> {line.text}
+        </p>
+      ))}
+      {summary ? <p className="lead-transcript-summary">{summary}</p> : null}
     </div>
   )
 }
@@ -239,8 +236,8 @@ export function LeadCallTranscript({ phone, selected }: TranscriptProps) {
         <p className="lead-info-eyebrow">
           Llamada del {formatFecha(selected.fecha)} · {selected.agente || 'Asesor'} · {fmtSecs(selected.duracionSeg)}
         </p>
-        {hasTranscript(selected) ? (
-          <StoredLines text={selected.resumen} />
+        {hasTranscript(selected) || selected.resumen?.trim() ? (
+          <StoredNotes text={selected.resumen} />
         ) : (
           <p className="lead-voice-hint">Esta llamada no tiene transcripción guardada.</p>
         )}

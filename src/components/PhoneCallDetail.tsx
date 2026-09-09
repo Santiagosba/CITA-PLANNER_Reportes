@@ -29,8 +29,7 @@ import {
   fmtMoney,
   fmtSeconds,
   hangupLabel,
-  hasStoredTranscript,
-  parseStoredTranscript,
+  splitStoredNotes,
   productLabel,
 } from '../lib/callFormat'
 import type { FinishedCall, TranscriptLine } from '../lib/softphone'
@@ -202,10 +201,10 @@ export default function PhoneCallDetail({ call, onBack, onCall }: Props) {
   const Icon = missed ? PhoneMissed : call.direction === 'incoming' ? PhoneIncoming : PhoneOutgoing
   const duration = detail?.duracion_seg ?? call.durationSec
   const cost = detail?.cost ?? null
-  const transcript: TranscriptLine[] = detail && hasStoredTranscript(detail.notas)
-    ? parseStoredTranscript(detail.notas)
-    : call.transcript
-  const summary = detail && detail.notas && !hasStoredTranscript(detail.notas) ? detail.notas : null
+  const stored = splitStoredNotes(detail?.notas)
+  const transcript: TranscriptLine[] =
+    stored.lines.length >= (call.transcript?.length ?? 0) ? stored.lines : call.transcript
+  const summary = stored.summary || (stored.lines.length === 0 ? detail?.notas || null : null)
 
   return (
     <section className="phone-detail" aria-label="Detalle de la llamada">

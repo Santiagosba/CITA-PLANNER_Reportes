@@ -157,6 +157,16 @@ const TRANSCRIPTION_TIMEOUT_MS = 45_000
 
 let legSyncForCall: string | null = null
 let transcriptionTimeoutTimer = 0
+/** Tras colgar, Deepgram aún puede mandar el último turno: lo recogemos unos segundos. */
+const HANGUP_FLUSH_MS = 3_000
+let hangupFlushTimer = 0
+let hangupFlush: {
+  logId: string
+  callControlId: string | null
+  sessionId: string | null
+  legControlId: string | null
+  legSessionId: string | null
+} | null = null
 
 /**
  * Sincroniza la transcripción con api-crm cuando la llamada ya está contestada:
@@ -282,10 +292,14 @@ function loadHistory(): FinishedCall[] {
 
 function saveHistory(history: FinishedCall[]) {
   try {
-    // La transcripción ya viaja a api-crm; en local guardamos solo la constancia.
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(history.map((c) => ({ ...c, transcript: [] }))))
+    // Guardamos el diálogo completo: api-crm a veces pisa `notas` con un resumen de IA.
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
   } catch {
-    /* sin espacio o modo privado: seguimos sin persistir */
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history.map((c) => ({ ...c, transcript: [] }))))
+    } catch {
+      /* sin espacio o modo privado: seguimos sin persistir */
+    }
   }
 }
 
@@ -433,9 +447,15 @@ export function phoneTail(raw: string | null | undefined): string {
 /** Transcripción en texto plano, lista para guardar en notas. */
 export function transcriptToText(lines: TranscriptLine[]): string {
   return lines
-    .filter((line) => line.final && line.text.trim())
+    .filter((line) => line.text.trim())
     .map((line) => `${line.speaker === 'asesor' ? 'Asesor' : 'Cliente'}: ${line.text.trim()}`)
     .join('\n')
+}
+
+function persistTranscriptNotes(logId: string | null, lines: TranscriptLine[]) {
+  const transcriptText = transcriptToText(lines)
+  if (!logId || !transcriptText) return
+  void patchCallLog(logId, { notas: `Transcripción de la llamada\n${transcriptText}` }).catch(() => undefined)
 }
 
 function ensureRemoteAudio(): HTMLAudioElement {
@@ -469,14 +489,21 @@ function finishCall(cause?: string) {
   const current = state.call
   rtcCall = null
   window.clearTimeout(transcriptionTimeoutTimer)
+  window.clearTimeout(hangupFlushTimer)
   legSyncForCall = null
-  clearCrmSocketCallSubscriptions()
-  if (!current) return
+  if (!current) {
+    clearCrmSocketCallSubscriptions()
+    hangupFlush = null
+    return
+  }
 
   const endedAt = Date.now()
   const answered = current.answeredAt
   const duration = answered ? Math.max(0, Math.round((endedAt - answered) / 1000)) : 0
-  const transcriptText = transcriptToText(current.transcript)
+  const finalized = current.transcript
+    .filter((line) => line.text.trim())
+    .map((line) => ({ ...line, final: true }))
+  persistTranscriptNotes(current.logId, finalized)
 
   if (current.logId) {
     const estado = answered
@@ -492,8 +519,23 @@ function finishCall(cause?: string) {
       fecha_fin: new Date(endedAt).toISOString(),
       duracion_seg: duration,
       ...(cause ? { hangup_cause: cause } : {}),
-      ...(transcriptText ? { notas: `Transcripción de la llamada\n${transcriptText}` } : {}),
     }).catch(() => undefined)
+    hangupFlush = {
+      logId: current.logId,
+      callControlId: current.callControlId,
+      sessionId: current.sessionId,
+      legControlId: current.legControlId,
+      legSessionId: current.legSessionId,
+    }
+    hangupFlushTimer = window.setTimeout(() => {
+      const latest = state.lastCall
+      if (latest?.logId === current.logId) persistTranscriptNotes(current.logId, latest.transcript)
+      hangupFlush = null
+      clearCrmSocketCallSubscriptions()
+    }, HANGUP_FLUSH_MS)
+  } else {
+    hangupFlush = null
+    clearCrmSocketCallSubscriptions()
   }
 
   const finished: FinishedCall = {
@@ -505,7 +547,7 @@ function finishCall(cause?: string) {
     answered: Boolean(answered),
     durationSec: duration,
     endedAt,
-    transcript: current.transcript.filter((line) => line.final),
+    transcript: finalized,
     hangupCause: cause || null,
   }
   const history = [finished, ...state.history].slice(0, HISTORY_MAX)
@@ -637,34 +679,55 @@ function onNotification(n: INotification) {
  * cliente; comparte `call_session_id` con nuestra pata WebRTC.
  * `inbound` = voz del cliente, `outbound` = voz del asesor.
  */
+function applyTranscriptLine(
+  lines: TranscriptLine[],
+  evt: TranscriptionEvent,
+): TranscriptLine[] {
+  const text = evt.transcript.trim()
+  if (!text) return lines
+  const speaker: TranscriptSpeaker = evt.transcription_track === 'outbound' ? 'asesor' : 'cliente'
+  const next = lines.slice()
+  const lastIdx = next.length - 1
+  const last = next[lastIdx]
+  if (last && !last.final && last.speaker === speaker) {
+    next[lastIdx] = { ...last, text, final: evt.is_final, at: evt.timestamp }
+  } else {
+    next.push({ id: `t${++lineSeq}`, speaker, text, final: evt.is_final, at: evt.timestamp })
+  }
+  return next
+}
+
 function onTranscription(evt: TranscriptionEvent) {
   const current = state.call
-  if (!current || current.phase === 'ending') return
-  const known = knownTelnyxIds(current)
   const eventIds = [evt.call_control_id, evt.call_leg_id, evt.call_session_id].filter(isTelnyxId)
-  const matches = eventIds.some((id) => known.includes(id))
-  // Sin ids todavía (Telnyx aún no los ha mandado al SDK ni api-crm ha enlazado
-  // la fila) aceptamos el evento: el socket sólo trae nuestras llamadas.
-  if (!matches && known.length > 0) return
+  const matchesCall = (ids: string[]) => eventIds.some((id) => ids.includes(id)) || ids.length === 0
 
-  const text = evt.transcript.trim()
-  if (!text) return
-
-  if (current.transcription !== 'live') {
-    window.clearTimeout(transcriptionTimeoutTimer)
-    patchCall({ transcription: 'live' })
+  if (current && current.phase !== 'ending') {
+    if (!matchesCall(knownTelnyxIds(current))) return
+    if (!evt.transcript.trim()) return
+    if (current.transcription !== 'live') {
+      window.clearTimeout(transcriptionTimeoutTimer)
+      patchCall({ transcription: 'live' })
+    }
+    patchCall({ transcript: applyTranscriptLine(current.transcript, evt) })
+    return
   }
-  const speaker: TranscriptSpeaker = evt.transcription_track === 'outbound' ? 'asesor' : 'cliente'
-  const lines = current.transcript.slice()
-  const lastIdx = lines.length - 1
-  const last = lines[lastIdx]
 
-  if (last && !last.final && last.speaker === speaker) {
-    lines[lastIdx] = { ...last, text, final: evt.is_final, at: evt.timestamp }
-  } else {
-    lines.push({ id: `t${++lineSeq}`, speaker, text, final: evt.is_final, at: evt.timestamp })
-  }
-  patchCall({ transcript: lines })
+  const finished = state.lastCall
+  if (!finished || !hangupFlush || finished.logId !== hangupFlush.logId) return
+  const lingeringIds = [
+    hangupFlush.callControlId,
+    hangupFlush.sessionId,
+    hangupFlush.legControlId,
+    hangupFlush.legSessionId,
+  ].filter(isTelnyxId)
+  if (!matchesCall(lingeringIds)) return
+  const lines = applyTranscriptLine(finished.transcript, evt).map((line) => ({ ...line, final: true }))
+  const history = state.history.map((item) =>
+    item.logId === finished.logId && item.endedAt === finished.endedAt ? { ...item, transcript: lines } : item,
+  )
+  saveHistory(history)
+  setState({ lastCall: { ...finished, transcript: lines }, history })
 }
 
 async function doConnect(): Promise<void> {
