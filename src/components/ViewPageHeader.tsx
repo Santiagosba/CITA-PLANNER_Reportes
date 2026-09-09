@@ -47,10 +47,15 @@ function pageCopy(
   }
   switch (route) {
     case 'dashboard-general':
-      return {
-        title: 'Dashboard General & Control Operativo',
-        subtitle: 'Visión ejecutiva de llamadas, derivaciones a taller y estado de boxes',
-      }
+      return appRole === 'asesor'
+        ? {
+            title: 'Dashboard',
+            subtitle: 'Tus tareas de hoy y el volumen de consultas del día, la semana, el mes o el año.',
+          }
+        : {
+            title: 'Dashboard',
+            subtitle: 'Tareas de hoy, volumen del taller y trabajo del equipo por periodo.',
+          }
     case 'pending-citas':
       return {
         title: 'Triage operativo',

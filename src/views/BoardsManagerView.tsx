@@ -30,6 +30,9 @@ import { useOperationalData } from '../hooks/useOperationalData'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
 import { buildOwnerScopeContext, matchesOwnerScope, type OwnerScope } from '../lib/ownerScope'
 import OwnerScopeFilter from '../components/OwnerScopeFilter'
+import TicketOwnerPicker from '../components/TicketOwnerPicker'
+import type { CrmAppRole } from '../lib/crmRoles'
+import type { AdvisorWorkspace } from '../lib/advisorWorkspace'
 import type { Workshop } from '../types'
 
 type DepartmentId = 'mechanics' | 'bodywork' | 'insurance' | 'parts' | 'sales'
@@ -130,6 +133,7 @@ const LIFT_PX = 6
 type Props = {
   workshop: Workshop
   currentUser: { name: string; email: string }
+  appRole?: CrmAppRole
   onOpenLead?: (peticion: PeticionPendiente) => void
   refreshToken?: number
 }
@@ -440,11 +444,19 @@ const BoardTicket = memo(function BoardTicket({
   column,
   ghost,
   onPointerDown,
+  workshop,
+  workspace,
+  currentUser,
+  appRole,
 }: {
   card: BoardCard
   column: PriorityColumn
   ghost?: boolean
   onPointerDown?: (e: ReactPointerEvent<HTMLElement>) => void
+  workshop: Workshop
+  workspace: AdvisorWorkspace
+  currentUser: { name: string; email: string }
+  appRole: CrmAppRole
 }) {
   const id = cardId(card)
   const tone = badgeTone(column.tone)
@@ -509,6 +521,14 @@ const BoardTicket = memo(function BoardTicket({
       <span className="kanban-card-meta">{item.tipopeticion || 'Sin tipo'}</span>
       {vehicle ? <span className="kanban-card-meta">{vehicle}</span> : null}
       {item.descripcion ? <p className="kanban-card-desc">{item.descripcion}</p> : null}
+      <TicketOwnerPicker
+        workshop={workshop}
+        workspace={workspace}
+        currentUser={currentUser}
+        appRole={appRole}
+        peticion={item}
+        compact
+      />
       <footer>
         <time>{formatFecha(item.fechainicio)}</time>
         <span title={urgency.reasons.join(' · ') || 'Fórmula de urgencia'}>Urgencia {urgency.score}</span>
@@ -520,6 +540,7 @@ const BoardTicket = memo(function BoardTicket({
 export default function BoardsManagerView({
   workshop,
   currentUser,
+  appRole = 'asesor',
   onOpenLead,
   refreshToken = 0,
 }: Props) {
@@ -527,7 +548,10 @@ export default function BoardsManagerView({
   const { items, loading, error, sourceNotice, refresh } = useOperationalData(workshop, range)
   const workshopKey = workshop.containerIdTaller || workshop.id
   const { workspace } = useAdvisorWorkspace(workshopKey, currentUser, true)
-  const [ownerScope, setOwnerScope] = useState<OwnerScope>('todas')
+  const [ownerScope, setOwnerScope] = useState<OwnerScope>(appRole === 'asesor' ? 'grupo' : 'todas')
+  useEffect(() => {
+    setOwnerScope(appRole === 'asesor' ? 'grupo' : 'todas')
+  }, [appRole])
   const ownerCtx = useMemo(
     () => buildOwnerScopeContext(workspace, currentUser.email),
     [workspace, currentUser.email],
@@ -1068,6 +1092,10 @@ export default function BoardsManagerView({
                       key={cardId(card)}
                       card={card}
                       column={column}
+                      workshop={workshop}
+                      workspace={workspace}
+                      currentUser={currentUser}
+                      appRole={appRole}
                     />
                   ))
                 )}

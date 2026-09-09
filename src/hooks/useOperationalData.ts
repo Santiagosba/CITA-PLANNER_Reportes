@@ -8,6 +8,8 @@ import {
   type PeticionPendiente,
   type TipoPeticionRow,
 } from '../lib/peticionesPendientes'
+import { DEMO_TICKETS_NOTICE, isDemoTicketId, mergeLiveAndDemoTickets } from '../lib/demoTickets'
+import { PETICIONES_PATCHED_EVENT } from '../lib/ticketOps'
 import {
   COPY_FALLBACK_NOTICE,
   loadPeticionesCopy,
@@ -41,13 +43,16 @@ function requestKey(workshop: Workshop, range: DateRange): string {
 async function fetchData(workshop: Workshop, range: DateRange): Promise<CacheEntry> {
   const resolved = await resolveAvioldTallerIdsDetailed(workshop)
   if (!resolved.ids.length) {
-    throw new Error('No encontramos este taller en el sistema.')
+    const items = mergeLiveAndDemoTickets([], workshop, range)
+    if (!items.length) throw new Error('No encontramos este taller en el sistema.')
+    return { timestamp: Date.now(), items, tipos: [] }
   }
 
-  const [items, tipos] = await Promise.all([
+  const [live, tipos] = await Promise.all([
     fetchPendingPeticiones(resolved.ids, range),
     fetchTiposPeticion(),
   ])
+  const items = mergeLiveAndDemoTickets(live, workshop, range)
 
   return { timestamp: Date.now(), items, tipos }
 }
@@ -90,14 +95,18 @@ export function useOperationalData(workshop: Workshop, range: DateRange) {
         cache.set(key, data)
         setItems(data.items)
         setTipos(data.tipos)
-        setSourceNotice(getPeticionesSourceNotice())
-        savePeticionesCopy(workshopCopyId(workshop), data.items)
+        const liveOnly = data.items.filter((row) => !isDemoTicketId(row.idpeticion))
+        const apiNotice = getPeticionesSourceNotice()
+        const hasDemo = liveOnly.length < data.items.length
+        setSourceNotice([apiNotice, hasDemo ? DEMO_TICKETS_NOTICE : null].filter(Boolean).join(' ') || null)
+        savePeticionesCopy(workshopCopyId(workshop), liveOnly)
       } catch (e) {
-        const copy = loadPeticionesCopy(workshopCopyId(workshop))
-        if (copy?.length) {
-          setItems(copy)
+        const copy = loadPeticionesCopy(workshopCopyId(workshop)) ?? []
+        const merged = mergeLiveAndDemoTickets(copy, workshop, range)
+        if (merged.length) {
+          setItems(merged)
           setError(null)
-          setSourceNotice(COPY_FALLBACK_NOTICE)
+          setSourceNotice(copy.length ? COPY_FALLBACK_NOTICE : DEMO_TICKETS_NOTICE)
         } else {
           setError(e instanceof Error ? e.message : 'No se pudieron cargar los datos')
         }
@@ -112,6 +121,20 @@ export function useOperationalData(workshop: Workshop, range: DateRange) {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    const onPatch = (event: Event) => {
+      const detail = (event as CustomEvent<{ idpeticion?: string; patch?: Partial<PeticionPendiente> }>).detail
+      if (!detail?.idpeticion || !detail.patch) return
+      const apply = (rows: PeticionPendiente[]) =>
+        rows.map((row) => (row.idpeticion === detail.idpeticion ? { ...row, ...detail.patch } : row))
+      setItems((prev) => apply(prev))
+      const entry = cache.get(key)
+      if (entry) cache.set(key, { ...entry, items: apply(entry.items) })
+    }
+    window.addEventListener(PETICIONES_PATCHED_EVENT, onPatch)
+    return () => window.removeEventListener(PETICIONES_PATCHED_EVENT, onPatch)
+  }, [key])
 
   return useMemo(
     () => ({

@@ -48,6 +48,7 @@ export const ADMIN_SHELL_ROUTES: DashboardShellRoute[] = [
   'pending-citas',
   'equipos',
   'asignar-tarea',
+  'tareas-hoy',
   'stats-equipo',
   'boards',
   'laura',

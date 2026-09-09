@@ -7,7 +7,6 @@ import {
   normalizeEmail,
   personByEmail,
   personById,
-  teamForPerson,
   type AdvisorWorkspace,
   type AssignedTask,
 } from './advisorWorkspace'
@@ -33,13 +32,15 @@ export function buildOwnerScopeContext(
 ): OwnerScopeContext {
   const myEmail = normalizeEmail(email)
   const me = personByEmail(workspace, myEmail)
-  const team = me ? teamForPerson(workspace, me.id) : undefined
   const teamEmails = new Set<string>()
-  if (team) {
-    for (const memberId of team.memberIds) {
-      const person = personById(workspace, memberId)
-      const memberEmail = normalizeEmail(person?.email ?? '')
-      if (memberEmail && memberEmail !== myEmail) teamEmails.add(memberEmail)
+  if (me) {
+    for (const team of workspace.teams) {
+      if (!team.memberIds.includes(me.id)) continue
+      for (const memberId of team.memberIds) {
+        const person = personById(workspace, memberId)
+        const memberEmail = normalizeEmail(person?.email ?? '')
+        if (memberEmail && memberEmail !== myEmail) teamEmails.add(memberEmail)
+      }
     }
   }
   return { myEmail, teamEmails }
@@ -62,7 +63,9 @@ export function matchesOwnerScope(
   ctx: OwnerScopeContext,
 ): boolean {
   if (scope === 'todas') return true
-  return classifyOwnerEmail(email, ctx) === scope
+  const kind = classifyOwnerEmail(email, ctx)
+  if (scope === 'grupo') return kind === 'mias' || kind === 'grupo'
+  return kind === scope
 }
 
 export function taskOwnerEmail(workspace: AdvisorWorkspace, task: AssignedTask): string | null {
@@ -84,7 +87,7 @@ export function ownerScopeEmptyCopy(scope: OwnerScope): string {
     case 'mias':
       return 'No hay nada tuyo en este periodo.'
     case 'grupo':
-      return 'Nadie de tu grupo tiene tickets o tareas aquí.'
+      return 'No hay tickets o tareas de tu equipo.'
     case 'companeros':
       return 'No hay nada de otros compañeros en este periodo.'
     case 'sin_dueno':

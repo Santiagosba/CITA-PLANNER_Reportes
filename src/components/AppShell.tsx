@@ -28,6 +28,7 @@ const ADMIN_NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] 
   { id: 'pending-citas', label: 'Triage operativo', icon: ClipboardList },
   { id: 'equipos', label: 'Equipos', icon: Users },
   { id: 'asignar-tarea', label: 'Asignar tarea', icon: UserPlus },
+  { id: 'tareas-hoy', label: 'Tareas de hoy', icon: CalendarCheck2 },
   { id: 'stats-equipo', label: 'Estadísticas', icon: BarChart3 },
   { id: 'boards', label: 'Gestor de tableros', icon: Columns3 },
   { id: 'laura', label: 'Asistente de IA Laura', icon: Sparkles },

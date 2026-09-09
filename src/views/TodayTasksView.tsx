@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CalendarCheck2, CheckCircle2 } from 'lucide-react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
 import { HexLoaderScreen } from '../components/ui/HexLoader'
@@ -12,6 +12,8 @@ import {
   personById,
 } from '../lib/advisorWorkspace'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
+import { teammatesForReassign } from '../lib/ticketOps'
+import type { CrmAppRole } from '../lib/crmRoles'
 import { useOperationalData } from '../hooks/useOperationalData'
 import {
   buildOwnerScopeContext,
@@ -25,16 +27,20 @@ import type { Workshop } from '../types'
 type Props = {
   workshop: Workshop
   currentUser: { name: string; email: string }
+  appRole?: CrmAppRole
   onOpenLead: (peticion: PeticionPendiente) => void
 }
 
-export default function TodayTasksView({ workshop, currentUser, onOpenLead }: Props) {
+export default function TodayTasksView({ workshop, currentUser, appRole = 'asesor', onOpenLead }: Props) {
   const workshopId = workshop.containerIdTaller || workshop.id
-  const { workspace, setTaskStatus } = useAdvisorWorkspace(workshopId, currentUser, true)
+  const { workspace, setTaskStatus, setTaskAssignee } = useAdvisorWorkspace(workshopId, currentUser, true)
   const today = localTodayIso()
   const range = resolveDateRange('mes', '', '')
   const { items, loading, error, sourceNotice } = useOperationalData(workshop, range)
-  const [ownerScope, setOwnerScope] = useState<OwnerScope>('mias')
+  const [ownerScope, setOwnerScope] = useState<OwnerScope>(appRole === 'asesor' ? 'grupo' : 'todas')
+  useEffect(() => {
+    setOwnerScope(appRole === 'asesor' ? 'grupo' : 'todas')
+  }, [appRole])
   const ownerCtx = useMemo(
     () => buildOwnerScopeContext(workspace, currentUser.email),
     [workspace, currentUser.email],
@@ -86,7 +92,9 @@ export default function TodayTasksView({ workshop, currentUser, onOpenLead }: Pr
           <div>
             <p className="section-eyebrow">Bandeja</p>
             <h2 className="ops-card-title">Tareas de hoy</h2>
-            <p className="section-subtitle">Las tuyas, las del grupo, las de compañeros o las que no tienen dueño.</p>
+            <p className="section-subtitle">
+              Las tuyas y las del equipo. Si un compañero está de baja o el cliente lo atendió otro, pásasela.
+            </p>
           </div>
           <CalendarCheck2 size={22} aria-hidden style={{ color: 'var(--color-brand)' }} />
         </div>
@@ -121,6 +129,22 @@ export default function TodayTasksView({ workshop, currentUser, onOpenLead }: Pr
                     {task.notes ? <p className="section-subtitle">{task.notes}</p> : null}
                   </div>
                   <div className="role-task-actions">
+                    <label className="ticket-owner-picker is-compact" onClick={(e) => e.stopPropagation()}>
+                      <span className="sr-only">Pasar tarea</span>
+                      <select
+                        className="field-select"
+                        value={task.assigneeId}
+                        aria-label="Pasar tarea a otro asesor"
+                        onChange={(e) => setTaskAssignee(task.id, e.target.value)}
+                      >
+                        <option value="">Sin dueño</option>
+                        {teammatesForReassign(workspace, currentUser.email, appRole).map((person) => (
+                          <option key={person.id} value={person.id}>
+                            {person.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                     <span className={`badge ${task.status === 'hecho' ? 'tone-positive' : overdue ? 'tone-negative' : 'tone-warning'}`}>
                       {task.status === 'hecho' ? 'Hecha' : overdue ? 'Atrasada' : 'Pendiente'}
                     </span>

@@ -188,19 +188,117 @@ function isWorkspace(value: unknown): value is AdvisorWorkspace {
   )
 }
 
+function uniqueIds(ids: string[]): string[] {
+  return [...new Set(ids.filter(Boolean))]
+}
+
+/** Un solo equipo de prueba con Ana, Luis y Carmen para pasarse tickets. */
+export function ensureDemoPracticeTeam(workspace: AdvisorWorkspace): AdvisorWorkspace {
+  let people = workspace.people
+  for (const asesor of DEMO_ASESORES) {
+    const email = normalizeEmail(asesor.email)
+    if (!people.some((person) => normalizeEmail(person.email) === email)) {
+      people = [
+        ...people,
+        {
+          id: asesor.id,
+          name: `${asesor.firstName} ${asesor.lastName}`.trim(),
+          email,
+        },
+      ]
+    }
+  }
+  const draft = { ...workspace, people }
+  const demoIds = DEMO_ASESORES.map((asesor) => personByEmail(draft, asesor.email)?.id || asesor.id)
+  const merged = workspace.teams.filter((team) => team.id === 'team-prueba' || team.id === 'team-general')
+  const otherTeams = workspace.teams.filter((team) => team.id !== 'team-prueba' && team.id !== 'team-general')
+  const practice: AdvisorTeam = {
+    id: 'team-prueba',
+    name: 'Equipo de prueba',
+    memberIds: uniqueIds([...merged.flatMap((team) => team.memberIds), ...demoIds]),
+    taskTypeIds: uniqueIds([
+      ...merged.flatMap((team) => team.taskTypeIds),
+      ...workspace.taskTypes.map((item) => item.id),
+    ]),
+    boardIds: uniqueIds([
+      ...merged.flatMap((team) => team.boardIds),
+      ...workspace.boards.map((item) => item.id),
+    ]),
+  }
+  return ensureDemoPracticeTasks({ ...draft, teams: [practice, ...otherTeams] })
+}
+
+function buildDemoPracticeTasks(workspace: AdvisorWorkspace, previous: AssignedTask[]): AssignedTask[] {
+  const today = localTodayIso()
+  const priorById = new Map(previous.map((task) => [task.id, task]))
+  return DEMO_ASESORES.flatMap((asesor, advisorIndex) => {
+    const slug = asesor.firstName.toLowerCase()
+    return [1, 2, 3, 4].map((n) => {
+      const id = `demo-task-${slug}-${n}`
+      const prior = priorById.get(id)
+      return {
+        id,
+        title:
+          n === 1
+            ? `Llamar al cliente de prueba ${n}`
+            : n === 2
+              ? 'Confirmar cita de prueba'
+              : n === 3
+                ? 'Seguimiento de recambio'
+                : 'Pasar ticket si estás de baja',
+        notes: 'Tarea de prueba ligada a un ticket ficticio. Se puede pasar a un compañero.',
+        taskTypeId: workspace.taskTypes[n % workspace.taskTypes.length]?.id || 'tt-llamada',
+        boardId: workspace.boards[advisorIndex % workspace.boards.length]?.id || null,
+        teamId: 'team-prueba',
+        assigneeId: prior?.assigneeId || asesor.id,
+        dueDate: today,
+        createdAt: prior?.createdAt || new Date().toISOString(),
+        createdByEmail: 'santy@gmail.com',
+        status: 'pendiente' as const,
+        peticionId: `demo-ticket-${slug}-${String(n).padStart(2, '0')}`,
+      }
+    })
+  })
+}
+
+function ensureDemoPracticeTasks(workspace: AdvisorWorkspace): AdvisorWorkspace {
+  const today = localTodayIso()
+  const demoTasks = workspace.tasks.filter((task) => task.id.startsWith('demo-task-'))
+  const expected = DEMO_ASESORES.length * 4
+  const allClosed = demoTasks.length > 0 && demoTasks.every((task) => task.status === 'hecho')
+
+  if (demoTasks.length === expected && !allClosed) {
+    return {
+      ...workspace,
+      tasks: workspace.tasks.map((task) => {
+        if (!task.id.startsWith('demo-task-') && !task.id.startsWith('task-local-')) return task
+        if (task.status === 'pendiente' && task.dueDate < today) return { ...task, dueDate: today }
+        return task
+      }),
+    }
+  }
+
+  const others = workspace.tasks
+    .filter((task) => !task.id.startsWith('demo-task-'))
+    .map((task) =>
+      task.id.startsWith('task-local-') && (allClosed || task.status === 'hecho')
+        ? { ...task, status: 'pendiente' as const, dueDate: today }
+        : task,
+    )
+  return { ...workspace, tasks: [...others, ...buildDemoPracticeTasks(workspace, demoTasks)] }
+}
+
 export function loadAdvisorWorkspace(workshopId: string): AdvisorWorkspace {
-  if (!workshopId || typeof localStorage === 'undefined') return seedAdvisorWorkspace()
+  if (!workshopId || typeof localStorage === 'undefined') return ensureDemoPracticeTeam(seedAdvisorWorkspace())
   try {
     const raw = localStorage.getItem(storageKey(workshopId))
-    if (!raw) return seedAdvisorWorkspace()
+    if (!raw) return ensureDemoPracticeTeam(seedAdvisorWorkspace())
     const parsed = JSON.parse(raw) as unknown
-    if (!isWorkspace(parsed)) return seedAdvisorWorkspace()
-    if (parsed.tasks.length === 0) {
-      return { ...parsed, tasks: seedAdvisorWorkspace().tasks }
-    }
-    return parsed
+    if (!isWorkspace(parsed)) return ensureDemoPracticeTeam(seedAdvisorWorkspace())
+    const withSeedTasks = parsed.tasks.length === 0 ? { ...parsed, tasks: seedAdvisorWorkspace().tasks } : parsed
+    return ensureDemoPracticeTeam(withSeedTasks)
   } catch {
-    return seedAdvisorWorkspace()
+    return ensureDemoPracticeTeam(seedAdvisorWorkspace())
   }
 }
 
@@ -346,6 +444,19 @@ export function setAssignedTaskStatus(
   return {
     ...workspace,
     tasks: workspace.tasks.map((task) => (task.id === taskId ? { ...task, status } : task)),
+  }
+}
+
+export function setAssignedTaskAssignee(
+  workspace: AdvisorWorkspace,
+  taskId: string,
+  assigneeId: string,
+): AdvisorWorkspace {
+  return {
+    ...workspace,
+    tasks: workspace.tasks.map((task) =>
+      task.id === taskId ? { ...task, assigneeId, teamId: task.teamId || 'team-prueba' } : task,
+    ),
   }
 }
 

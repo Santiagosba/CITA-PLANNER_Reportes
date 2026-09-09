@@ -19,6 +19,7 @@ type Props = {
   onMarkGestionado: (gestionado: boolean) => void
   onOpenLead?: (peticion: PeticionPendiente) => void
   revealIndex?: number
+  ownerSlot?: ReactNode
 }
 
 function PeticionRow({
@@ -33,6 +34,7 @@ function PeticionRow({
   onMarkGestionado,
   onOpenLead,
   revealIndex = 0,
+  ownerSlot,
 }: Props) {
   const pendiente = isPeticionPendiente(p)
   const c = p.cita
@@ -86,9 +88,14 @@ function PeticionRow({
               <span className="prow-name">
                 <TicketClientBlock peticion={p} size="md" />
               </span>
-              <span className={`badge ${pendiente ? 'tone-warning' : 'tone-positive'}`}>
-                {pendiente ? 'Sin cita' : 'Con cita'}
+              <span className={`badge ${p.gestionado ? 'tone-positive' : 'tone-warning'}`}>
+                {p.gestionado ? 'Hecha' : 'Por hacer'}
               </span>
+              {!p.gestionado ? (
+                <span className={`badge ${pendiente ? 'tone-warning' : 'tone-neutral'}`}>
+                  {pendiente ? 'Sin cita' : 'Con cita'}
+                </span>
+              ) : null}
             </span>
             <span className="prow-facts">
               {facts.map((f) => (
@@ -109,6 +116,8 @@ function PeticionRow({
             )}
           </span>
         </button>
+
+        {ownerSlot}
 
         {telHref ? (
           <a

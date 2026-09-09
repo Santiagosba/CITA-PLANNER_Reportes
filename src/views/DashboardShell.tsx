@@ -40,6 +40,9 @@ import {
 import { resolveDateRange } from '../lib/dateRangePresets'
 import { callNoteLine, useSoftphone } from '../lib/softphone'
 import { useOperationalData } from '../hooks/useOperationalData'
+import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
+import { isDemoTicketId } from '../lib/demoTickets'
+import { applyPeticionPatch, PETICIONES_PATCHED_EVENT } from '../lib/ticketOps'
 
 type Props = {
   workshop: Workshop
@@ -97,6 +100,9 @@ function defaultRect(index: number): WinRect {
 
 type SessionWindowProps = {
   session: GestionSession
+  workshop: Workshop
+  currentUser: { name: string; email: string }
+  appRole: CrmAppRole
   minimizeRequest: number
   staggerMs: number
   onFocus: (id: string) => void
@@ -110,6 +116,9 @@ type SessionWindowProps = {
 
 const SessionWindow = memo(function SessionWindow({
   session,
+  workshop,
+  currentUser,
+  appRole,
   minimizeRequest,
   staggerMs,
   onFocus,
@@ -120,6 +129,8 @@ const SessionWindow = memo(function SessionWindow({
   onMinimize,
   onToggleMaximize,
 }: SessionWindowProps) {
+  const workshopId = workshop.containerIdTaller || workshop.id
+  const { workspace } = useAdvisorWorkspace(workshopId, currentUser, true)
   const id = session.id
   const handleFocus = useCallback(() => onFocus(id), [id, onFocus])
   const handleRect = useCallback((rect: WinRect) => onRectChange(id, rect), [id, onRectChange])
@@ -151,6 +162,10 @@ const SessionWindow = memo(function SessionWindow({
       onClose={handleClose}
       onMinimize={handleMinimize}
       onToggleMaximize={handleMax}
+      workshop={workshop}
+      workspace={workspace}
+      currentUser={currentUser}
+      appRole={appRole}
     />
   )
 })
@@ -202,6 +217,22 @@ export default function DashboardShell({
     const sync = () => setBotName(loadActiveBotProfile().name)
     window.addEventListener(BOT_CONFIG_EVENT, sync)
     return () => window.removeEventListener(BOT_CONFIG_EVENT, sync)
+  }, [])
+
+  useEffect(() => {
+    const onPatch = (event: Event) => {
+      const detail = (event as CustomEvent<{ idpeticion?: string; patch?: Partial<PeticionPendiente> }>).detail
+      if (!detail?.idpeticion || !detail.patch) return
+      setSessions((prev) =>
+        prev.map((session) =>
+          session.id === detail.idpeticion
+            ? { ...session, peticion: { ...session.peticion, ...detail.patch } }
+            : session,
+        ),
+      )
+    }
+    window.addEventListener(PETICIONES_PATCHED_EVENT, onPatch)
+    return () => window.removeEventListener(PETICIONES_PATCHED_EVENT, onPatch)
   }, [])
 
   const bumpZ = useCallback(() => {
@@ -578,7 +609,14 @@ export default function DashboardShell({
         }, 800)
       }
 
-      if (id.startsWith('inbound-') || id.startsWith('cita-')) {
+      if (id.startsWith('inbound-') || id.startsWith('cita-') || isDemoTicketId(id)) {
+        if (isDemoTicketId(id)) {
+          void applyPeticionPatch(workshop, session.peticion, {
+            gestionado,
+            gestionobservaciones: session.gestionObs.trim() || undefined,
+            gestionemail: session.peticion.gestionemail || asesor.email || '',
+          })
+        }
         applyLocal()
         return
       }
@@ -596,7 +634,7 @@ export default function DashboardShell({
         setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, saveStatus: 'idle' } : s)))
       }
     },
-    [asesor.email, closeSession, sessions],
+    [asesor.email, closeSession, sessions, workshop],
   )
 
   const goToSection = useCallback(
@@ -661,6 +699,7 @@ export default function DashboardShell({
         <DashboardGeneralView
           workshop={workshop}
           currentUser={currentUser}
+          appRole={appRole}
           onOpenTriage={() => {
             hideDeskWindows()
             setTriageTab('kanban')
@@ -670,6 +709,10 @@ export default function DashboardShell({
             hideDeskWindows()
             setTriageTab('calendario')
             setShellRoute('pending-citas')
+          }}
+          onOpenTodayTasks={() => {
+            hideDeskWindows()
+            setShellRoute('tareas-hoy')
           }}
           onOpenLead={openLead}
           refreshToken={gestionBump}
@@ -685,11 +728,12 @@ export default function DashboardShell({
       ) : shellRoute === 'stats-equipo' ? (
         <EmployeeStatsView workshop={workshop} currentUser={currentUser} />
       ) : shellRoute === 'tareas-hoy' ? (
-        <TodayTasksView workshop={workshop} currentUser={currentUser} onOpenLead={openLead} />
+        <TodayTasksView workshop={workshop} currentUser={currentUser} appRole={appRole} onOpenLead={openLead} />
       ) : shellRoute === 'boards' ? (
         <BoardsManagerView
           workshop={workshop}
           currentUser={currentUser}
+          appRole={appRole}
           onOpenLead={openLead}
           refreshToken={gestionBump}
         />
@@ -716,6 +760,7 @@ export default function DashboardShell({
           key={`${shellRoute}-${triageTab}`}
           refreshToken={gestionBump}
           onOpenLead={openLead}
+          appRole={appRole}
         />
       )}
       </div>
@@ -737,6 +782,9 @@ export default function DashboardShell({
                 <SessionWindow
                   key={session.id}
                   session={session}
+                  workshop={workshop}
+                  currentUser={currentUser}
+                  appRole={appRole}
                   minimizeRequest={sideMinWave}
                   staggerMs={index * 45}
                   onFocus={focusSession}

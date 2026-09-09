@@ -28,7 +28,11 @@ import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib
 import { ticketClientLabel, ticketClientPhone, ticketVehicleLabel } from '../lib/ticketClient'
 import { scoreTicketUrgency } from '../lib/ticketUrgency'
 import TicketClientBlock from './TicketClientBlock'
+import TicketOwnerPicker from './TicketOwnerPicker'
 import { isSlaCritico } from '../lib/tallerStations'
+import type { CrmAppRole } from '../lib/crmRoles'
+import type { AdvisorWorkspace } from '../lib/advisorWorkspace'
+import type { Workshop } from '../types'
 import { useLiquidGlass } from '../hooks/useLiquidGlass'
 import {
   animateWinBox,
@@ -72,6 +76,10 @@ type Props = {
   onClose: () => void
   onMinimize: () => void
   onToggleMaximize: () => void
+  workshop?: Workshop
+  workspace?: AdvisorWorkspace
+  currentUser?: { name: string; email: string }
+  appRole?: CrmAppRole
 }
 
 const MIN_W = 420
@@ -100,6 +108,10 @@ function LeadGestionDrawer({
   onClose,
   onMinimize,
   onToggleMaximize,
+  workshop,
+  workspace,
+  currentUser,
+  appRole,
 }: Props) {
   const [tab, setTab] = useState<TabId>('resumen')
   const [selectedCall, setSelectedCall] = useState<CustomerCallItem | null>(null)
@@ -551,6 +563,16 @@ function LeadGestionDrawer({
                 <MessageSquare size={14} />
                 WhatsApp
               </a>
+            ) : null}
+            {workshop && workspace && currentUser && appRole ? (
+              <TicketOwnerPicker
+                workshop={workshop}
+                workspace={workspace}
+                currentUser={currentUser}
+                appRole={appRole}
+                peticion={p}
+                compact
+              />
             ) : null}
           </div>
         </div>

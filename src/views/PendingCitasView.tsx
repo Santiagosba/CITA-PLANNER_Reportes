@@ -45,6 +45,10 @@ import {
   workshopCopyId,
 } from '../lib/workingCopy'
 import { invalidateOperationalData } from '../hooks/useOperationalData'
+import { DEMO_TICKETS_NOTICE, isDemoTicketId, mergeLiveAndDemoTickets } from '../lib/demoTickets'
+import { applyPeticionPatch, PETICIONES_PATCHED_EVENT } from '../lib/ticketOps'
+import TicketOwnerPicker from '../components/TicketOwnerPicker'
+import type { CrmAppRole } from '../lib/crmRoles'
 
 type Props = {
   workshop: Workshop
@@ -54,6 +58,7 @@ type Props = {
   initialSlaOnly?: boolean
   onOpenLead?: (peticion: PeticionPendiente) => void
   refreshToken?: number
+  appRole?: CrmAppRole
 }
 
 type TabId = 'kanban' | 'tabla' | 'calendario'
@@ -65,6 +70,7 @@ export default function PendingCitasView({
   initialSlaOnly = false,
   onOpenLead,
   refreshToken = 0,
+  appRole = 'asesor',
 }: Props) {
   const [tab, setTab] = useState<TabId>(initialTab)
   const [items, setItems] = useState<PeticionPendiente[]>([])
@@ -85,7 +91,7 @@ export default function PendingCitasView({
   const [channel, setChannel] = useState('voz-wa')
   const [slaOnly, setSlaOnly] = useState(initialSlaOnly)
   const [estado, setEstado] = useState<EstadoFilter>('faltan')
-  const [ownerScope, setOwnerScope] = useState<OwnerScope>('todas')
+  const [ownerScope, setOwnerScope] = useState<OwnerScope>(appRole === 'asesor' ? 'grupo' : 'todas')
   const workshopId = workshop.containerIdTaller || workshop.id
   const { workspace } = useAdvisorWorkspace(workshopId, currentUser, true)
   const ownerCtx = useMemo(
@@ -102,6 +108,10 @@ export default function PendingCitasView({
   useEffect(() => {
     setTab(initialTab)
   }, [initialTab])
+
+  useEffect(() => {
+    setOwnerScope(appRole === 'asesor' ? 'grupo' : 'todas')
+  }, [appRole])
 
   useEffect(() => {
     setSlaOnly(initialSlaOnly)
@@ -148,32 +158,44 @@ export default function PendingCitasView({
     try {
       const resolved = await getResolvedTallerIds()
       if (!resolved.ids.length) {
+        const demo = mergeLiveAndDemoTickets([], workshop, dateRange)
+        if (demo.length) {
+          setItems(demo)
+          setSourceNotice(DEMO_TICKETS_NOTICE)
+          setSelectedId((prev) => {
+            if (prev && demo.some((r) => r.idpeticion === prev)) return prev
+            return demo.find((r) => !r.gestionado)?.idpeticion ?? demo[0]?.idpeticion ?? null
+          })
+          return
+        }
         setError('No encontramos este taller en el sistema. Prueba a elegir otro.')
         setItems([])
         return
       }
-      const rows = await fetchPendingPeticiones(resolved.ids, {
+      const live = await fetchPendingPeticiones(resolved.ids, {
         tipoPeticionId: tipoFilter === '' ? null : tipoFilter,
         from: dateRange.from,
         to: dateRange.to,
       })
+      const rows = mergeLiveAndDemoTickets(live, workshop, dateRange)
       setItems(rows)
-      savePeticionesCopy(workshopCopyId(workshop), rows)
-      setSourceNotice(getPeticionesSourceNotice())
+      savePeticionesCopy(workshopCopyId(workshop), live)
+      setSourceNotice(getPeticionesSourceNotice() || (rows.length > live.length ? DEMO_TICKETS_NOTICE : null))
       setSelectedId((prev) => {
         if (prev && rows.some((r) => r.idpeticion === prev)) return prev
         const faltan = rows.filter((r) => !r.gestionado)
         return faltan[0]?.idpeticion ?? rows[0]?.idpeticion ?? null
       })
     } catch (e) {
-      const copy = loadPeticionesCopy(workshopCopyId(workshop))
-      if (copy?.length) {
-        setItems(copy)
+      const copy = loadPeticionesCopy(workshopCopyId(workshop)) ?? []
+      const rows = mergeLiveAndDemoTickets(copy, workshop, dateRange)
+      if (rows.length) {
+        setItems(rows)
         setError(null)
-        setSourceNotice(COPY_FALLBACK_NOTICE)
+        setSourceNotice(copy.length ? COPY_FALLBACK_NOTICE : DEMO_TICKETS_NOTICE)
         setSelectedId((prev) => {
-          if (prev && copy.some((r) => r.idpeticion === prev)) return prev
-          return copy.find((r) => !r.gestionado)?.idpeticion ?? copy[0]?.idpeticion ?? null
+          if (prev && rows.some((r) => r.idpeticion === prev)) return prev
+          return rows.find((r) => !r.gestionado)?.idpeticion ?? rows[0]?.idpeticion ?? null
         })
       } else {
         setItems([])
@@ -191,6 +213,18 @@ export default function PendingCitasView({
   useEffect(() => {
     if (refreshToken > 0) void load(true)
   }, [refreshToken, load])
+
+  useEffect(() => {
+    const onPatch = (event: Event) => {
+      const detail = (event as CustomEvent<{ idpeticion?: string; patch?: Partial<PeticionPendiente> }>).detail
+      if (!detail?.idpeticion || !detail.patch) return
+      setItems((prev) =>
+        prev.map((row) => (row.idpeticion === detail.idpeticion ? { ...row, ...detail.patch } : row)),
+      )
+    }
+    window.addEventListener(PETICIONES_PATCHED_EVENT, onPatch)
+    return () => window.removeEventListener(PETICIONES_PATCHED_EVENT, onPatch)
+  }, [])
 
   const matchesScopeFilters = useCallback(
     (p: PeticionPendiente) => {
@@ -316,11 +350,19 @@ export default function PendingCitasView({
     setSaveStatus('loading')
     setError(null)
     try {
-      await updatePeticionGestion(currentId, {
-        gestionado,
-        gestionobservaciones: obs,
-        gestionemail: email,
-      })
+      if (isDemoTicketId(currentId)) {
+        await applyPeticionPatch(workshop, current, {
+          gestionado,
+          gestionobservaciones: obs,
+          gestionemail: email,
+        })
+      } else {
+        await updatePeticionGestion(currentId, {
+          gestionado,
+          gestionobservaciones: obs,
+          gestionemail: email,
+        })
+      }
       setSaveStatus('success')
       await new Promise((r) => setTimeout(r, 650))
       const nextPatch = {
@@ -515,6 +557,16 @@ export default function PendingCitasView({
                         onMarkGestionado={handleMarkGestionado}
                         onOpenLead={onOpenLead}
                         revealIndex={groupIndex === 0 ? itemIndex : 16}
+                        ownerSlot={
+                          <TicketOwnerPicker
+                            workshop={workshop}
+                            workspace={workspace}
+                            currentUser={currentUser}
+                            appRole={appRole}
+                            peticion={p}
+                            compact
+                          />
+                        }
                       />
                     ))}
                   </ul>
@@ -554,6 +606,7 @@ export default function PendingCitasView({
                     <th>Cliente</th>
                     <th>Matrícula</th>
                     <th>Tipo</th>
+                    <th>Dueño</th>
                     <th>Consulta</th>
                     <th>Estado</th>
                     <th>Cita</th>
@@ -584,6 +637,16 @@ export default function PendingCitasView({
                         </td>
                         <td>{c?.matricula ? <VehiclePlate value={c.matricula} compact /> : '—'}</td>
                         <td>{p.tipopeticion ?? '—'}</td>
+                        <td onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+                          <TicketOwnerPicker
+                            workshop={workshop}
+                            workspace={workspace}
+                            currentUser={currentUser}
+                            appRole={appRole}
+                            peticion={p}
+                            compact
+                          />
+                        </td>
                         <td>{formatFecha(p.fechainicio)}</td>
                         <td>
                           <span className={`badge ${hecha ? 'tone-positive' : 'tone-warning'}`}>

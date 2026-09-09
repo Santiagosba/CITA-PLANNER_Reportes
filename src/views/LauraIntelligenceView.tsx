@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, Camera, Coins, Mic, PhoneCall, Sparkles, Timer, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Activity, Camera, Coins, Mic, Sparkles, Timer, Trash2 } from 'lucide-react'
 import Card from '../components/ui/Card'
+import { LauraPareto, LauraRadar, LauraUprightPie } from '../components/LauraCharts'
 import LauraCallCosts from '../components/LauraCallCosts'
 import { resizeImageFile } from '../lib/lauraProfile'
 import {
@@ -154,8 +155,9 @@ export default function LauraIntelligenceView({ workshopName, showCallCosts = fa
             <Card className="laura-panel" padding="md">
               <p className="section-eyebrow">Distribución por Tipología</p>
               <h2 className="ops-card-title">Pentágono 3D · Clasificación IA según motivo</h2>
-              <Radar3D
+              <LauraRadar
                 caption="5 ramas de posventa · escala 0–50%"
+                scaleMax={50}
                 axes={TIPOLOGIA.map((item) => ({
                   label: item.label,
                   short: item.short,
@@ -167,8 +169,9 @@ export default function LauraIntelligenceView({ workshopName, showCallCosts = fa
             <Card className="laura-panel" padding="md">
               <p className="section-eyebrow">Distribución por Canal</p>
               <h2 className="ops-card-title">Pastel vertical · Entradas a centralita</h2>
-              <UprightPie
+              <LauraUprightPie
                 caption="Disco 3D de pie · Canal Voz"
+                centerLabel="Voz"
                 slices={[
                   { label: 'Voz Telefónica (Laura AI)', value: '98,7%', pct: 98.7, color: '#0a55b8', icon: true },
                   { label: 'WhatsApp', value: '1,3%', pct: 1.3, color: '#f59e0b' },
@@ -176,7 +179,15 @@ export default function LauraIntelligenceView({ workshopName, showCallCosts = fa
               />
             </Card>
           </section>
-          <ParetoChart />
+          <Card className="laura-panel" padding="md">
+            <LauraPareto
+              eyebrow="Evolución Diaria (Últimos 9 Días)"
+              title="Pareto · Volumen atendido y acumulado"
+              legend={['9 Días', 'Mes Q1']}
+              rows={DAILY.map((item) => ({ key: item.day, label: item.day, value: item.volume }))}
+              sortByValue
+            />
+          </Card>
         </>
       ) : null}
 
@@ -187,8 +198,9 @@ export default function LauraIntelligenceView({ workshopName, showCallCosts = fa
             <Card className="laura-panel" padding="md">
               <p className="section-eyebrow">Distribución por Tipología</p>
               <h2 className="ops-card-title">Pentágono 3D · Clasificación IA según motivo</h2>
-              <Radar3D
+              <LauraRadar
                 caption="5 ramas de posventa · escala 0–50%"
+                scaleMax={50}
                 axes={TIPOLOGIA.map((item) => ({
                   label: item.label,
                   short: item.short,
@@ -200,8 +212,9 @@ export default function LauraIntelligenceView({ workshopName, showCallCosts = fa
             <Card className="laura-panel" padding="md">
               <p className="section-eyebrow">Canal de entrada</p>
               <h2 className="ops-card-title">Pastel vertical · Entradas a centralita</h2>
-              <UprightPie
+              <LauraUprightPie
                 caption="Disco 3D de pie · Voz frente a WhatsApp"
+                centerLabel="Voz"
                 slices={[
                   { label: 'Voz Telefónica (Laura AI)', value: '98,7%', pct: 98.7, color: '#0a55b8', icon: true },
                   { label: 'WhatsApp', value: '1,3%', pct: 1.3, color: '#f59e0b' },
@@ -238,7 +251,15 @@ export default function LauraIntelligenceView({ workshopName, showCallCosts = fa
               </li>
             </ul>
           </Card>
-          <ParetoChart />
+          <Card className="laura-panel" padding="md">
+            <LauraPareto
+              eyebrow="Evolución Diaria (Últimos 9 Días)"
+              title="Pareto · Volumen atendido y acumulado"
+              legend={['9 Días', 'Mes Q1']}
+              rows={DAILY.map((item) => ({ key: item.day, label: item.day, value: item.volume }))}
+              sortByValue
+            />
+          </Card>
         </>
       ) : null}
     </div>
@@ -343,22 +364,6 @@ function LauraProfileCard({ workshopName }: { workshopName: string }) {
       </span>
     </header>
   )
-}
-
-function pieGradient(slices: { pct: number; color: string }[]) {
-  let start = 0
-  const stops = slices.map((slice) => {
-    const end = start + slice.pct
-    const stop = `${slice.color} ${start}% ${end}%`
-    start = end
-    return stop
-  })
-  return `conic-gradient(${stops.join(', ')})`
-}
-
-function polarPoint(cx: number, cy: number, radius: number, angleDeg: number) {
-  const rad = ((angleDeg - 90) * Math.PI) / 180
-  return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) }
 }
 
 function PrecisionBlock() {
@@ -502,280 +507,5 @@ function BubbleChart() {
         })}
       </svg>
     </div>
-  )
-}
-
-function Radar3D({
-  caption,
-  axes,
-}: {
-  caption: string
-  axes: { label: string; short: string; value: number; color: string }[]
-}) {
-  const size = 320
-  const cx = size / 2
-  const cy = size / 2 + 4
-  const radius = 104
-  const scaleMax = 50
-  const ringValues = [10, 20, 30, 40, 50]
-
-  const ringPaths = ringValues.map((v) =>
-    axes
-      .map((_, index) => {
-        const p = polarPoint(cx, cy, radius * (v / scaleMax), index * 72)
-        return `${index === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`
-      })
-      .join(' ') + ' Z',
-  )
-  const valuePts = axes.map((axis, index) =>
-    polarPoint(cx, cy, radius * (Math.min(axis.value, scaleMax) / scaleMax), index * 72),
-  )
-  const valuePath =
-    valuePts.map((p, index) => `${index === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ') + ' Z'
-  const labelPts = axes.map((axis, index) => ({
-    ...axis,
-    ...polarPoint(cx, cy, radius + 34, index * 72),
-  }))
-
-  return (
-    <div className="laura-chart-block">
-      <div className="laura-radar" aria-hidden>
-        <div className="laura-radar-stage">
-          <svg viewBox={`0 0 ${size} ${size}`} className="laura-radar-svg">
-            <defs>
-              <radialGradient id="lauraRadarFill" cx="50%" cy="42%" r="68%">
-                <stop offset="0%" stopColor="rgba(96,165,250,0.55)" />
-                <stop offset="100%" stopColor="rgba(11,99,214,0.28)" />
-              </radialGradient>
-            </defs>
-            {ringPaths.map((d, index) => (
-              <path key={d} className="laura-radar-ring" d={d} style={{ ['--i' as string]: String(index) }} />
-            ))}
-            {axes.map((_, index) => {
-              const p = polarPoint(cx, cy, radius, index * 72)
-              return (
-                <line
-                  key={index}
-                  className="laura-radar-axis"
-                  x1={cx}
-                  y1={cy}
-                  x2={p.x}
-                  y2={p.y}
-                  style={{ ['--i' as string]: String(index) }}
-                />
-              )
-            })}
-            <path className="laura-radar-area" d={valuePath} />
-            {valuePts.map((p, index) => (
-              <circle
-                key={index}
-                className="laura-radar-dot"
-                cx={p.x}
-                cy={p.y}
-                r="5"
-                style={{ ['--i' as string]: String(index) }}
-              />
-            ))}
-            {ringValues.map((v) => {
-              const p = polarPoint(cx, cy, radius * (v / scaleMax), 0)
-              return (
-                <text key={v} className="laura-radar-scale" x={cx + 5} y={p.y + 3}>
-                  {v}%
-                </text>
-              )
-            })}
-          </svg>
-          {labelPts.map((item) => (
-            <span
-              key={item.label}
-              className="laura-radar-label"
-              style={{ left: `${(item.x / size) * 100}%`, top: `${(item.y / size) * 100}%` }}
-            >
-              <b style={{ color: item.color }}>{item.value}%</b>
-              {item.short}
-            </span>
-          ))}
-        </div>
-      </div>
-      <p className="section-subtitle">{caption}</p>
-      <ul className="laura-legend">
-        {axes.map((item) => (
-          <li key={item.label}>
-            <i style={{ background: item.color }} aria-hidden />
-            <span>{item.label}</span>
-            <strong>{item.value}%</strong>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-function UprightPie({
-  caption,
-  slices,
-}: {
-  caption: string
-  slices: { label: string; value: string; pct: number; color: string; icon?: boolean }[]
-}) {
-  const gradient = pieGradient(slices)
-  const box = 200
-  const cxy = box / 2
-  let acc = 0
-  const callouts = slices.map((slice) => {
-    const midPct = acc + slice.pct / 2
-    acc += slice.pct
-    const p = polarPoint(cxy, cxy, box * 0.42, midPct * 3.6)
-    return { ...slice, x: (p.x / box) * 100, y: (p.y / box) * 100 }
-  })
-  const lead = slices[0]
-
-  return (
-    <div className="laura-chart-block">
-      <div className="laura-upie">
-        <div className="laura-upie-stage" aria-hidden>
-          {Array.from({ length: 14 }, (_, layer) => (
-            <span
-              key={layer}
-              className={`laura-upie-layer${layer === 0 ? ' is-face' : ''}`}
-              style={{ background: gradient, ['--z' as string]: String(layer) }}
-            />
-          ))}
-          <span className="laura-upie-hole">
-            <b>{lead?.value}</b>
-            <small>Voz</small>
-          </span>
-        </div>
-        <div className="laura-upie-callouts">
-          {callouts.map((item, index) => (
-            <span
-              key={item.label}
-              className="laura-upie-tag"
-              style={{
-                left: `${item.x}%`,
-                top: `${item.y}%`,
-                ['--dot' as string]: item.color,
-                ['--i' as string]: String(index),
-              }}
-            >
-              {item.value}
-            </span>
-          ))}
-        </div>
-      </div>
-      <p className="section-subtitle">{caption}</p>
-      <ul className="laura-legend">
-        {slices.map((item) => (
-          <li key={item.label}>
-            <i style={{ background: item.color }} aria-hidden />
-            <span>
-              {item.icon ? <PhoneCall size={14} aria-hidden /> : null}
-              {item.label}
-            </span>
-            <strong>{item.value}</strong>
-          </li>
-        ))}
-      </ul>
-    </div>
-  )
-}
-
-function ParetoChart() {
-  const rows = useMemo(() => {
-    const sorted = [...DAILY].sort((a, b) => b.volume - a.volume)
-    const total = sorted.reduce((sum, item) => sum + item.volume, 0)
-    let acc = 0
-    return sorted.map((item) => {
-      acc += item.volume
-      return { ...item, share: (item.volume / total) * 100, cumulative: (acc / total) * 100 }
-    })
-  }, [])
-  const maxVolume = rows[0]?.volume ?? 1
-  const cols = rows.length
-  const linePoints = rows
-    .map((item, index) => {
-      const x = ((index + 0.5) / cols) * 100
-      const y = 100 - item.cumulative
-      return `${x.toFixed(2)},${y.toFixed(2)}`
-    })
-    .join(' ')
-
-  return (
-    <Card className="laura-panel" padding="md">
-      <div className="laura-chart-head">
-        <div>
-          <p className="section-eyebrow">Evolución Diaria (Últimos 9 Días)</p>
-          <h2 className="ops-card-title">Pareto · Volumen atendido y acumulado</h2>
-        </div>
-        <div className="laura-chart-legend">
-          <span>9 Días</span>
-          <span>Mes Q1</span>
-        </div>
-      </div>
-      <div className="laura-pareto" role="img" aria-label="Gráfico de Pareto del volumen diario">
-        <div className="laura-pareto-axis is-left" aria-hidden>
-          <span>{maxVolume}</span>
-          <span>{Math.round(maxVolume * 0.5)}</span>
-          <span>0</span>
-        </div>
-        <div className="laura-pareto-plot">
-          <div className="laura-pareto-grid" aria-hidden>
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
-          <div className="laura-pareto-bars">
-            {rows.map((item, index) => (
-              <div
-                key={`${item.day}-${item.volume}`}
-                className="laura-pareto-col"
-                style={{ ['--i' as string]: String(index) }}
-              >
-                <span className="laura-pareto-value">{item.volume}</span>
-                <span className="laura-pareto-bar" style={{ height: `${(item.volume / maxVolume) * 100}%` }} />
-              </div>
-            ))}
-          </div>
-          <svg className="laura-pareto-line" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <polyline points={linePoints} vectorEffect="non-scaling-stroke" pathLength={100} />
-          </svg>
-          {rows.map((item, index) => (
-            <span
-              key={`dot-${item.day}`}
-              className="laura-pareto-dot"
-              style={{
-                left: `${((index + 0.5) / cols) * 100}%`,
-                bottom: `${item.cumulative}%`,
-                ['--i' as string]: String(index),
-              }}
-            >
-              <em>{Math.round(item.cumulative)}%</em>
-            </span>
-          ))}
-        </div>
-        <div className="laura-pareto-axis is-right" aria-hidden>
-          <span>100%</span>
-          <span>50%</span>
-          <span>0%</span>
-        </div>
-      </div>
-      <div className="laura-pareto-xaxis" aria-hidden>
-        {rows.map((item) => (
-          <span key={`x-${item.day}`}>{item.day}</span>
-        ))}
-      </div>
-      <ul className="laura-chart-keys">
-        <li>
-          <i className="is-auto" aria-hidden />
-          Llamadas del día
-        </li>
-        <li>
-          <i className="is-derived" aria-hidden />
-          Acumulado Pareto
-        </li>
-      </ul>
-    </Card>
   )
 }

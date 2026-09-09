@@ -9,6 +9,7 @@ import {
   patchTeam,
   removeTeam,
   saveAdvisorWorkspace,
+  setAssignedTaskAssignee,
   setAssignedTaskStatus,
   type AdvisorTeam,
   type AdvisorWorkspace,
@@ -58,6 +59,8 @@ export function useAdvisorWorkspace(
         commit(addAssignedTask(workspace, input)),
       setTaskStatus: (taskId: string, status: AssignedTaskStatus) =>
         commit(setAssignedTaskStatus(workspace, taskId, status)),
+      setTaskAssignee: (taskId: string, assigneeId: string) =>
+        commit(setAssignedTaskAssignee(workspace, taskId, assigneeId)),
     }),
     [commit, workspace],
   )
