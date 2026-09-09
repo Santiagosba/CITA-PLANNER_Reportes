@@ -296,15 +296,12 @@ export default function DashboardShell({
     setSideMinWave((n) => n + 1)
   }, [])
 
-  /** Apartado del panel: el contenido pasa al frente y se recogen fichas y apps. */
+  /** Apartado del panel: las fichas van a la barra, que se queda visible para restaurarlas. */
   const hideDeskWindows = useCallback(() => {
     apps.minimizeAll()
-    setSessions((prev) => {
-      if (prev.every((s) => s.minimized)) return prev
-      return prev.map((s) => (s.minimized ? s : { ...s, minimized: true, maximized: false }))
-    })
+    setSideMinWave((n) => n + 1)
     setActiveId(null)
-    setAgendaTucked(true)
+    setAgendaTucked(false)
   }, [])
 
   const restoreDesk = useCallback(() => {
@@ -456,22 +453,10 @@ export default function DashboardShell({
       // El chip del teléfono abre su app: no toca el escritorio.
       if (t.closest('.softphone-chip')) return
 
-      // Apartados del panel (Dashboard, triage, Laura…): siempre recoger
-      // ventanas para que la vista quede delante. Nunca restaurar aquí:
-      // el segundo clic volvía a abrir el teléfono encima.
-      if (t.closest('.dashboard-nav')) {
-        hideDeskWindows()
-        return
-      }
-      if (t.closest('.dashboard-sidebar')) {
-        if (hasOpenWindows()) hideDeskWindows()
-        return
-      }
-
-      // El contenido de los paneles no restaura ventanas: si no, al cambiar
-      // de apartado o pulsar el fondo del dashboard saltaban otra vez.
-      if (t.closest('.dashboard-main')) {
-        if (hasOpenWindows()) hideDeskWindows()
+      // Sidebar y contenido del panel: no recoger ni restaurar. El cambio de
+      // apartado ya llama a hideDeskWindows; un clic en el texto no debe
+      // hacer desaparecer las fichas ni esconder la barra.
+      if (t.closest('.dashboard-nav, .dashboard-sidebar, .dashboard-main')) {
         return
       }
 
@@ -530,7 +515,7 @@ export default function DashboardShell({
 
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [hideDeskWindows, minimizeAllToSides, restoreDesk, tuckAgenda])
+  }, [minimizeAllToSides, restoreDesk, tuckAgenda])
 
   const toggleMaximize = useCallback((id: string) => {
     setSessions((prev) =>
