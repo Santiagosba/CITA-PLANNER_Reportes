@@ -250,9 +250,15 @@ export function usableCallerId(raw: string | null | undefined): string | null {
   return n
 }
 
+/**
+ * DID reservado para CitaPlanner en `aviold.app_channel_numbers`
+ * (app_scope = 'citaplanner', active = true, is_default = true).
+ */
+const CITAPLANNER_DEFAULT_CALLER_ID = '+34930453616'
+
 function fallbackCallerId(): string | null {
   const fromEnv = (import.meta.env.VITE_TELNYX_DEFAULT_CALLER_ID as string | undefined)?.trim()
-  return usableCallerId(fromEnv || '+34930451547')
+  return usableCallerId(fromEnv || CITAPLANNER_DEFAULT_CALLER_ID)
 }
 
 function resolveCallerId(fromApi: string | null | undefined): string | null {
