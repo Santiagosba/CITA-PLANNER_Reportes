@@ -16,8 +16,19 @@ import DashboardGeneralView from './DashboardGeneralView'
 import BoardsManagerView from './BoardsManagerView'
 import LauraIntelligenceView from './LauraIntelligenceView'
 import BotIdentityView from './BotIdentityView'
+import TeamsManagerView from './TeamsManagerView'
+import AssignTaskView from './AssignTaskView'
+import EmployeeStatsView from './EmployeeStatsView'
+import TodayTasksView from './TodayTasksView'
 import { mapSessionUserToCrmUser, type Workshop } from '../types'
 import { isGlobalAviAdmin } from '../lib/operationsConnect'
+import {
+  crmAppRoleLabel,
+  defaultRouteForRole,
+  resolveCrmAppRole,
+  routeAllowedForRole,
+  type CrmAppRole,
+} from '../lib/crmRoles'
 import { getAppProductName } from '../lib/appIdentity'
 import { BOT_CONFIG_EVENT, loadActiveBotProfile } from '../lib/botProfiles'
 import {
@@ -36,6 +47,7 @@ type Props = {
   onClearWorkshop: () => void
   isDarkMode: boolean
   onToggleTheme: () => void
+  onLocalPreviewRole?: (role: CrmAppRole) => void
 }
 
 type GestionSession = {
@@ -149,9 +161,12 @@ export default function DashboardShell({
   onClearWorkshop,
   isDarkMode,
   onToggleTheme,
+  onLocalPreviewRole,
 }: Props) {
-  const [shellRoute, setShellRoute] = useState<DashboardShellRoute>('pending-citas')
+  const appRole = resolveCrmAppRole(sessionUser)
+  const [shellRoute, setShellRoute] = useState<DashboardShellRoute>(() => defaultRouteForRole(appRole))
   const asesor = mapSessionUserToCrmUser(sessionUser)
+  const currentUser = { name: asesor.displayName, email: asesor.email }
   const [triageTab, setTriageTab] = useState<'kanban' | 'tabla' | 'calendario'>('kanban')
   const [sessions, setSessions] = useState<GestionSession[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -167,6 +182,12 @@ export default function DashboardShell({
   // primera ficha y sube al frente cuando se pulsa.
   const [agendaZ, setAgendaZ] = useState(99)
   const canEditHubBranding = isGlobalAviAdmin({ user: sessionUser })
+
+  useEffect(() => {
+    if (!routeAllowedForRole(shellRoute, appRole)) {
+      setShellRoute(defaultRouteForRole(appRole))
+    }
+  }, [appRole, shellRoute])
 
   useEffect(() => {
     const sync = () => setBotName(loadActiveBotProfile().name)
@@ -626,7 +647,9 @@ export default function DashboardShell({
       isDarkMode={isDarkMode}
       onToggleTheme={onToggleTheme}
       asesorName={asesor.displayName}
-      asesorRole={asesor.role}
+      asesorRole={crmAppRoleLabel(appRole)}
+      appRole={appRole}
+      onLocalPreviewRole={onLocalPreviewRole}
     >
       <ViewPageHeader
         route={shellRoute}
@@ -661,6 +684,14 @@ export default function DashboardShell({
           onOpenLead={openLead}
           refreshToken={gestionBump}
         />
+      ) : shellRoute === 'equipos' ? (
+        <TeamsManagerView workshop={workshop} currentUser={currentUser} />
+      ) : shellRoute === 'asignar-tarea' ? (
+        <AssignTaskView workshop={workshop} currentUser={currentUser} />
+      ) : shellRoute === 'stats-equipo' ? (
+        <EmployeeStatsView workshop={workshop} currentUser={currentUser} />
+      ) : shellRoute === 'tareas-hoy' ? (
+        <TodayTasksView workshop={workshop} currentUser={currentUser} onOpenLead={openLead} />
       ) : shellRoute === 'boards' ? (
         <BoardsManagerView workshop={workshop} onOpenLead={openLead} refreshToken={gestionBump} />
       ) : shellRoute === 'laura' ? (
@@ -673,6 +704,7 @@ export default function DashboardShell({
             workshop={workshop}
             isDarkMode={isDarkMode}
             showBrandingTab={canEditHubBranding}
+            showTeamTab={appRole === 'admin'}
           />
         </div>
       ) : (

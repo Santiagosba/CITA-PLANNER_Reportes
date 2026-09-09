@@ -42,6 +42,7 @@ type Props = {
   workshop: Workshop
   isDarkMode: boolean
   showBrandingTab?: boolean
+  showTeamTab?: boolean
 }
 
 const MOCK_CENTERS = [
@@ -108,10 +109,29 @@ function Panel({ children, className = '' }: { children: React.ReactNode; classN
   return <div className={`glass glass-lite card-pad-md ${className}`.trim()}>{children}</div>
 }
 
-export default function SettingsShellView({ workshop, isDarkMode: _isDarkMode, showBrandingTab = false }: Props) {
+export default function SettingsShellView({
+  workshop,
+  isDarkMode: _isDarkMode,
+  showBrandingTab = false,
+  showTeamTab = true,
+}: Props) {
   const [activeTab, setActiveTab] = useState<SettingsShellTab>('general')
 
-  const visibleTabs = TABS.filter((t) => t.id !== 'branding' || showBrandingTab)
+  const visibleTabs = useMemo(
+    () =>
+      TABS.filter((t) => {
+        if (t.id === 'branding') return showBrandingTab
+        if (t.id === 'team') return showTeamTab
+        return true
+      }),
+    [showBrandingTab, showTeamTab],
+  )
+
+  useEffect(() => {
+    if (!visibleTabs.some((tab) => tab.id === activeTab)) {
+      setActiveTab(visibleTabs[0]?.id ?? 'general')
+    }
+  }, [activeTab, visibleTabs])
 
   const isDemo = workshop.source === 'demo'
 

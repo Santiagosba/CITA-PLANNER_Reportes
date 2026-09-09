@@ -1,5 +1,7 @@
 import {
   BadgeCheck,
+  BarChart3,
+  CalendarCheck2,
   ClipboardList,
   Columns3,
   LayoutDashboard,
@@ -11,19 +13,29 @@ import {
   Settings,
   Sparkles,
   Sun,
+  UserPlus,
+  Users,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { DashboardShellRoute } from './Sidebar'
 import { SoftphoneStatusChip } from './SoftphoneDock'
 import { BOT_CONFIG_EVENT, loadActiveBotProfile } from '../lib/botProfiles'
+import type { CrmAppRole } from '../lib/crmRoles'
 
-const NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] = [
+const ADMIN_NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] = [
   { id: 'dashboard-general', label: 'Dashboard general', icon: LayoutDashboard },
   { id: 'pending-citas', label: 'Triage operativo', icon: ClipboardList },
+  { id: 'equipos', label: 'Equipos', icon: Users },
+  { id: 'asignar-tarea', label: 'Asignar tarea', icon: UserPlus },
+  { id: 'stats-equipo', label: 'Estadísticas', icon: BarChart3 },
   { id: 'boards', label: 'Gestor de tableros', icon: Columns3 },
   { id: 'laura', label: 'Asistente de IA Laura', icon: Sparkles },
   { id: 'bot-identity', label: 'Identidad del bot', icon: BadgeCheck },
+]
+
+const ASESOR_NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] = [
+  { id: 'tareas-hoy', label: 'Tareas de hoy', icon: CalendarCheck2 },
 ]
 
 /** Pieza extruida: apila capas del mismo vector en Z para darle grosor 3D real. */
@@ -111,6 +123,8 @@ type Props = {
   onToggleTheme: () => void
   asesorName?: string | null
   asesorRole?: string | null
+  appRole?: CrmAppRole
+  onLocalPreviewRole?: (role: CrmAppRole) => void
   children: ReactNode
 }
 
@@ -128,8 +142,11 @@ export default function AppShell({
   onToggleTheme,
   asesorName,
   asesorRole,
+  appRole = 'asesor',
+  onLocalPreviewRole,
   children,
 }: Props) {
+  const navItems = appRole === 'admin' ? ADMIN_NAV : ASESOR_NAV
   const [botName, setBotName] = useState(() => loadActiveBotProfile().name)
   useEffect(() => {
     const sync = () => setBotName(loadActiveBotProfile().name)
@@ -210,16 +227,18 @@ export default function AppShell({
           ) : null}
         </div>
 
-        <div className="px-2">
-          <button type="button" className="dashboard-inbound-btn" onClick={onNewInbound}>
-            <Plus size={16} strokeWidth={2.5} aria-hidden />
-            Nueva tarea / Inbound
-            <PhoneCall size={14} aria-hidden />
-          </button>
-        </div>
+        {appRole === 'admin' ? (
+          <div className="px-2">
+            <button type="button" className="dashboard-inbound-btn" onClick={onNewInbound}>
+              <Plus size={16} strokeWidth={2.5} aria-hidden />
+              Nueva tarea / Inbound
+              <PhoneCall size={14} aria-hidden />
+            </button>
+          </div>
+        ) : null}
 
         <nav className="dashboard-nav">
-          {NAV.map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon
             const active = activeRoute === item.id
             const label = item.id === 'laura' ? `Asistente de IA ${botName}` : item.label
@@ -240,6 +259,29 @@ export default function AppShell({
         </nav>
 
         <div className="dashboard-sidebar-footer">
+          {onLocalPreviewRole ? (
+            <div className="local-preview-switch" role="group" aria-label="Ver como en local">
+              <p className="section-eyebrow">Ver como (local)</p>
+              <div className="local-preview-switch-row">
+                <button
+                  type="button"
+                  className={`ghost-button ${appRole === 'admin' ? 'is-active' : ''}`}
+                  onClick={() => onLocalPreviewRole('admin')}
+                  aria-pressed={appRole === 'admin'}
+                >
+                  Admin
+                </button>
+                <button
+                  type="button"
+                  className={`ghost-button ${appRole === 'asesor' ? 'is-active' : ''}`}
+                  onClick={() => onLocalPreviewRole('asesor')}
+                  aria-pressed={appRole === 'asesor'}
+                >
+                  Asesor
+                </button>
+              </div>
+            </div>
+          ) : null}
           <SoftphoneStatusChip />
           <button
             type="button"

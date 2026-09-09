@@ -20,6 +20,15 @@ import {
   type ConnectRoute,
 } from './lib/operationsConnect'
 import { clearLegacyDemoSession, demoAsesoresEnabled, signInAsDemoAsesor, type DemoAsesor } from './lib/demoAsesores'
+import {
+  LOCAL_PREVIEW_ENABLED,
+  LOCAL_PREVIEW_WORKSHOP,
+  buildLocalPreviewUser,
+  clearLocalPreview,
+  readLocalPreview,
+  writeLocalPreview,
+} from './lib/localPreview'
+import type { CrmAppRole } from './lib/crmRoles'
 import { parseConnectSiteIds, scopedSitesEmptyDenied } from './lib/connectSiteScope'
 import type { SlugBrandingContext } from './lib/licenseBrandingContext'
 import { buildSlugBrandingContext } from './lib/licenseBrandingContext'
@@ -96,6 +105,7 @@ export default function App() {
   const [slugBranding, setSlugBranding] = useState<SlugBrandingContext | null>(null)
   const [preferredWorkshopIdTaller, setPreferredWorkshopIdTaller] = useState<string | null>(null)
   const [loginNotice, setLoginNotice] = useState<LoginNotice | null>(null)
+  const [localPreview, setLocalPreview] = useState(() => readLocalPreview())
   const accessCheckInFlight = useRef(false)
   const firstSlugResolveDone = useRef(false)
   const lastPathSlugRef = useRef<string | null | undefined>(undefined)
@@ -593,6 +603,8 @@ export default function App() {
 
   const handleLogout = useCallback(async () => {
     try {
+      clearLocalPreview()
+      setLocalPreview(null)
       await signOut()
       setSession(null)
       setSelectedWorkshop(null)
@@ -604,12 +616,22 @@ export default function App() {
     }
   }, [])
 
+  const handleLocalPreview = useCallback((role: CrmAppRole) => {
+    setLoginNotice(null)
+    setLocalPreview(writeLocalPreview(role))
+  }, [])
+
   const handleDemoLogin = useCallback(async (asesor: DemoAsesor) => {
     setLoginNotice(null)
     const { error } = await signInAsDemoAsesor(asesor)
     if (error) setLoginNotice({ kind: 'error', message: error })
     // Con éxito, `onAuthStateChange` fija la sesión real (JWT) como en cualquier login.
   }, [])
+
+  const previewUser = localPreview ? buildLocalPreviewUser(localPreview.role) : null
+  const effectiveUser = previewUser ?? (session as { user?: unknown } | null)?.user
+  const previewOnly = Boolean(localPreview && !(session as { user?: unknown } | null)?.user)
+  const effectiveWorkshop = selectedWorkshop ?? (localPreview ? LOCAL_PREVIEW_WORKSHOP : null)
 
   const rootClass = isDarkMode ? 'dark' : ''
 
@@ -621,7 +643,7 @@ export default function App() {
     )
   }
 
-  if (!(session as any)?.user) {
+  if (!effectiveUser) {
     return (
       <div className={rootClass}>
         <LoginView
@@ -630,12 +652,13 @@ export default function App() {
           externalNotice={loginNotice}
           onDismissNotice={() => setLoginNotice(null)}
           onDemoLogin={demoAsesoresEnabled() ? handleDemoLogin : undefined}
+          onLocalPreview={LOCAL_PREVIEW_ENABLED ? handleLocalPreview : undefined}
         />
       </div>
     )
   }
 
-  if (!selectedWorkshop) {
+  if (!effectiveWorkshop) {
     return (
       <div className={rootClass}>
         <WorkshopSelectorView
@@ -658,14 +681,18 @@ export default function App() {
   return (
     <div className={rootClass}>
       <DashboardShell
-        key={selectedWorkshop.id}
-        workshop={selectedWorkshop}
-        sessionUser={(session as { user?: unknown })?.user}
+        key={`${effectiveWorkshop.id}-${localPreview?.role ?? 'real'}`}
+        workshop={effectiveWorkshop}
+        sessionUser={effectiveUser}
         licenseLogoUrl={mergedSidebarLogo}
         onLogout={() => void handleLogout()}
-        onClearWorkshop={() => setSelectedWorkshop(null)}
+        onClearWorkshop={() => {
+          if (previewOnly) return
+          setSelectedWorkshop(null)
+        }}
         isDarkMode={isDarkMode}
         onToggleTheme={() => setIsDarkMode((prev) => !prev)}
+        onLocalPreviewRole={LOCAL_PREVIEW_ENABLED ? handleLocalPreview : undefined}
       />
     </div>
   )

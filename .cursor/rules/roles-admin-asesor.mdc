@@ -1,0 +1,37 @@
+---
+description: Roles CRM — admin gestiona equipos/tableros/tareas; asesor ve Tareas de hoy
+alwaysApply: true
+---
+
+# Roles: admin vs asesor
+
+Dos experiencias distintas. No mezclar pantallas ni datos entre ellas.
+
+## Admin (vista de taller)
+
+Admin de taller por email: `santy@gmail.com`. Los asesores `@taller.demo` son asesores.
+
+Puede:
+
+- Crear y gestionar **equipos de asesores**
+- Definir y asignar a cada equipo sus **tipos de tareas** y **tableros**
+- Ver **estadísticas de trabajo** de sus empleados
+- **Asignar tareas** a asesores concretos
+
+No es el escritorio operativo del asesor. Gestor de tableros, equipo y métricas van aquí.
+
+## Asesor
+
+Puede:
+
+- Ver **Tareas de hoy** (su bandeja del día: las que el admin le asignó + las suyas del periodo)
+
+No crea equipos, no configura tipos/tableros de otros, no ve estadísticas del resto del equipo.
+
+## Al implementar
+
+- Nav y rutas según rol: admin ≠ asesor
+- Una tarea asignada por el admin aparece en Tareas de hoy del asesor
+- Tableros y tipos de tarea se filtran por el equipo del usuario
+- Stats de empleados: solo admin, sobre **todas** las filas del periodo (sin `TOP`/`LIMIT`)
+- Textos en español llano: «Tareas de hoy», «Asignar tarea», «Equipo»

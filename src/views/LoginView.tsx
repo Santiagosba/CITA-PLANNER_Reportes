@@ -13,6 +13,7 @@ interface LoginViewProps {
   externalNotice?: { kind: 'error' | 'info'; message: string } | null
   onDismissNotice?: () => void
   onDemoLogin?: (asesor: DemoAsesor) => void | Promise<void>
+  onLocalPreview?: (role: 'admin' | 'asesor') => void
 }
 
 export default function LoginView({
@@ -21,6 +22,7 @@ export default function LoginView({
   externalNotice,
   onDismissNotice,
   onDemoLogin,
+  onLocalPreview,
 }: LoginViewProps) {
   const [step, setStep] = useState(1)
   const [email, setEmail] = useState('')
@@ -97,6 +99,33 @@ export default function LoginView({
           <p className="section-subtitle mt-2">
             Acceso para asesores del taller. Elige tu cuenta de prueba o entra con tu correo.
           </p>
+
+          {onLocalPreview ? (
+            <div className="login-asesor-list" role="group" aria-label="Prueba en local">
+              <p className="field-label">Probar en este ordenador</p>
+              <p className="section-subtitle" style={{ marginTop: 0 }}>
+                Solo con <code>npm run dev</code>. No usa el deploy.
+              </p>
+              <button type="button" className="login-asesor-card" onClick={() => onLocalPreview('admin')}>
+                <span className="login-asesor-avatar" aria-hidden>
+                  AD
+                </span>
+                <span className="login-asesor-copy">
+                  <strong>Entrar como admin</strong>
+                  <small>Equipos, asignar y estadísticas</small>
+                </span>
+              </button>
+              <button type="button" className="login-asesor-card" onClick={() => onLocalPreview('asesor')}>
+                <span className="login-asesor-avatar" aria-hidden>
+                  AR
+                </span>
+                <span className="login-asesor-copy">
+                  <strong>Entrar como Ana (asesora)</strong>
+                  <small>Tareas de hoy</small>
+                </span>
+              </button>
+            </div>
+          ) : null}
 
           {onDemoLogin ? (
             <div className="login-asesor-list" role="list">

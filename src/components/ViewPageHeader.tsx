@@ -48,6 +48,26 @@ function pageCopy(route: DashboardShellRoute, triageTab: TriageTab | undefined, 
         title: 'Triage operativo',
         subtitle: 'Llamadas y tareas del chatbot: cuántas están hechas y cuántas faltan.',
       }
+    case 'equipos':
+      return {
+        title: 'Equipos',
+        subtitle: 'Crea equipos de asesores y asígnales tipos de tarea y tableros.',
+      }
+    case 'asignar-tarea':
+      return {
+        title: 'Asignar tarea',
+        subtitle: 'Elige asesor, tipo y día. La tarea aparece en su bandeja.',
+      }
+    case 'stats-equipo':
+      return {
+        title: 'Estadísticas',
+        subtitle: 'Trabajo de cada asesor: tareas asignadas y consultas cerradas.',
+      }
+    case 'tareas-hoy':
+      return {
+        title: 'Tareas de hoy',
+        subtitle: 'Lo que te toca cerrar hoy.',
+      }
     case 'boards':
       return {
         title: 'Gestor de tableros',
