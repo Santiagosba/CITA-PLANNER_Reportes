@@ -29,8 +29,40 @@ export type CallSocketEvent = {
   timestamp: string
 }
 
+type CallSubscription = {
+  logId: string
+  callControlId?: string
+  sessionId?: string
+  onAck?: (ok: boolean) => void
+}
+
 let socket: Socket | null = null
 let registeredUser: string | null = null
+/**
+ * Salas de llamada activas. Socket.io pierde las salas al reconectar, así que
+ * las guardamos y las volvemos a pedir en cada `connect`.
+ */
+const subscriptions = new Map<string, CallSubscription>()
+
+function subscriptionKey(sub: CallSubscription): string {
+  return `${sub.logId}|${sub.callControlId || ''}|${sub.sessionId || ''}`
+}
+
+function emitSubscribe(s: Socket, sub: CallSubscription) {
+  s.timeout(8000).emit(
+    'subscribe_call',
+    {
+      logId: sub.logId,
+      callControlId: sub.callControlId || undefined,
+      sessionId: sub.sessionId || undefined,
+    },
+    (err: unknown, res?: { ok?: boolean }) => {
+      // Sin respuesta (versión antigua de api-crm) no lo tratamos como rechazo.
+      if (err) return
+      sub.onAck?.(Boolean(res?.ok))
+    },
+  )
+}
 
 export function getCrmSocket(): Socket | null {
   const base = crmRealtimeBase()
@@ -46,7 +78,10 @@ export function getCrmSocket(): Socket | null {
     reconnectionDelayMax: 8000,
   })
   socket.on('connect', () => {
-    if (registeredUser) socket?.emit('register_user', registeredUser)
+    const s = socket
+    if (!s) return
+    if (registeredUser) s.emit('register_user', registeredUser)
+    for (const sub of subscriptions.values()) emitSubscribe(s, sub)
   })
   return socket
 }
@@ -58,20 +93,45 @@ export function registerCrmSocketUser(crmUserId: string | null | undefined) {
   if (s?.connected && registeredUser) s.emit('register_user', registeredUser)
 }
 
-/** Se suscribe a la sala privada de una llamada después de validar su propiedad en api-crm. */
+/**
+ * Se suscribe a la sala privada de una llamada después de validar su propiedad
+ * en api-crm. Idempotente por (logId, ids); `onAck(false)` = sin permiso.
+ */
 export function subscribeCrmSocketCall(call: {
   logId?: string | null
   callControlId?: string | null
   sessionId?: string | null
+  onAck?: (ok: boolean) => void
 }) {
   if (!call.logId || (!call.callControlId && !call.sessionId)) return
-  const s = getCrmSocket()
-  if (!s) return
-  s.emit('subscribe_call', {
+  const sub: CallSubscription = {
     logId: call.logId,
     callControlId: call.callControlId || undefined,
     sessionId: call.sessionId || undefined,
-  })
+    onAck: call.onAck,
+  }
+  const key = subscriptionKey(sub)
+  if (subscriptions.has(key)) return
+  subscriptions.set(key, sub)
+  const s = getCrmSocket()
+  if (!s) return
+  if (s.connected) emitSubscribe(s, sub)
+  // Si aún no está conectado, `connect` reenvía todas las suscripciones.
+}
+
+/** Olvida las salas de la llamada (o de todas) al colgar. */
+export function clearCrmSocketCallSubscriptions(logId?: string | null) {
+  if (!logId) {
+    subscriptions.clear()
+    return
+  }
+  for (const [key, sub] of subscriptions) {
+    if (sub.logId === logId) subscriptions.delete(key)
+  }
+}
+
+export function isCrmSocketConnected(): boolean {
+  return Boolean(socket?.connected)
 }
 
 export function onCrmTranscription(handler: (evt: TranscriptionEvent) => void): () => void {

@@ -14,7 +14,15 @@ import {
   RefreshCw,
   X,
 } from 'lucide-react'
-import { estimatedCallCost, softphone, useSoftphone, type ActiveCall, type FinishedCall, type TranscriptLine } from '../lib/softphone'
+import {
+  estimatedCallCost,
+  softphone,
+  transcriptionLabel,
+  useSoftphone,
+  type ActiveCall,
+  type FinishedCall,
+  type TranscriptLine,
+} from '../lib/softphone'
 import { useSoftphoneLevels } from '../lib/audioLevels'
 import { fmtMoney, hangupLabel } from '../lib/callFormat'
 import { apps, useApps } from '../lib/apps'
@@ -80,7 +88,21 @@ function useTelLinkInterceptor() {
   }, [])
 }
 
-function LiveTranscript({ lines }: { lines: TranscriptLine[] }) {
+function transcriptEmptyText(call: ActiveCall): string {
+  switch (call.transcription) {
+    case 'denied':
+      return 'api-crm no reconoce esta llamada como tuya: no se puede transcribir. Pide que vinculen tu usuario al CRM.'
+    case 'unavailable':
+      return 'La transcripción no ha arrancado. La grabación sigue disponible al colgar.'
+    case 'live':
+    case 'linking':
+      return 'Escuchando… la transcripción aparece en cuanto haya conversación.'
+    default:
+      return 'La transcripción empieza cuando el cliente conteste.'
+  }
+}
+
+function LiveTranscript({ call, lines }: { call: ActiveCall; lines: TranscriptLine[] }) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = ref.current
@@ -89,7 +111,7 @@ function LiveTranscript({ lines }: { lines: TranscriptLine[] }) {
   return (
     <div ref={ref} className="softphone-transcript custom-scrollbar-light" aria-live="polite">
       {lines.length === 0 ? (
-        <p className="softphone-transcript-empty">Escuchando… la transcripción aparece en cuanto haya conversación.</p>
+        <p className="softphone-transcript-empty">{transcriptEmptyText(call)}</p>
       ) : (
         lines.map((line) => (
           <p key={line.id} className={`softphone-line ${line.speaker} ${line.final ? '' : 'is-partial'}`}>
@@ -259,7 +281,7 @@ export default function SoftphoneDock() {
           <div className="softphone-live-meta">
             <span>{liveCost ? fmtMoney(liveCost.amount, liveCost.currency) : 'Coste al colgar'}</span>
             <span>{call.recording ? 'Grabando' : inConversation ? 'Conectando grabación…' : 'Sin grabar aún'}</span>
-            <span>{call.transcript.some((l) => l.final) ? 'Transcribiendo' : inConversation ? 'Esperando voz…' : 'Transcripción al contestar'}</span>
+            <span className={`softphone-tx-status is-${call.transcription}`}>{transcriptionLabel(call)}</span>
           </div>
 
           {inConversation && showTranscript ? (
@@ -269,7 +291,7 @@ export default function SoftphoneDock() {
                 <span>{lastLine.text}</span>
               </p>
             ) : (
-              <LiveTranscript lines={call.transcript} />
+              <LiveTranscript call={call} lines={call.transcript} />
             )
           ) : null}
 

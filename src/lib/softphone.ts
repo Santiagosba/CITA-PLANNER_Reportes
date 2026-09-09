@@ -21,6 +21,7 @@ import { useSyncExternalStore } from 'react'
 import type { TelnyxRTC as TelnyxClient, Call, INotification } from '@telnyx/webrtc'
 import {
   CrmApiError,
+  fetchCallDetail,
   fetchOutboundCli,
   fetchRateEstimate,
   fetchWebrtcCredentials,
@@ -31,6 +32,7 @@ import {
   type RateEstimate,
 } from './crmApi'
 import {
+  clearCrmSocketCallSubscriptions,
   onCrmTranscription,
   registerCrmSocketUser,
   subscribeCrmSocketCall,
@@ -41,6 +43,18 @@ export type SoftphoneStatus = 'off' | 'connecting' | 'ready' | 'error'
 export type CallDirection = 'outgoing' | 'incoming'
 export type CallPhase = 'dialing' | 'ringing' | 'active' | 'held' | 'ending'
 export type TranscriptSpeaker = 'asesor' | 'cliente'
+/**
+ * Estado de la transcripción Deepgram de la llamada en curso.
+ *  - `pending`: aún no hay conversación (marcando/sonando).
+ *  - `linking`: contestada; esperando a que api-crm enlace la pata Telnyx y
+ *    arranque el streaming.
+ *  - `live`: ya llegan segmentos por Socket.io.
+ *  - `denied`: api-crm no reconoce la llamada como nuestra (usuario sin
+ *    vincular en el CRM) y no manda los eventos.
+ *  - `unavailable`: contestada hace rato y no ha llegado nada (streaming caído
+ *    o sin `STREAM_WS_URL` en api-crm).
+ */
+export type TranscriptionStatus = 'pending' | 'linking' | 'live' | 'denied' | 'unavailable'
 
 export type TranscriptLine = {
   id: string
@@ -62,10 +76,19 @@ export type ActiveCall = {
   answeredAt: number | null
   muted: boolean
   logId: string | null
+  /** Ids de nuestra pata WebRTC según el SDK de Telnyx. */
   callControlId: string | null
   sessionId: string | null
+  /**
+   * Ids de la pata que transcribe api-crm (la del cliente). Los enlaza el
+   * webhook `call.initiated` a la fila de `llamadas_softphone`; los leemos de
+   * `GET /api/calls/log/:id` en cuanto la llamada se contesta.
+   */
+  legControlId: string | null
+  legSessionId: string | null
   /** api-crm graba automáticamente en cuanto la llamada se contesta. */
   recording: boolean
+  transcription: TranscriptionStatus
   transcript: TranscriptLine[]
   /** Tarifa estimada por minuto (para el contador de coste en vivo). */
   rate: RateEstimate | null
@@ -100,14 +123,115 @@ function loadRateEstimate(callId: string, number: string) {
     .catch(() => undefined)
 }
 
+function isTelnyxId(raw: string | null | undefined): raw is string {
+  const v = raw?.trim() || ''
+  return Boolean(v) && !v.startsWith('webrtc-')
+}
+
+/** Todos los ids Telnyx que identifican esta llamada (pata WebRTC + pata del cliente). */
+function knownTelnyxIds(call: ActiveCall): string[] {
+  return [call.callControlId, call.sessionId, call.legControlId, call.legSessionId].filter(isTelnyxId)
+}
+
 /** Pide a api-crm el streaming Deepgram sobre esta pata (idempotente en servidor). */
 function requestLiveTranscription(call: ActiveCall | null) {
-  const controlId = call?.callControlId?.trim()
-  if (!controlId || controlId.startsWith('webrtc-')) return
+  // La pata que api-crm reconoce como nuestra es la enlazada en la fila del log.
+  const controlId = call?.legControlId ?? call?.callControlId
+  if (!isTelnyxId(controlId)) return
   void startCallTranscription({
     call_control_id: controlId,
-    call_session_id: call?.sessionId,
+    call_session_id: call?.legSessionId ?? call?.sessionId,
   }).catch(() => undefined)
+}
+
+/** Cada cuánto se comprueba si api-crm ya ha enlazado la pata Telnyx a la fila del log. */
+const LEG_LINK_POLL_MS = 1500
+const LEG_LINK_MAX_ATTEMPTS = 12
+/** Tras contestar, si no llega ningún segmento en este tiempo damos la transcripción por caída. */
+const TRANSCRIPTION_TIMEOUT_MS = 45_000
+
+let legSyncForCall: string | null = null
+let transcriptionTimeoutTimer = 0
+
+/**
+ * Sincroniza la transcripción con api-crm cuando la llamada ya está contestada:
+ *  1. Lee `GET /api/calls/log/:id` hasta que la fila tenga el `call_control_id`
+ *     real de Telnyx (lo pone el webhook `call.initiated`).
+ *  2. Se suscribe a la sala Socket.io de esos ids y pide el streaming (por si
+ *     el webhook `call.answered` no lo arrancó).
+ * Idempotente por llamada; se relanza si el `logId` llega después de contestar.
+ */
+function ensureTranscriptionSync() {
+  const call = state.call
+  if (!call || !call.logId) return
+  if (call.phase !== 'active' && call.phase !== 'held') return
+  if (legSyncForCall === call.id) return
+  legSyncForCall = call.id
+  const callId = call.id
+  const logId = call.logId
+
+  if (call.transcription === 'pending') patchCall({ transcription: 'linking' })
+  armTranscriptionTimeout(callId)
+
+  void (async () => {
+    for (let attempt = 0; attempt < LEG_LINK_MAX_ATTEMPTS; attempt++) {
+      const current = state.call
+      if (!current || current.id !== callId || current.phase === 'ending') return
+      try {
+        const detail = await fetchCallDetail(logId)
+        if (isTelnyxId(detail.call_control_id)) {
+          const legControlId = detail.call_control_id
+          const legSessionId = isTelnyxId(detail.call_session_id) ? detail.call_session_id : current.legSessionId
+          if (legControlId !== current.legControlId || legSessionId !== current.legSessionId) {
+            patchCall({ legControlId, legSessionId })
+          }
+          requestLiveTranscription(state.call)
+          return
+        }
+      } catch (e) {
+        if (e instanceof CrmApiError && e.status === 403) {
+          if (state.call?.id === callId && state.call.transcription !== 'live') {
+            patchCall({ transcription: 'denied' })
+          }
+          return
+        }
+      }
+      await new Promise((r) => setTimeout(r, LEG_LINK_POLL_MS))
+    }
+    // Sin enlace en la fila: intentamos con lo que tenga el SDK.
+    requestLiveTranscription(state.call)
+  })()
+}
+
+function armTranscriptionTimeout(callId: string) {
+  window.clearTimeout(transcriptionTimeoutTimer)
+  transcriptionTimeoutTimer = window.setTimeout(() => {
+    const current = state.call
+    if (!current || current.id !== callId) return
+    if (current.transcription === 'linking') patchCall({ transcription: 'unavailable' })
+  }, TRANSCRIPTION_TIMEOUT_MS)
+}
+
+function onSubscriptionAck(callId: string, ok: boolean) {
+  const current = state.call
+  if (!current || current.id !== callId) return
+  if (!ok && current.transcription !== 'live') patchCall({ transcription: 'denied' })
+}
+
+/** Texto corto para la UI según el estado de la transcripción. */
+export function transcriptionLabel(call: ActiveCall): string {
+  switch (call.transcription) {
+    case 'live':
+      return 'Transcribiendo'
+    case 'linking':
+      return 'Conectando transcripción…'
+    case 'denied':
+      return 'Sin permiso para transcribir'
+    case 'unavailable':
+      return 'Transcripción no disponible'
+    default:
+      return 'Transcripción al contestar'
+  }
 }
 
 export type SoftphoneState = {
@@ -175,12 +299,29 @@ function setState(patch: Partial<SoftphoneState>) {
   if (
     nextCall &&
     (
+      previousCall?.id !== nextCall.id ||
       previousCall?.logId !== nextCall.logId ||
       previousCall?.callControlId !== nextCall.callControlId ||
-      previousCall?.sessionId !== nextCall.sessionId
+      previousCall?.sessionId !== nextCall.sessionId ||
+      previousCall?.legControlId !== nextCall.legControlId ||
+      previousCall?.legSessionId !== nextCall.legSessionId
     )
   ) {
-    subscribeCrmSocketCall(nextCall)
+    const onAck = (ok: boolean) => onSubscriptionAck(nextCall.id, ok)
+    // Sala de nuestra pata WebRTC…
+    subscribeCrmSocketCall({
+      logId: nextCall.logId,
+      callControlId: isTelnyxId(nextCall.callControlId) ? nextCall.callControlId : null,
+      sessionId: isTelnyxId(nextCall.sessionId) ? nextCall.sessionId : null,
+      onAck,
+    })
+    // …y de la pata del cliente, que es la que emite `call_transcription`.
+    subscribeCrmSocketCall({
+      logId: nextCall.logId,
+      callControlId: nextCall.legControlId,
+      sessionId: nextCall.legSessionId,
+      onAck,
+    })
   }
   emit()
 }
@@ -300,15 +441,15 @@ function syncTelnyxIds(call: Call) {
   const sessionId = ids?.telnyxSessionId || current.sessionId
   if (callControlId !== current.callControlId || sessionId !== current.sessionId) {
     patchCall({ callControlId, sessionId })
-    if (state.call?.phase === 'active' || state.call?.phase === 'held') {
-      requestLiveTranscription({ ...current, callControlId, sessionId })
-    }
   }
 }
 
 function finishCall(cause?: string) {
   const current = state.call
   rtcCall = null
+  window.clearTimeout(transcriptionTimeoutTimer)
+  legSyncForCall = null
+  clearCrmSocketCallSubscriptions()
   if (!current) return
 
   const endedAt = Date.now()
@@ -388,7 +529,10 @@ function onCallUpdate(call: Call) {
         logId: null,
         callControlId: ids?.telnyxCallControlId || null,
         sessionId: ids?.telnyxSessionId || null,
+        legControlId: null,
+        legSessionId: null,
         recording: false,
+        transcription: 'pending',
         transcript: [],
         rate: null,
       },
@@ -401,7 +545,11 @@ function onCallUpdate(call: Call) {
       call_control_id: ids?.telnyxCallControlId || null,
       call_session_id: ids?.telnyxSessionId || null,
     })
-      .then((row) => patchCall({ logId: row.id }))
+      .then((row) => {
+        if (state.call?.id !== call.id) return
+        patchCall({ logId: row.id })
+        ensureTranscriptionSync()
+      })
       .catch(() => undefined)
     return
   }
@@ -432,7 +580,7 @@ function onCallUpdate(call: Call) {
         muted: call.isAudioMuted,
         recording: true,
       })
-      requestLiveTranscription(state.call)
+      ensureTranscriptionSync()
       break
     case 'held':
       patchCall({ phase: 'held' })
@@ -471,15 +619,20 @@ function onNotification(n: INotification) {
 function onTranscription(evt: TranscriptionEvent) {
   const current = state.call
   if (!current || current.phase === 'ending') return
-  const sameSession = Boolean(current.sessionId) && evt.call_session_id === current.sessionId
-  const sameLeg = Boolean(current.callControlId) && evt.call_control_id === current.callControlId
-  // Sin ids todavía (Telnyx aún no los ha mandado al SDK) aceptamos el evento si es
-  // la única llamada activa del operador: el socket sólo trae nuestras llamadas.
-  const idsUnknown = !current.sessionId && !current.callControlId
-  if (!sameSession && !sameLeg && !idsUnknown) return
+  const known = knownTelnyxIds(current)
+  const eventIds = [evt.call_control_id, evt.call_leg_id, evt.call_session_id].filter(isTelnyxId)
+  const matches = eventIds.some((id) => known.includes(id))
+  // Sin ids todavía (Telnyx aún no los ha mandado al SDK ni api-crm ha enlazado
+  // la fila) aceptamos el evento: el socket sólo trae nuestras llamadas.
+  if (!matches && known.length > 0) return
 
   const text = evt.transcript.trim()
   if (!text) return
+
+  if (current.transcription !== 'live') {
+    window.clearTimeout(transcriptionTimeoutTimer)
+    patchCall({ transcription: 'live' })
+  }
   const speaker: TranscriptSpeaker = evt.transcription_track === 'outbound' ? 'asesor' : 'cliente'
   const lines = current.transcript.slice()
   const lastIdx = lines.length - 1
@@ -661,7 +814,10 @@ export const softphone = {
         logId: null,
         callControlId: call.telnyxIDs?.telnyxCallControlId || null,
         sessionId: call.telnyxIDs?.telnyxSessionId || null,
+        legControlId: null,
+        legSessionId: null,
         recording: false,
+        transcription: 'pending',
         transcript: [],
         rate: null,
       },
@@ -669,15 +825,20 @@ export const softphone = {
     loadRateEstimate(call.id, number)
 
     // Sin ids Telnyx todavía: api-crm los enlaza después por teléfono
-    // (`linkRecentSoftphoneToTelnyxLeg`) para colgar la grabación en esta fila.
+    // (`linkRecentSoftphoneToTelnyxLeg`) para colgar la grabación y la
+    // transcripción en esta fila. Por eso mandamos siempre el marcador `webrtc-`.
     void logCallStart({
       telefono_destino: number,
       telefono_origen: state.callerId,
       direccion: 'outgoing',
-      call_control_id: call.telnyxIDs?.telnyxCallControlId || `webrtc-${call.id}`,
+      call_control_id: `webrtc-${call.id}`,
       call_session_id: call.telnyxIDs?.telnyxSessionId || null,
     })
-      .then((row) => patchCall({ logId: row.id }))
+      .then((row) => {
+        if (state.call?.id !== call.id) return
+        patchCall({ logId: row.id })
+        ensureTranscriptionSync()
+      })
       .catch(() => undefined)
 
     return true

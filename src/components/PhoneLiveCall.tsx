@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Coins, FileText, Grid3x3, Mic, MicOff, Pause, Phone, PhoneIncoming, PhoneOff, Play, Timer } from 'lucide-react'
-import { estimatedCallCost, softphone, type ActiveCall } from '../lib/softphone'
+import { estimatedCallCost, softphone, transcriptionLabel, type ActiveCall } from '../lib/softphone'
 import { useSoftphoneLevels } from '../lib/audioLevels'
 import { fmtMoney, fmtSeconds } from '../lib/callFormat'
 import { TranscriptLines } from './PhoneCallDetail'
@@ -41,6 +41,32 @@ type Props = {
   callerId: string | null
 }
 
+function transcriptionTone(call: ActiveCall): string {
+  switch (call.transcription) {
+    case 'live':
+      return 'tone-positive'
+    case 'denied':
+    case 'unavailable':
+      return 'tone-warning'
+    default:
+      return 'tone-info'
+  }
+}
+
+function transcriptEmptyText(call: ActiveCall): string {
+  switch (call.transcription) {
+    case 'denied':
+      return 'api-crm no reconoce esta llamada como tuya: no se puede transcribir. Pide que vinculen tu usuario al CRM.'
+    case 'unavailable':
+      return 'La transcripción no ha arrancado. La grabación sigue disponible al colgar.'
+    case 'live':
+    case 'linking':
+      return 'Escuchando… la transcripción aparece en cuanto haya conversación.'
+    default:
+      return 'La transcripción empieza cuando el cliente conteste.'
+  }
+}
+
 /** Transcripción en vivo con autoscroll al final. */
 export function LiveTranscript({ call }: { call: ActiveCall }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -48,22 +74,15 @@ export function LiveTranscript({ call }: { call: ActiveCall }) {
     const el = ref.current?.querySelector('.phone-transcript')
     if (el) el.scrollTop = el.scrollHeight
   }, [call.transcript])
-  const listening = call.phase === 'active' || call.phase === 'held'
   return (
     <div ref={ref} className="phone-live-transcript" aria-live="polite">
       <p className="phone-suggest-title">
         <FileText size={13} aria-hidden />
         Transcripción en vivo
         {call.recording ? <span className="phone-live-rec">REC</span> : null}
+        <span className={`badge ${transcriptionTone(call)} phone-live-tx-badge`}>{transcriptionLabel(call)}</span>
       </p>
-      <TranscriptLines
-        lines={call.transcript}
-        emptyText={
-          listening
-            ? 'Escuchando… la transcripción aparece en cuanto haya conversación.'
-            : 'La transcripción empieza cuando el cliente conteste.'
-        }
-      />
+      <TranscriptLines lines={call.transcript} emptyText={transcriptEmptyText(call)} />
     </div>
   )
 }

@@ -8254,6 +8254,20 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   color: var(--muted);
 }
 
+/* Estado de la transcripción Deepgram (dock flotante). */
+.softphone-tx-status.is-live {
+  color: #15803d;
+}
+
+.softphone-tx-status.is-linking {
+  color: var(--brand, #0b63d6);
+}
+
+.softphone-tx-status.is-denied,
+.softphone-tx-status.is-unavailable {
+  color: #b45309;
+}
+
 .softphone-live-line {
   display: flex;
   gap: 8px;
@@ -10503,6 +10517,17 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
 
 .phone-live-inline .phone-live-transcript .phone-transcript {
   max-height: 200px;
+}
+
+/* Badge de estado de la transcripción en la cabecera del panel. */
+.phone-live-tx-badge {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
+.phone-live-rec + .phone-live-tx-badge {
+  margin-left: 6px;
 }
 
 .phone-live-rec {
