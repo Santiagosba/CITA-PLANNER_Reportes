@@ -149,14 +149,14 @@ function requestLiveTranscription(call: ActiveCall | null) {
   }).catch(() => undefined)
 }
 
-/** Cada cuánto se comprueba si api-crm ya ha enlazado la pata Telnyx a la fila del log. */
-const LEG_LINK_POLL_MS = 1500
-const LEG_LINK_MAX_ATTEMPTS = 12
-/** Tras contestar, si no llega ningún segmento en este tiempo damos la transcripción por caída. */
-const TRANSCRIPTION_TIMEOUT_MS = 45_000
+/** Reintento mientras la llamada está activa y aún no llegan segmentos Deepgram. */
+const TRANSCRIPTION_RETRY_MS = 4_000
+/** Si el cliente tarda en coger, 45 s era poco: el tono disparaba el timeout. */
+const TRANSCRIPTION_TIMEOUT_MS = 3 * 60_000
 
 let legSyncForCall: string | null = null
 let transcriptionTimeoutTimer = 0
+let transcriptionRetryTimer = 0
 /** Tras colgar, Deepgram aún puede mandar el último turno: lo recogemos unos segundos. */
 const HANGUP_FLUSH_MS = 3_000
 let hangupFlushTimer = 0
@@ -169,12 +169,9 @@ let hangupFlush: {
 } | null = null
 
 /**
- * Sincroniza la transcripción con api-crm cuando la llamada ya está contestada:
- *  1. Lee `GET /api/calls/log/:id` hasta que la fila tenga el `call_control_id`
- *     real de Telnyx (lo pone el webhook `call.initiated`).
- *  2. Se suscribe a la sala Socket.io de esos ids y pide el streaming (por si
- *     el webhook `call.answered` no lo arrancó).
- * Idempotente por llamada; se relanza si el `logId` llega después de contestar.
+ * Sincroniza la transcripción cuando hay conversación. Si el cliente tarda en
+ * coger, el primer `active` suele ser tono/secretaría: hay que reintentar
+ * `transcription/start` hasta que Deepgram mande segmentos.
  */
 function ensureTranscriptionSync() {
   const call = state.call
@@ -182,51 +179,45 @@ function ensureTranscriptionSync() {
   if (call.phase !== 'active' && call.phase !== 'held') return
   if (legSyncForCall === call.id) return
   legSyncForCall = call.id
-  const callId = call.id
-  const logId = call.logId
+  if (call.transcription === 'pending' || call.transcription === 'unavailable') {
+    patchCall({ transcription: 'linking' })
+  }
+  armTranscriptionTimeout(call.id)
+  void kickTranscription(call.id)
+}
 
-  if (call.transcription === 'pending') patchCall({ transcription: 'linking' })
-  armTranscriptionTimeout(callId)
-  // No esperar al detalle: el SDK ya tiene ids y POST /transcription/start existe.
-  requestLiveTranscription(call)
+async function kickTranscription(callId: string) {
+  window.clearTimeout(transcriptionRetryTimer)
+  const current = state.call
+  if (!current || current.id !== callId) return
+  if (current.phase !== 'active' && current.phase !== 'held') return
+  if (current.transcription === 'live' || current.transcription === 'denied') return
 
-  void (async () => {
-    for (let attempt = 0; attempt < LEG_LINK_MAX_ATTEMPTS; attempt++) {
-      const current = state.call
-      if (!current || current.id !== callId || current.phase === 'ending') return
-      try {
-        const detail = await fetchCallDetail(logId)
-        if (isTelnyxId(detail.call_control_id)) {
-          const legControlId = detail.call_control_id
-          const legSessionId = isTelnyxId(detail.call_session_id) ? detail.call_session_id : current.legSessionId
-          if (legControlId !== current.legControlId || legSessionId !== current.legSessionId) {
-            patchCall({ legControlId, legSessionId })
-          }
-          requestLiveTranscription(state.call)
-          return
-        }
-      } catch (e) {
-        if (e instanceof CrmApiError && e.status === 403) {
-          if (state.call?.id === callId && state.call.transcription !== 'live') {
-            patchCall({ transcription: 'denied' })
-          }
-          return
-        }
-        if (isEndpointMissing(e)) {
-          // api-crm antiguo: no hay detalle de llamada. Nos quedamos con los
-          // ids del SDK y avisamos en la UI; no insistimos.
-          if (state.call?.id === callId && state.call.transcription === 'linking') {
-            patchCall({ transcription: 'unsupported' })
-          }
-          requestLiveTranscription(state.call)
-          return
+  if (current.logId) {
+    try {
+      const detail = await fetchCallDetail(current.logId)
+      if (state.call?.id !== callId) return
+      if (isTelnyxId(detail.call_control_id)) {
+        const legControlId = detail.call_control_id
+        const legSessionId = isTelnyxId(detail.call_session_id)
+          ? detail.call_session_id
+          : state.call.legSessionId
+        if (legControlId !== state.call.legControlId || legSessionId !== state.call.legSessionId) {
+          patchCall({ legControlId, legSessionId })
         }
       }
-      await new Promise((r) => setTimeout(r, LEG_LINK_POLL_MS))
+    } catch (e) {
+      if (e instanceof CrmApiError && e.status === 403) {
+        if (state.call?.id === callId && state.call.transcription !== 'live') {
+          patchCall({ transcription: 'denied' })
+        }
+        return
+      }
     }
-    // Sin enlace en la fila: intentamos con lo que tenga el SDK.
-    requestLiveTranscription(state.call)
-  })()
+  }
+
+  requestLiveTranscription(state.call)
+  transcriptionRetryTimer = window.setTimeout(() => void kickTranscription(callId), TRANSCRIPTION_RETRY_MS)
 }
 
 function armTranscriptionTimeout(callId: string) {
@@ -489,6 +480,7 @@ function finishCall(cause?: string) {
   const current = state.call
   rtcCall = null
   window.clearTimeout(transcriptionTimeoutTimer)
+  window.clearTimeout(transcriptionRetryTimer)
   window.clearTimeout(hangupFlushTimer)
   legSyncForCall = null
   if (!current) {
@@ -611,7 +603,6 @@ function onCallUpdate(call: Call) {
       .then((row) => {
         if (state.call?.id !== call.id) return
         patchCall({ logId: row.id })
-        ensureTranscriptionSync()
       })
       .catch(() => undefined)
     return
