@@ -64,7 +64,9 @@ export function matchesOwnerScope(
 ): boolean {
   if (scope === 'todas') return true
   const kind = classifyOwnerEmail(email, ctx)
-  if (scope === 'grupo') return kind === 'mias' || kind === 'grupo'
+  // La bandeja del equipo: lo mío, lo de compañeros del grupo y lo sin dueño.
+  // Si no, Ana y el resto de asesores no ven lo que hay que recoger.
+  if (scope === 'grupo') return kind === 'mias' || kind === 'grupo' || kind === 'sin_dueno'
   return kind === scope
 }
 
@@ -87,7 +89,7 @@ export function ownerScopeEmptyCopy(scope: OwnerScope): string {
     case 'mias':
       return 'No hay nada tuyo en este periodo.'
     case 'grupo':
-      return 'No hay tickets o tareas de tu equipo.'
+      return 'No hay tickets o tareas tuyos, del equipo o sin dueño.'
     case 'companeros':
       return 'No hay nada de otros compañeros en este periodo.'
     case 'sin_dueno':

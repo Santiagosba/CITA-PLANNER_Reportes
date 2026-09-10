@@ -43,6 +43,7 @@ import { useOperationalData } from '../hooks/useOperationalData'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
 import { isDemoTicketId } from '../lib/demoTickets'
 import { applyPeticionPatch, PETICIONES_PATCHED_EVENT } from '../lib/ticketOps'
+import { isEmptyDeskRestore, isOsFurniture, isPrimaryWorkAction } from '../lib/osDeskClick'
 
 type Props = {
   workshop: Workshop
@@ -336,12 +337,19 @@ export default function DashboardShell({
     setSideMinWave((n) => n + 1)
   }, [])
 
-  /** Apartado del panel: las fichas van a la barra, que se queda visible para restaurarlas. */
+  const sessionsRef = useRef(sessions)
+  useEffect(() => {
+    sessionsRef.current = sessions
+  }, [sessions])
+
+  /** Recoge fichas y apps abiertas al cambiar de panel. No crea ni abre la barra si no había ventanas. */
   const hideDeskWindows = useCallback(() => {
-    apps.minimizeAll()
+    const openSessions = sessionsRef.current.some((session) => !session.minimized)
+    const openApps = apps.getState().windows.some((win) => !win.minimized)
+    if (!openSessions && !openApps) return
+    if (openApps) apps.pinTaskbar()
     setSideMinWave((n) => n + 1)
     setActiveId(null)
-    setAgendaTucked(false)
   }, [])
 
   const restoreDesk = useCallback(() => {
@@ -407,16 +415,11 @@ export default function DashboardShell({
 
   const openWindows = useMemo(() => sessions.filter((s) => !s.minimized), [sessions])
   const openWindowsRef = useRef(openWindows)
-  const sessionsRef = useRef(sessions)
   const agendaTuckedRef = useRef(agendaTucked)
 
   useEffect(() => {
     openWindowsRef.current = openWindows
   }, [openWindows])
-
-  useEffect(() => {
-    sessionsRef.current = sessions
-  }, [sessions])
 
   useEffect(() => {
     agendaTuckedRef.current = agendaTucked
@@ -468,87 +471,30 @@ export default function DashboardShell({
 
     const tuckDesk = () => {
       if (!hasOpenWindows()) return
+      apps.pinTaskbar()
       minimizeAllToSides()
-      apps.minimizeAll()
     }
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return
-      const t = e.target as HTMLElement | null
-      if (!t) return
+      if (isOsFurniture(e.target)) return
 
-      // Escritorio: una ficha o la agenda traen su propia ventana al frente
-      // (lo hacen ellas mismas con onFocus); nunca minimizan el resto.
-      if (t.closest('.lead-os-window, .call-agenda-root')) return
-      if (
-        t.closest(
-          '.inbound-modal-root, .gestion-capacity-toast, .agenda-peek, .softphone-dock, .softphone-toast, .view-page-search',
-        )
-      ) {
+      if (hasOpenWindows()) {
+        // Tickets, KPIs y nav ya abren o cambian de vista; no recoger encima.
+        if (isPrimaryWorkAction(e.target)) return
+        tuckDesk()
         return
       }
 
-      // El chip del teléfono abre su app: no toca el escritorio.
-      if (t.closest('.softphone-chip')) return
-
-      // Acciones de verdad: no recoger ni restaurar. El fondo (huecos del
-      // panel, cabecera, sidebar) sí: un clic recoge, el siguiente las saca.
-      if (
-        t.closest(
-          [
-            'button',
-            'a',
-            'input',
-            'textarea',
-            'select',
-            'label',
-            'summary',
-            '[role="button"]',
-            '[role="link"]',
-            '[role="menuitem"]',
-            '[role="tab"]',
-            '[role="option"]',
-            '[role="checkbox"]',
-            '[role="switch"]',
-            '[contenteditable]',
-            '.ops-feed-row',
-            '.ops-kpi',
-            '.report-row-clickable',
-            '.prow',
-            '.prow-toggle',
-            '.triage-view-btn',
-            '.fc-event',
-            '.calendar-event',
-            '.calendar-slot',
-            '.calendar-chip',
-            '.calendar-schedule',
-            '.calendar-month-cell',
-            '.calendar-year-day',
-            '.calendar-year-month',
-            '.elevator-slot.is-clickable',
-            '.is-clickable',
-            '.kanban-card',
-            '.kanban-card-slot',
-            '.list-row',
-            '.role-check',
-            '.role-task-row',
-            '.dashboard-nav-item',
-          ].join(', '),
-        )
-      ) {
-        return
-      }
-
-      if (!hasOpenWindows() && hasMinimizedDesk()) {
+      // Recogido: solo un hueco vacío saca las ventanas. Un campo o una
+      // tarjeta no debe restaurarlas.
+      if (hasMinimizedDesk() && isEmptyDeskRestore(e.target)) {
         restoreDesk()
-        return
       }
-
-      tuckDesk()
     }
 
-    document.addEventListener('pointerdown', onPointerDown)
-    return () => document.removeEventListener('pointerdown', onPointerDown)
+    document.addEventListener('pointerdown', onPointerDown, true)
+    return () => document.removeEventListener('pointerdown', onPointerDown, true)
   }, [minimizeAllToSides, restoreDesk])
 
   const toggleMaximize = useCallback((id: string) => {
