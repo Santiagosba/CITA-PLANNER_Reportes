@@ -51,12 +51,14 @@ const AppWindowItem = memo(function AppWindowItem({
   const meta = APP_META[win.id]
   return (
     <ToolWindow
+      windowId={`app:${win.id}`}
       className={`app-${win.id}`}
       title={meta.label}
       icon={<AppIcon id={win.id} />}
       meta={win.id === 'phone' ? <PhoneMeta /> : null}
       rect={win.rect}
       zIndex={win.z}
+      placement={win.placement}
       maximized={win.maximized}
       enterFrom={win.enterFrom}
       minimizeRequest={minimizeRequest + win.minimizeRequest}
@@ -68,9 +70,9 @@ const AppWindowItem = memo(function AppWindowItem({
       onRectChange={(rect) => apps.setRect(win.id, rect)}
       onClose={() => apps.close(win.id)}
       onMinimize={() => apps.minimize(win.id)}
-      onToggleMaximize={() => apps.toggleMaximize(win.id)}
+      onPlace={(placement) => apps.place(win.id, placement)}
     >
-      <AppContent id={win.id} roomy={win.maximized} />
+      <AppContent id={win.id} roomy={win.maximized || win.placement === 'fill'} />
     </ToolWindow>
   )
 })

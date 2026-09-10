@@ -5,6 +5,7 @@
  * de Vite/Vercel reenvía a CitaplannerServer.
  */
 
+import { filterCrmUuids, isCrmUuid } from './crmUuid'
 import type { GestionPatch, PeticionPendiente, PeticionesFilters, TipoPeticionRow } from './peticionesPendientes'
 import type { CitaTaller } from './citasTaller'
 import { supabase } from './supabase'
@@ -179,8 +180,12 @@ export async function sqlResolveTallerIds(input: {
   nombre?: string
   expandGrupo?: boolean
 }): Promise<SqlResolveTalleresResult> {
+  const hubIds = filterCrmUuids(input.hubIds)
+  if (!hubIds.length && !input.nombre?.trim()) {
+    return { ids: [], talleres: [], via: 'none' }
+  }
   const params: Record<string, string | string[]> = {
-    idTaller: input.hubIds.map((id) => id.trim().toLowerCase()).filter(Boolean),
+    idTaller: hubIds,
   }
   if (input.nombre?.trim()) params.nombre = input.nombre.trim()
   if (input.expandGrupo) params.expandGrupo = '1'
@@ -195,8 +200,10 @@ export async function sqlFetchPendingPeticiones(
   idTallerIds: string[],
   filters: PeticionesFilters = {},
 ): Promise<PeticionPendiente[]> {
+  const idTaller = filterCrmUuids(idTallerIds)
+  if (!idTaller.length) return []
   const params: Record<string, string | string[]> = {
-    idTaller: idTallerIds,
+    idTaller,
   }
   if (filters.caller?.trim()) params.caller = filters.caller.trim()
   if (filters.tipoPeticionId != null) params.tipoPeticionId = String(filters.tipoPeticionId)
@@ -212,8 +219,10 @@ export async function sqlFetchCitas(
   idTallerIds: string[],
   range: { from?: string; to?: string } = {},
 ): Promise<CitaTaller[]> {
+  const idTaller = filterCrmUuids(idTallerIds)
+  if (!idTaller.length) return []
   const params: Record<string, string | string[]> = {
-    idTaller: idTallerIds,
+    idTaller,
   }
   if (range.from?.trim()) params.from = range.from.trim()
   if (range.to?.trim()) params.to = range.to.trim()
@@ -221,6 +230,7 @@ export async function sqlFetchCitas(
 }
 
 export async function sqlUpdatePeticionGestion(idpeticion: string, patch: GestionPatch): Promise<void> {
+  if (!isCrmUuid(idpeticion)) return
   await parseJson<{ ok: boolean }>(
     await apiFetch(url(`/api/peticiones/${encodeURIComponent(idpeticion)}/gestion`), {
       method: 'PATCH',

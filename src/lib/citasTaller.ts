@@ -1,4 +1,6 @@
 import type { Workshop } from '../types'
+import { filterCrmUuids } from './crmUuid'
+import { isLocalPreviewWorkshop } from './localPreview'
 import { fetchAllSupabasePages } from './supabaseFetchAll'
 import { supabaseAviOld } from './supabase'
 import { resolveAvioldTallerIdsDetailed } from './peticionesPendientes'
@@ -60,18 +62,21 @@ export async function fetchCitasTaller(
   workshop: Workshop,
   range: { from?: string; to?: string },
 ): Promise<CitaTaller[]> {
+  if (isLocalPreviewWorkshop(workshop)) return []
+
   const resolved = await resolveAvioldTallerIdsDetailed(workshop)
-  if (!resolved.ids.length) return []
+  const ids = filterCrmUuids(resolved.ids)
+  if (!ids.length) return []
 
   if (isSqlServerPeticionesSource()) {
-    return sqlFetchCitas(resolved.ids, range)
+    return sqlFetchCitas(ids, range)
   }
 
   const rows = (await fetchAllSupabasePages(() => {
     let query = supabaseAviOld
       .from('citas')
       .select(CITA_TALLER_SELECT)
-      .in('idtaller', resolved.ids)
+      .in('idtaller', ids)
     if (range.from) query = query.gte('fecha', `${range.from}T00:00:00`)
     if (range.to) query = query.lte('fecha', `${range.to}T23:59:59`)
     return query.order('fecha', { ascending: true })

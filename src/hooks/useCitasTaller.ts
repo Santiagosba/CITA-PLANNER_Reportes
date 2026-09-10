@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchCitasTaller, type CitaTaller } from '../lib/citasTaller'
+import { isExpectedDemoIdError } from '../lib/crmUuid'
+import { isDemoCitaId, mergeLiveAndDemoCitas } from '../lib/demoTickets'
+import { isLocalPreviewWorkshop } from '../lib/localPreview'
 import { loadCitasCopy, saveCitasCopy, workshopCopyId } from '../lib/workingCopy'
 import type { Workshop } from '../types'
 
@@ -34,18 +37,30 @@ export function useCitasTaller(workshop: Workshop, range: Range) {
           request = fetchCitasTaller(workshop, range)
           inflight.set(key, request)
         }
-        const rows = await request
+        const rows = mergeLiveAndDemoCitas(await request, workshop, range)
         cache.set(key, { timestamp: Date.now(), citas: rows })
         setCitas(rows)
-        saveCitasCopy(workshopCopyId(workshop), rows)
+        saveCitasCopy(workshopCopyId(workshop), rows.filter((row) => !isDemoCitaId(row.idcita)))
       } catch (e) {
-        const copy = loadCitasCopy(workshopCopyId(workshop))
-        if (copy?.length) {
-          setCitas(copy)
+        const reason = e instanceof Error ? e.message : 'No se pudieron cargar las citas'
+        const fallback = mergeLiveAndDemoCitas(
+          isLocalPreviewWorkshop(workshop) || isExpectedDemoIdError(reason)
+            ? []
+            : loadCitasCopy(workshopCopyId(workshop)) ?? [],
+          workshop,
+          range,
+        )
+        if (fallback.length) {
+          setCitas(fallback)
           setError(null)
-        } else {
-          setError(e instanceof Error ? e.message : 'No se pudieron cargar las citas')
+          return
         }
+        if (isLocalPreviewWorkshop(workshop) || isExpectedDemoIdError(reason)) {
+          setCitas([])
+          setError(null)
+          return
+        }
+        setError(reason)
       } finally {
         inflight.delete(key)
         setLoading(false)

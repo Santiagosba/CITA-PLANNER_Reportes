@@ -56,6 +56,8 @@ function setup(resolve = async () => ({ ids: ['workshop'] }), copy = [], enrich 
     },
     '../lib/ticketOps': { PETICIONES_PATCHED_EVENT: 'patched' },
     '../lib/workingCopy': { COPY_FALLBACK_NOTICE: 'Copy', loadPeticionesCopy: () => copy, savePeticionesCopy: () => {}, workshopCopyId: () => 'workshop' },
+    '../lib/crmUuid': { isExpectedDemoIdError: (message) => /local-preview|invalid guid|invalid input syntax for type uuid/i.test(message) },
+    '../lib/localPreview': { isLocalPreviewWorkshop: (workshop) => workshop?.source === 'demo' || workshop?.id === 'local-preview' },
   }
   const { useOperationalData } = load('hooks/useOperationalData', modules)
   const workshop = { id: 'workshop', originalId: 'workshop' }
@@ -77,11 +79,20 @@ test('refresh callbacks stay stable across loading and completed renders', async
 
 test('local preview loads demo tickets without contacting a backend', async () => {
   const app = setup(() => new Promise(() => {}))
-  Object.assign(app.workshop, { id: 'local-preview', source: 'demo' })
+  Object.assign(app.workshop, { id: 'local-preview', source: 'demo', originalId: 'local-preview', containerIdTaller: 'local-preview' })
   await app.render().refresh()
   assert.equal(app.render().loading, false)
   assert.equal(app.render().items[0].idpeticion, 'demo')
+  assert.equal(app.render().sourceNotice, null)
+  assert.equal(app.render().error, null)
   assert.equal(app.requests(), 0)
+})
+
+test('a leaked local-preview uuid error does not look like a connection outage', async () => {
+  const app = setup(async () => { throw new Error('invalid input syntax for type uuid: "local-preview"') })
+  await app.render().refresh()
+  assert.equal(app.render().error, null)
+  assert.equal(app.render().sourceNotice, null)
 })
 
 test('overlapping refreshes share one request', async () => {
@@ -172,21 +183,24 @@ test('real data loader skips the calendar on first paint and name merging preser
   const api = load('lib/peticionesPendientes', {
     './supabase': {}, './supabaseFetchAll': {}, './licenciaGrupo': {},
     './ticketClient': load('lib/ticketClient'),
+    './crmUuid': load('lib/crmUuid'),
+    './localPreview': { isLocalPreviewWorkshop: () => false },
     './sqlServerApi': {
       isSqlServerPeticionesSource: () => true,
       sqlFetchPendingPeticiones: async () => [{ idpeticion: 'one', caller: '612345678', gestionado: false }],
       sqlFetchCitas: async () => { calendarCalls++; return [{ idcita: 'cita', nombre: 'Ana', movil: '612345678' }] },
     },
   })
-  const rows = await api.fetchPendingPeticiones(['workshop'], {}, { includeClientNames: false })
+  const tallerId = '11111111-1111-4111-8111-111111111111'
+  const rows = await api.fetchPendingPeticiones([tallerId], {}, { includeClientNames: false })
   assert.equal(calendarCalls, 0)
-  const enriched = await api.enrichPeticionClientNames(rows, ['workshop'])
+  const enriched = await api.enrichPeticionClientNames(rows, [tallerId])
   assert.equal(calendarCalls, 1)
   const edited = [{ ...rows[0], gestionado: true, gestionobservaciones: 'Editado mientras cargaba' }]
   const merged = api.mergePeticionClientNames(edited, enriched)
   assert.equal(merged[0].clienteNombre, 'Ana')
   assert.equal(merged[0].gestionado, true)
   assert.equal(merged[0].gestionobservaciones, 'Editado mientras cargaba')
-  await api.enrichPeticionClientNames(merged, ['workshop'])
+  await api.enrichPeticionClientNames(merged, [tallerId])
   assert.equal(calendarCalls, 1)
 })

@@ -2,6 +2,7 @@
  * Modelo licencia/contenedor Hub Connect (UUID web + taller_web_activo + RPC talleres).
  */
 
+import { filterCrmUuids, isCrmUuid } from './crmUuid'
 import { supabaseOperations } from './supabase'
 import { getCrmHubWebIdFromEnv } from './hubWebEnv'
 import { isGlobalAviAdmin } from './operationsConnect'
@@ -47,7 +48,7 @@ function mapContainerFields(
 }
 
 export async function fetchContainerRow(containerIdtaller: string): Promise<ContainerRow | null> {
-  if (!containerIdtaller) return null
+  if (!isCrmUuid(containerIdtaller)) return null
   const webId = getCrmHubWebIdFromEnv()
   try {
     const { data, error } = await supabaseOperations
@@ -91,6 +92,7 @@ export async function fetchUserContainerIds(userId: string | null | undefined, l
 }
 
 export async function fetchContainersByIds(ids: string[]): Promise<ContainerRow[]> {
+  ids = filterCrmUuids(ids)
   if (!Array.isArray(ids) || ids.length === 0) return []
   const webId = getCrmHubWebIdFromEnv()
   try {

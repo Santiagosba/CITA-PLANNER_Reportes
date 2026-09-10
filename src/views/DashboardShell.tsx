@@ -5,8 +5,11 @@ import ViewPageHeader from '../components/ViewPageHeader'
 import GestionBubbleDock, { MAX_TASKS, type AgendaSessionItem } from '../components/GestionBubbleDock'
 import SoftphoneDock from '../components/SoftphoneDock'
 import AppWindows from '../components/AppWindows'
-import { OPEN_TASKBAR_EVENT, apps, setAppZProvider, useTaskbarPinned } from '../lib/apps'
+import { OPEN_TASKBAR_EVENT, APP_META, apps, setAppZProvider, useActiveAppId, useTaskbarPinned } from '../lib/apps'
 import LeadGestionDrawer, { type WinRect } from '../components/LeadGestionDrawer'
+import WindowSnapGuides from '../components/os/WindowSnapGuides'
+import WindowSwitcher from '../components/os/WindowSwitcher'
+import { resolvePlacement, type OsPlacement } from '../lib/osGeometry'
 import NewInboundDrawer from '../components/NewInboundDrawer'
 import type { ActionStatus } from '../components/ui/ActionButton'
 import { type DashboardShellRoute } from '../components/Sidebar'
@@ -43,7 +46,8 @@ import { useOperationalData } from '../hooks/useOperationalData'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
 import { isDemoTicketId } from '../lib/demoTickets'
 import { applyPeticionPatch, PETICIONES_PATCHED_EVENT } from '../lib/ticketOps'
-import { isEmptyDeskRestore, isOsFurniture, isPrimaryWorkAction } from '../lib/osDeskClick'
+import { isIdleDeskClick } from '../lib/osDeskClick'
+import { ticketClientLabel } from '../lib/ticketClient'
 
 type Props = {
   workshop: Workshop
@@ -63,6 +67,7 @@ type GestionSession = {
   saveStatus: ActionStatus
   minimized: boolean
   maximized: boolean
+  placement: OsPlacement
   rect: WinRect
   preMaxRect: WinRect | null
   z: number
@@ -112,7 +117,7 @@ type SessionWindowProps = {
   onMarkGestionado: (id: string, gestionado: boolean) => void
   onClose: (id: string) => void
   onMinimize: (id: string) => void
-  onToggleMaximize: (id: string) => void
+  onPlace: (id: string, placement: OsPlacement) => void
 }
 
 const SessionWindow = memo(function SessionWindow({
@@ -128,7 +133,7 @@ const SessionWindow = memo(function SessionWindow({
   onMarkGestionado,
   onClose,
   onMinimize,
-  onToggleMaximize,
+  onPlace,
 }: SessionWindowProps) {
   const workshopId = workshop.containerIdTaller || workshop.id
   const { workspace } = useAdvisorWorkspace(workshopId, currentUser, true)
@@ -142,7 +147,7 @@ const SessionWindow = memo(function SessionWindow({
   )
   const handleClose = useCallback(() => onClose(id), [id, onClose])
   const handleMinimize = useCallback(() => onMinimize(id), [id, onMinimize])
-  const handleMax = useCallback(() => onToggleMaximize(id), [id, onToggleMaximize])
+  const handlePlace = useCallback((placement: OsPlacement) => onPlace(id, placement), [id, onPlace])
 
   return (
     <LeadGestionDrawer
@@ -151,6 +156,7 @@ const SessionWindow = memo(function SessionWindow({
       gestionObs={session.gestionObs}
       rect={session.rect}
       zIndex={session.z}
+      placement={session.placement}
       maximized={session.maximized}
       enterFrom={session.enterFrom}
       minimizeRequest={minimizeRequest}
@@ -162,7 +168,7 @@ const SessionWindow = memo(function SessionWindow({
       onMarkGestionado={handleMark}
       onClose={handleClose}
       onMinimize={handleMinimize}
-      onToggleMaximize={handleMax}
+      onPlace={handlePlace}
       workshop={workshop}
       workspace={workspace}
       currentUser={currentUser}
@@ -195,6 +201,12 @@ export default function DashboardShell({
   const [capacityNotice, setCapacityNotice] = useState<string | null>(null)
   const [agendaTucked, setAgendaTucked] = useState(false)
   const [sideMinWave, setSideMinWave] = useState(0)
+  const [switcher, setSwitcher] = useState<{
+    items: { id: string; kind: 'ficha' | 'app'; title: string }[]
+    index: number
+  } | null>(null)
+  const switcherRef = useRef(switcher)
+  const activeAppId = useActiveAppId()
   const zRef = useRef(100)
   // La agenda comparte el orden de apilado con las fichas: nace por debajo de la
   // primera ficha y sube al frente cuando se pulsa.
@@ -283,6 +295,7 @@ export default function DashboardShell({
           saveStatus: 'idle',
           minimized: false,
           maximized: false,
+          placement: 'free',
           rect: defaultRect(prev.length),
           preMaxRect: null,
           z,
@@ -330,7 +343,9 @@ export default function DashboardShell({
   }, [])
 
   const minimizeSession = useCallback((id: string) => {
-    setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, minimized: true, maximized: false } : s)))
+    setSessions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, minimized: true, maximized: false, placement: 'free' } : s)),
+    )
   }, [])
 
   const minimizeAllToSides = useCallback(() => {
@@ -469,41 +484,153 @@ export default function DashboardShell({
       )
     }
 
+    const taskbarShowing = () => taskbarPresent() && !agendaTuckedRef.current
+
     const tuckDesk = () => {
-      if (!hasOpenWindows()) return
-      apps.pinTaskbar()
-      minimizeAllToSides()
+      const windowsOut = hasOpenWindows()
+      const barOut = taskbarShowing()
+      if (!windowsOut && !barOut) return
+      if (windowsOut) {
+        apps.pinTaskbar()
+        minimizeAllToSides()
+      } else if (barOut) {
+        apps.pinTaskbar()
+      }
+      if (barOut) tuckAgenda()
     }
 
     const onPointerDown = (e: PointerEvent) => {
       if (e.button !== 0) return
-      if (isOsFurniture(e.target)) return
+      // Fondo, cabecera o hueco sin otra acción. Un ticket, filtro o botón no.
+      if (!isIdleDeskClick(e)) return
 
-      if (hasOpenWindows()) {
-        // Tickets, KPIs y nav ya abren o cambian de vista; no recoger encima.
-        if (isPrimaryWorkAction(e.target)) return
+      if (hasOpenWindows() || taskbarShowing()) {
         tuckDesk()
         return
       }
 
-      // Recogido: solo un hueco vacío saca las ventanas. Un campo o una
-      // tarjeta no debe restaurarlas.
-      if (hasMinimizedDesk() && isEmptyDeskRestore(e.target)) {
-        restoreDesk()
-      }
+      if (hasMinimizedDesk()) restoreDesk()
     }
 
     document.addEventListener('pointerdown', onPointerDown, true)
     return () => document.removeEventListener('pointerdown', onPointerDown, true)
-  }, [minimizeAllToSides, restoreDesk])
+  }, [minimizeAllToSides, restoreDesk, tuckAgenda])
 
-  const toggleMaximize = useCallback((id: string) => {
+  const activeIdRef = useRef(activeId)
+  const activeAppIdRef = useRef(activeAppId)
+  useEffect(() => {
+    activeIdRef.current = activeId
+  }, [activeId])
+  useEffect(() => {
+    activeAppIdRef.current = activeAppId
+  }, [activeAppId])
+  useEffect(() => {
+    switcherRef.current = switcher
+  }, [switcher])
+
+  useEffect(() => {
+    const typing = (target: EventTarget | null) =>
+      Boolean((target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable="true"]'))
+
+    const openItems = () => {
+      const fichas = sessionsRef.current
+        .filter((s) => !s.minimized)
+        .map((s) => ({ id: s.id, kind: 'ficha' as const, title: ticketClientLabel(s.peticion) }))
+      const tools = apps
+        .getState()
+        .windows.filter((w) => !w.minimized)
+        .map((w) => ({ id: w.id, kind: 'app' as const, title: APP_META[w.id].label }))
+      return [...fichas, ...tools]
+    }
+
+    const focusedKey = () => {
+      if (activeAppIdRef.current) return `app:${activeAppIdRef.current}`
+      if (activeIdRef.current) return `ficha:${activeIdRef.current}`
+      return null
+    }
+
+    const applySwitcher = (items: { id: string; kind: 'ficha' | 'app' }[], index: number) => {
+      const item = items[index]
+      if (!item) return
+      if (item.kind === 'app') apps.focus(item.id as 'phone' | 'notes' | 'contacts' | 'guide')
+      else focusSession(item.id)
+    }
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey
+      if (!mod) return
+
+      if (e.key === 'Tab') {
+        const items = openItems()
+        if (items.length < 2) return
+        e.preventDefault()
+        const current = switcherRef.current
+        const list = current?.items ?? items
+        const from = current
+          ? current.index
+          : list.findIndex((item) => `${item.kind}:${item.id}` === focusedKey())
+        const next = (Math.max(0, from) + (e.shiftKey ? -1 : 1) + list.length) % list.length
+        setSwitcher({ items: list, index: next })
+        return
+      }
+
+      if (typing(e.target)) return
+      if (e.key === 'w' || e.key === 'W') {
+        e.preventDefault()
+        if (e.altKey) {
+          const items = openItems()
+          const key = focusedKey()
+          const focused = items.find((item) => `${item.kind}:${item.id}` === key)
+          if (focused?.kind === 'app') {
+            for (const win of apps.getState().windows) apps.close(win.id)
+          } else {
+            closeAll()
+          }
+          return
+        }
+        if (activeAppIdRef.current) {
+          apps.close(activeAppIdRef.current)
+          return
+        }
+        if (activeIdRef.current) closeSession(activeIdRef.current)
+        return
+      }
+      if (e.key === 'm' || e.key === 'M') {
+        e.preventDefault()
+        if (activeAppIdRef.current) {
+          apps.minimize(activeAppIdRef.current)
+          return
+        }
+        if (activeIdRef.current) minimizeSession(activeIdRef.current)
+        return
+      }
+    }
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key !== 'Control' && e.key !== 'Meta') return
+      const current = switcherRef.current
+      if (!current) return
+      applySwitcher(current.items, current.index)
+      setSwitcher(null)
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+    }
+  }, [closeAll, closeSession, focusSession, minimizeSession])
+
+  const placeSession = useCallback((id: string, placement: OsPlacement) => {
     setSessions((prev) =>
       prev.map((s) => {
         if (s.id !== id) return s
-        if (s.maximized) {
+        const current = resolvePlacement(s.placement, s.maximized)
+        if (placement === 'free' || current === placement) {
           return {
             ...s,
+            placement: 'free',
             maximized: false,
             rect: s.preMaxRect ?? s.rect,
             preMaxRect: null,
@@ -511,8 +638,9 @@ export default function DashboardShell({
         }
         return {
           ...s,
-          maximized: true,
-          preMaxRect: s.rect,
+          placement,
+          maximized: placement === 'fill',
+          preMaxRect: current === 'free' ? s.rect : (s.preMaxRect ?? s.rect),
         }
       }),
     )
@@ -523,7 +651,9 @@ export default function DashboardShell({
   }, [])
 
   const updateRect = useCallback((id: string, rect: WinRect) => {
-    setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, rect, maximized: false, preMaxRect: null } : s)))
+    setSessions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, rect, maximized: false, placement: 'free', preMaxRect: null } : s)),
+    )
   }, [])
 
   const handleMarkGestionado = useCallback(
@@ -739,11 +869,13 @@ export default function DashboardShell({
                   onMarkGestionado={handleMarkGestionado}
                   onClose={closeSession}
                   onMinimize={minimizeSession}
-                  onToggleMaximize={toggleMaximize}
+                  onPlace={placeSession}
                 />
               ))}
 
               <AppWindows minimizeRequest={sideMinWave} staggerOffset={openWindows.length} />
+              <WindowSnapGuides />
+              {switcher ? <WindowSwitcher items={switcher.items} index={switcher.index} /> : null}
 
               <GestionBubbleDock
                 sessions={agendaSessions}

@@ -49,7 +49,9 @@ import {
   workshopCopyId,
 } from '../lib/workingCopy'
 import { invalidateOperationalData } from '../hooks/useOperationalData'
+import { isExpectedDemoIdError } from '../lib/crmUuid'
 import { DEMO_TICKETS_NOTICE, isDemoTicketId, mergeLiveAndDemoTickets } from '../lib/demoTickets'
+import { isLocalPreviewWorkshop } from '../lib/localPreview'
 import { compareTicketsByOpenFirst } from '../lib/doneFilter'
 import { applyPeticionPatch, PETICIONES_PATCHED_EVENT } from '../lib/ticketOps'
 import TicketOwnerPicker from '../components/TicketOwnerPicker'
@@ -132,6 +134,9 @@ export default function PendingCitasView({
   const resolvedCacheRef = useRef<{ key: string; value: ResolvedTallerIds } | null>(null)
 
   const getResolvedTallerIds = useCallback(async (): Promise<ResolvedTallerIds> => {
+    if (isLocalPreviewWorkshop(workshop)) {
+      return { ids: [], talleres: [], via: 'hub' }
+    }
     if (resolvedCacheRef.current?.key === workshopKey) {
       return resolvedCacheRef.current.value
     }
@@ -142,6 +147,10 @@ export default function PendingCitasView({
 
   // Tipos de petición: se cargan una sola vez por taller y en paralelo (no bloquean la lista)
   useEffect(() => {
+    if (isLocalPreviewWorkshop(workshop)) {
+      setTipos([])
+      return
+    }
     let cancelled = false
     void (async () => {
       try {
@@ -154,7 +163,7 @@ export default function PendingCitasView({
     return () => {
       cancelled = true
     }
-  }, [workshopKey])
+  }, [workshop, workshopKey])
 
   const loadVersion = useRef(0)
   const load = useCallback(async (silent = false) => {
@@ -169,7 +178,7 @@ export default function PendingCitasView({
         const demo = mergeLiveAndDemoTickets([], workshop, dateRange)
         if (demo.length) {
           setItems(demo)
-          setSourceNotice(DEMO_TICKETS_NOTICE)
+          setSourceNotice(isLocalPreviewWorkshop(workshop) ? null : DEMO_TICKETS_NOTICE)
           setSelectedId((prev) => {
             if (prev && demo.some((r) => r.idpeticion === prev)) return prev
             return demo.find((r) => !r.gestionado)?.idpeticion ?? demo[0]?.idpeticion ?? null
@@ -206,11 +215,19 @@ export default function PendingCitasView({
       if (rows.length) {
         setItems(rows)
         setError(null)
-        setSourceNotice(`${copy.length ? COPY_FALLBACK_NOTICE : DEMO_TICKETS_NOTICE} Motivo: ${e instanceof Error ? e.message : 'No se pudieron actualizar los datos.'}`)
+        const reason = e instanceof Error ? e.message : 'No se pudieron actualizar los datos.'
+        if (isLocalPreviewWorkshop(workshop) || isExpectedDemoIdError(reason)) {
+          setSourceNotice(isLocalPreviewWorkshop(workshop) ? null : DEMO_TICKETS_NOTICE)
+        } else {
+          setSourceNotice(`${copy.length ? COPY_FALLBACK_NOTICE : DEMO_TICKETS_NOTICE} Motivo: ${reason}`)
+        }
         setSelectedId((prev) => {
           if (prev && rows.some((r) => r.idpeticion === prev)) return prev
           return rows.find((r) => !r.gestionado)?.idpeticion ?? rows[0]?.idpeticion ?? null
         })
+      } else if (isLocalPreviewWorkshop(workshop) || isExpectedDemoIdError(e instanceof Error ? e.message : '')) {
+        setItems([])
+        setError(null)
       } else {
         setItems([])
         setError(e instanceof Error ? e.message : 'No se pudieron cargar las citas')
@@ -658,7 +675,15 @@ export default function PendingCitasView({
                           <TicketClientBlock peticion={p} size="sm" />
                         </td>
                         <td>{c?.matricula ? <VehiclePlate value={c.matricula} compact /> : '—'}</td>
-                        <td>{p.tipopeticion ?? '—'}</td>
+                        <td>
+                          {p.tipopeticion ?? '—'}
+                          {isDemoTicketId(p.idpeticion) ? (
+                            <>
+                              {' '}
+                              <span className="badge tone-info">Prueba</span>
+                            </>
+                          ) : null}
+                        </td>
                         <td onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
                           <TicketOwnerPicker
                             workshop={workshop}

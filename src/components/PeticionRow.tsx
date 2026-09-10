@@ -3,6 +3,7 @@ import { memo, type ReactNode } from 'react'
 import ActionButton, { type ActionStatus } from './ui/ActionButton'
 import VehiclePlate from './ui/VehiclePlate'
 import { formatAgendaTime } from '../lib/agendaGrouping'
+import { isDemoTicketId } from '../lib/demoTickets'
 import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
 import { ticketClientLabel, ticketClientPhone } from '../lib/ticketClient'
 import TicketClientBlock from './TicketClientBlock'
@@ -88,6 +89,7 @@ function PeticionRow({
               <span className="prow-name">
                 <TicketClientBlock peticion={p} size="md" />
               </span>
+              {isDemoTicketId(p.idpeticion) ? <span className="badge tone-info">Prueba</span> : null}
               <span className={`badge ${p.gestionado ? 'tone-positive' : 'tone-warning'}`}>
                 {p.gestionado ? 'Hecha' : 'Por hacer'}
               </span>

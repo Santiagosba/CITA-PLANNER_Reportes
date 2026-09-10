@@ -2,6 +2,7 @@
  * Branding por taller (`operations.crm_config` ui_branding + storage).
  */
 
+import { isCrmUuid } from './crmUuid'
 import { supabase, supabaseOperations, supabaseUrl } from './supabase'
 
 export const BRANDING_BUCKET = 'taller-branding'
@@ -56,7 +57,7 @@ function normalizeBranding(raw: unknown): TallerBranding | null {
 }
 
 export async function fetchTallerBranding(idtaller: string): Promise<TallerBranding | null> {
-  if (!idtaller) return null
+  if (!isCrmUuid(idtaller)) return null
   try {
     const { data, error } = await supabaseOperations
       .from('crm_config')
@@ -72,7 +73,7 @@ export async function fetchTallerBranding(idtaller: string): Promise<TallerBrand
 }
 
 export async function saveTallerBranding(idtaller: string, patch: Partial<TallerBranding>): Promise<TallerBranding | null> {
-  if (!idtaller) return null
+  if (!isCrmUuid(idtaller)) return null
   try {
     const current = (await fetchTallerBranding(idtaller)) ?? {}
     const merged: TallerBranding = {

@@ -7384,7 +7384,7 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   animation: avi-modal-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.lead-modal::after,
+.lead-modal:not(.lead-os-frame)::after,
 .inbound-modal::after {
   display: none !important;
 }
@@ -8408,20 +8408,6 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   animation: none !important;
 }
 
-.lead-os-window.is-moving .lead-os-frame {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 4px 14px rgba(15, 17, 21, 0.08),
-    0 16px 32px rgba(15, 17, 21, 0.1) !important;
-}
-
-.lead-os-window.is-resizing .lead-os-frame {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 1),
-    0 0 0 1.5px rgba(11, 99, 214, 0.18),
-    0 12px 28px rgba(15, 17, 21, 0.1) !important;
-}
-
 .lead-os-window.is-enter-spawn .lead-os-frame {
   animation: os-win-spawn 0.42s cubic-bezier(0.22, 1.05, 0.36, 1) both !important;
 }
@@ -8718,6 +8704,158 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
 .os-resize-handle.edge-nw { top: -4px; left: -4px; cursor: nwse-resize; }
 .os-resize-handle.edge-se { bottom: -4px; right: -4px; cursor: nwse-resize; }
 .os-resize-handle.edge-sw { bottom: -4px; left: -4px; cursor: nesw-resize; }
+
+.os-zoom-menu {
+  position: fixed;
+  z-index: 240;
+  min-width: 220px;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid var(--lgw-border);
+  background: var(--lgw-bg);
+  box-shadow: var(--lgw-shadow);
+  -webkit-backdrop-filter: var(--lgw-blur);
+  backdrop-filter: var(--lgw-blur);
+  color: var(--fog-strong);
+}
+
+.os-zoom-menu-label {
+  margin: 4px 6px 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.os-zoom-item,
+.os-zoom-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.os-zoom-item:hover,
+.os-zoom-tile:hover,
+.os-zoom-item.is-active,
+.os-zoom-tile.is-active {
+  background: var(--lgw-bg-soft);
+}
+
+.os-zoom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.os-zoom-ico {
+  display: block;
+  width: 22px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  opacity: 0.7;
+  position: relative;
+}
+
+.os-zoom-ico.is-fill {
+  background: rgba(11, 99, 214, 0.18);
+}
+
+.os-zoom-ico.is-left::after,
+.os-zoom-ico.is-right::after,
+.os-zoom-ico.is-top::after,
+.os-zoom-ico.is-bottom::after {
+  content: '';
+  position: absolute;
+  background: rgba(11, 99, 214, 0.35);
+}
+
+.os-zoom-ico.is-left::after { inset: 0 50% 0 0; }
+.os-zoom-ico.is-right::after { inset: 0 0 0 50%; }
+.os-zoom-ico.is-top::after { inset: 0 0 50% 0; }
+.os-zoom-ico.is-bottom::after { inset: 50% 0 0 0; }
+
+.os-snap-guides {
+  position: fixed;
+  inset: 0;
+  z-index: 230;
+  pointer-events: none;
+}
+
+.os-snap-line {
+  position: absolute;
+  background: rgba(11, 99, 214, 0.55);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.os-snap-line.is-x {
+  width: 2px;
+  transform: translateX(-1px);
+}
+
+.os-snap-line.is-y {
+  height: 2px;
+  transform: translateY(-1px);
+}
+
+.os-win-switcher {
+  position: fixed;
+  left: 50%;
+  top: 18%;
+  z-index: 250;
+  display: flex;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 22px;
+  border: 1px solid var(--lgw-border);
+  background: var(--lgw-bg);
+  box-shadow: var(--lgw-shadow);
+  -webkit-backdrop-filter: var(--lgw-blur);
+  backdrop-filter: var(--lgw-blur);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.os-win-switcher-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 112px;
+  max-width: 180px;
+  padding: 12px;
+  border-radius: 14px;
+  color: var(--fog-strong);
+}
+
+.os-win-switcher-item.is-active {
+  background: var(--lgw-bg-soft);
+  box-shadow: inset 0 0 0 2px rgba(11, 99, 214, 0.35);
+}
+
+.os-win-switcher-item strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.os-win-switcher-item span {
+  color: var(--muted);
+  font-size: 12px;
+}
 
 .gestion-capacity-toast {
   position: fixed;
@@ -13945,21 +14083,18 @@ body > .os-desk-layer.dashboard-shell {
    ::before  cuerpo esmerilado (blur + tinte + reflejo + luz que sigue al puntero)
    ::after   anillo Fresnel: brillo del filo, sin deformar al cambiar de tamaño */
 :root {
-  /* Canto visible fino en las ventanas; la curvatura óptica continúa 56 px. */
+  /* El cuerpo cubre también el canto: un solo material de vidrio. */
   --lg-bevel: 56px;
-  --lg-rim: 8px;
+  --lg-rim: 0px;
   --lg-rim-tint: rgba(255, 255, 255, 0.18);
-  --lg-rim-fx: saturate(1.7) brightness(1.1) contrast(1.06);
-  /* Fresnel: brillo que nace en el filo y se apaga hacia dentro + línea especular
-     arriba + arista más oscura abajo/derecha (lado en sombra). */
+  --lg-rim-fx: saturate(1.45) brightness(1.06) contrast(1.04);
+  /* Fresnel sobre el mismo cuerpo, no un marco distinto. */
   --lg-rim-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 1px 0 0 rgba(255, 255, 255, 0.6),
-    inset 2px 0 0 rgba(74, 222, 255, 0.14),
-    inset -2px 0 0 rgba(196, 91, 255, 0.11),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.4),
-    inset 0 0 9px rgba(255, 255, 255, 0.55),
-    inset -1px -1px 0 rgba(15, 23, 42, 0.1);
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    inset 1px 0 0 rgba(255, 255, 255, 0.42),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+    inset 0 0 12px rgba(255, 255, 255, 0.22),
+    inset -1px -1px 0 rgba(15, 23, 42, 0.08);
   --lg-light: rgba(255, 255, 255, 0.38);
 }
 
@@ -13967,13 +14102,11 @@ body > .os-desk-layer.dashboard-shell {
   --lg-rim-tint: rgba(255, 255, 255, 0.05);
   --lg-rim-fx: saturate(1.6) brightness(0.95) contrast(1.06);
   --lg-rim-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.26),
-    inset 1px 0 0 rgba(255, 255, 255, 0.14),
-    inset 2px 0 0 rgba(74, 222, 255, 0.12),
-    inset -2px 0 0 rgba(196, 91, 255, 0.09),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.1),
-    inset 0 0 9px rgba(255, 255, 255, 0.16),
-    inset -1px -1px 0 rgba(0, 0, 0, 0.4);
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 1px 0 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 0 12px rgba(255, 255, 255, 0.1),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.35);
   --lg-light: rgba(255, 255, 255, 0.13);
 }
 
@@ -14001,10 +14134,9 @@ body > .os-desk-layer.dashboard-shell {
     0 0 0 1px var(--lgw-edge) !important;
 }
 
-/* Sin máscaras (backdrop-filter + mask es frágil entre navegadores): la lente
-   (::after) es una capa completa por debajo que refracta TODA la ventana; el
-   cuerpo (::before) es una capa más pequeña encima que solo añade blur ligero
-   y tinte. Así el filo queda nítido y el cuerpo muestra el fondo doblado. */
+/* Un solo material: lente debajo, cuerpo de vidrio a toda la caja, Fresnel encima. */
+.lead-modal.lead-os-frame::before,
+.lead-modal.lead-os-frame::after,
 .lead-os-frame::before,
 .lead-os-frame::after,
 .call-agenda-panel::before,
@@ -14015,11 +14147,35 @@ body > .os-desk-layer.dashboard-shell {
   pointer-events: none;
 }
 
-/* Anillo Fresnel (encima de la lente): el canto no depende del tamaño. */
+/* Cuerpo esmerilado: cubre también el borde, mismo blur y tinte. */
+.lead-os-frame::before,
+.call-agenda-panel::before {
+  inset: 0;
+  z-index: -2;
+  border-radius: inherit;
+  background:
+    var(--lgw-sheen),
+    var(--lgw-bg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+  -webkit-backdrop-filter: var(--lgw-blur);
+  backdrop-filter: var(--lgw-blur);
+}
+
+.dashboard-shell:not(.is-light) .lead-os-frame::before,
+.dashboard-shell:not(.is-light) .call-agenda-panel::before {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* Fresnel sobre el mismo vidrio, no un anillo hueco. */
+.lead-modal.lead-os-frame::after,
 .lead-os-frame::after,
 .call-agenda-panel::after {
   inset: 0;
-  z-index: -2;
+  z-index: -1;
   border-radius: inherit;
   background: transparent;
   box-shadow: var(--lg-rim-shadow);
@@ -14073,45 +14229,18 @@ body > .os-desk-layer.dashboard-shell {
 .lg-lens-sw { bottom: 0; left: 0; --lg-part-filter: url(#lg2-shared-sw); }
 .lg-lens-se { bottom: 0; right: 0; --lg-part-filter: url(#lg2-shared-se); }
 
-/* Cuerpo esmerilado (capa superior, dentro del anillo) */
-.lead-os-frame::before,
-.call-agenda-panel::before {
-  inset: var(--lg-rim);
-  z-index: -1;
-  border-radius: calc(var(--lg-outer-radius) - var(--lg-rim));
-  background:
-    var(--lgw-sheen),
-    var(--lgw-bg);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.7),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-  /* La refracción vive en .lg-lens (56 px fijos). Aquí solo el cuerpo mate. */
-  -webkit-backdrop-filter: var(--lgw-blur);
-  backdrop-filter: var(--lgw-blur);
-}
-
-.dashboard-shell:not(.is-light) .lead-os-frame::before,
-.dashboard-shell:not(.is-light) .call-agenda-panel::before {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
-}
-
 .lead-os-frame {
   --lg-outer-radius: var(--radius-lg);
 }
 
 .call-agenda-panel {
-  /* Algo más de canto en la barra para que la refracción se lea en un panel
-     pequeño, pero sin recuperar los 16 px anteriores. */
-  --lg-rim: 10px;
+  --lg-rim: 0px;
   --lg-outer-radius: 18px;
   --lg-rim-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 1px 0 0 rgba(74, 222, 255, 0.28),
-    inset -1px 0 0 rgba(196, 91, 255, 0.22),
-    inset 0 0 7px rgba(255, 255, 255, 0.48),
-    inset 0 -1px 0 rgba(32, 66, 120, 0.15);
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    inset 1px 0 0 rgba(255, 255, 255, 0.36),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.26),
+    inset 0 0 10px rgba(255, 255, 255, 0.2);
 }
 
 .dashboard-shell:not(.is-light) .call-agenda-panel {
@@ -14237,7 +14366,8 @@ body > .os-desk-layer.dashboard-shell {
 .dashboard-shell:not(.is-light) .lead-os-window.is-moving .lead-os-frame,
 .dashboard-shell:not(.is-light) .lead-os-window.is-resizing .lead-os-frame {
   box-shadow:
-    0 12px 32px rgba(15, 23, 42, 0.16),
+    0 1px 2px var(--lgw-edge),
+    0 28px 70px rgba(15, 23, 42, 0.22),
     0 0 0 1px var(--lgw-edge) !important;
 }
 

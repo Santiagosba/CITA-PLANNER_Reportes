@@ -12,8 +12,8 @@ const TIPS: Section[] = [
   {
     title: 'El escritorio',
     items: [
-      'Cada cliente que abres es una ventana: muévela por la barra de título, redimensiónala por los bordes y usa el semáforo para cerrar, minimizar o agrandar (doble clic en el título también agranda).',
-      'Pulsa en el fondo o en la cabecera para recoger todas las ventanas a los lados; vuelve a pulsar para restaurarlas. Pulsar dentro de una ventana la trae al frente.',
+      'Cada cliente que abres es una ventana: muévela por la barra de título y se alinea con las demás. El semáforo cierra, minimiza o rellena; deja el puntero en el verde para mitades. Doble clic en el título rellena; doble clic en un borde estira ese lado.',
+      'Pulsa en el fondo, la cabecera o un hueco que no haga otra cosa para recoger las ventanas y la barra de tareas; vuelve a pulsar ahí para sacarlas. Un ticket, un botón, un campo o la barra de scroll no las mueve.',
       'La barra de tareas guarda las fichas abiertas y las apps (teléfono, notas, contactos, guía). Puedes abrirla siempre desde el botón de la cabecera, junto a la campana.',
     ],
   },

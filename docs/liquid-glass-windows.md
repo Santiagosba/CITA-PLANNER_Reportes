@@ -17,7 +17,8 @@ El resultado combina cuatro propiedades:
 
 - `src/hooks/useLiquidGlass.tsx`: genera y precarga la lente compartida.
 - `src/styles/avi-crm.css`: compone las capas, tintes, blur, bordes y fallbacks.
-- `src/components/ToolWindow.tsx`: activa el efecto en las apps flotantes.
+- `src/hooks/useOsWindow.ts`: marco de fichas y apps; activa el vidrio una sola vez.
+- `src/components/ToolWindow.tsx`: ventana de app; no duplica gestos.
 - `src/components/LeadGestionDrawer.tsx`: activa el efecto en las fichas.
 - `src/components/GestionBubbleDock.tsx`: activa el efecto en la barra de tareas.
 
@@ -28,8 +29,8 @@ detrás de su contenido:
 
 ```text
 Contenido de la ventana
-└── ::before  Cuerpo translúcido (tinte + blur + reflejo)
-    └── ::after  Fresnel y separación cian/magenta
+└── ::after   Fresnel sobre el mismo vidrio
+    └── ::before  Cuerpo translúcido a toda la caja (tinte + blur)
         └── .lg-lens  Lente refractiva SVG por piezas
 ```
 
@@ -78,7 +79,7 @@ añade el acabado translúcido:
 ```css
 .lead-os-frame::before,
 .call-agenda-panel::before {
-  inset: var(--lg-rim);
+  inset: 0;
   background:
     var(--lgw-sheen),
     var(--lgw-bg);
@@ -88,15 +89,14 @@ añade el acabado translúcido:
 
 Valores actuales:
 
-- Ventanas: canto visible de `8px`.
-- Barra de tareas: canto visible de `10px`.
+- Ventanas y barra: el cuerpo cubre también el canto (`--lg-rim: 0`).
 - Cuerpo claro: blanco al 60 %.
 - Cuerpo oscuro: gris azulado al 62 %.
 - Desenfoque: `blur(14px) saturate(1.15)`.
 
-El cuerpo no pretende ocultar completamente el dashboard. Lo convierte en
-formas suavizadas y coloreadas para que el texto y los controles tengan
-prioridad visual.
+El filo y el interior son el mismo vidrio. El Fresnel (`::after`) solo
+ilumina ese material; no es un marco hueco. No vuelvas a insetar el
+cuerpo ni a ocultar `.lead-modal.lead-os-frame::after`.
 
 ## 4. Canto, Fresnel y reflejos
 
@@ -190,7 +190,7 @@ en capturas de todo el dashboard.
 
 ### En `avi-crm.css`
 
-- `--lg-rim`: anchura visual del canto.
+- `--lg-rim`: debe ser `0`. El cuerpo y el canto son el mismo vidrio.
 - `--lgw-bg`: densidad del cuerpo translúcido.
 - `--lgw-blur`: desenfoque y saturación del fondo.
 - `--lg-rim-tint`: tinte del canto.
@@ -223,8 +223,8 @@ Comprobar:
 
 ### El filo ocupa demasiado espacio
 
-Reducir `--lg-rim`. No es necesario reducir `BEVEL`: el primero controla el
-canto visible y el segundo la transición óptica bajo el cuerpo.
+No agrandes `--lg-rim`: el cuerpo debe cubrir el canto. Si el Fresnel se lee
+demasiado, suaviza `--lg-rim-shadow`. `BEVEL` solo es la profundidad óptica.
 
 ### Baja el rendimiento
 

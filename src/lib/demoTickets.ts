@@ -4,6 +4,7 @@
  */
 
 import { DEMO_ASESORES } from './demoAsesores'
+import type { CitaTaller } from './citasTaller'
 import { toDateInputValue } from './dateRangePresets'
 import { normalizeEmail } from './advisorWorkspace'
 import type { PeticionPendiente } from './peticionesPendientes'
@@ -11,8 +12,9 @@ import type { Workshop } from '../types'
 
 export const DEMO_TICKETS_PER_ADVISOR = 35
 export const DEMO_TICKET_PREFIX = 'demo-ticket-'
+export const DEMO_CITA_PREFIX = 'demo-cita-'
 export const DEMO_TICKETS_NOTICE =
-  'Hay 35 tickets de prueba por asesor (Ana, Luis y Carmen), casi todos por hacer. Se pueden pasar entre el equipo y no se guardan en el taller real.'
+  'Junto a los tickets reales de la API hay 35 de prueba por asesor (Ana, Luis y Carmen), para demos. Se pueden pasar entre el equipo y no se guardan en el taller real.'
 
 const STORE_PREFIX = 'avi_demo_tickets_v3:'
 
@@ -73,6 +75,10 @@ const CARS = [
 
 export function isDemoTicketId(id: string | null | undefined): boolean {
   return String(id || '').startsWith(DEMO_TICKET_PREFIX)
+}
+
+export function isDemoCitaId(id: string | null | undefined): boolean {
+  return String(id || '').startsWith(DEMO_CITA_PREFIX)
 }
 
 export function demoAdvisorSlug(email: string): string {
@@ -238,7 +244,60 @@ export function mergeLiveAndDemoTickets(
   workshop: Workshop,
   range?: { from?: string; to?: string },
 ): PeticionPendiente[] {
-  const demo = filterDemoTicketsByRange(loadDemoTickets(workshop), range?.from, range?.to)
   const liveOnly = live.filter((row) => !isDemoTicketId(row.idpeticion))
+  const demo = filterDemoTicketsByRange(loadDemoTickets(workshop), range?.from, range?.to)
   return [...demo, ...liveOnly]
+}
+
+function citaInRange(fecha: string | null | undefined, from?: string, to?: string): boolean {
+  if (!from && !to) return true
+  if (!fecha) return false
+  const key = toDateInputValue(new Date(fecha))
+  if (from && key < from) return false
+  if (to && key > to) return false
+  return true
+}
+
+export function demoCitasFromTickets(workshop: Workshop, range?: { from?: string; to?: string }): CitaTaller[] {
+  const taller = String(workshop.containerIdTaller || workshop.id || 'demo-taller')
+  const rows: CitaTaller[] = []
+  for (const ticket of loadDemoTickets(workshop)) {
+    const cita = ticket.cita
+    if (!cita?.idcita || !citaInRange(cita.fecha, range?.from, range?.to)) continue
+    rows.push({
+      idcita: cita.idcita,
+      idtaller: taller,
+      fecha: cita.fecha,
+      asunto: cita.asunto,
+      observaciones: ticket.descripcion,
+      nombre: cita.nombre,
+      apellidos: cita.apellidos,
+      razonSocial: cita.razonSocial ?? null,
+      telefono: cita.telefono,
+      movil: cita.movil,
+      email: cita.email,
+      marca: cita.marca,
+      modelo: cita.modelo,
+      motor: null,
+      matricula: cita.matricula,
+      kilometros: null,
+      idEstadoCita: null,
+      idCentro: null,
+      idOperario: null,
+      direccion: null,
+      poblacion: null,
+      provincia: null,
+      contacto: cita.contacto ?? null,
+    })
+  }
+  return rows
+}
+
+export function mergeLiveAndDemoCitas(
+  live: CitaTaller[],
+  workshop: Workshop,
+  range?: { from?: string; to?: string },
+): CitaTaller[] {
+  const liveOnly = live.filter((row) => !isDemoCitaId(row.idcita))
+  return [...demoCitasFromTickets(workshop, range), ...liveOnly]
 }

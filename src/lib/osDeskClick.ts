@@ -1,11 +1,9 @@
 /**
- * Clics del escritorio: recoger o restaurar ventanas.
+ * Clics del escritorio: recoger y restaurar son el mismo gesto.
  *
- * Recoger (hay ventanas abiertas): casi cualquier clic fuera de las ventanas,
- * la barra y el teléfono — incluidos campos, filtros y tarjetas.
- *
- * Restaurar (todo recogido): solo huecos vacíos del panel. Un campo o una
- * tarjeta no debe volver a sacar las ventanas.
+ * En un hueco o texto que no hace nada: si hay ventanas, se recogen;
+ * si están recogidas, vuelven al frente. En un ticket, botón, campo,
+ * barra de scroll o la propia ventana no se toca el escritorio.
  */
 
 const OS_FURNITURE = [
@@ -17,9 +15,12 @@ const OS_FURNITURE = [
   '.softphone-dock',
   '.softphone-toast',
   '.softphone-chip',
+  '.os-zoom-menu',
+  '.os-win-switcher',
+  '.os-snap-guides',
 ].join(', ')
 
-/** Abre una ficha, navega o cambia de vista: no recoger encima. */
+/** Abre ficha, navega o cambia de vista. */
 const PRIMARY_WORK = [
   '.ops-feed-row',
   '.ops-kpi',
@@ -42,7 +43,9 @@ const PRIMARY_WORK = [
   '.dashboard-inbound-btn',
 ].join(', ')
 
-const RESTORE_CONTROLS = [
+/** Controles que ya tienen su propia acción (escribir, filtrar, enviar). */
+const DESK_ACTIONS = [
+  PRIMARY_WORK,
   'button',
   'a',
   'input',
@@ -57,39 +60,33 @@ const RESTORE_CONTROLS = [
   '[role="option"]',
   '[role="checkbox"]',
   '[role="switch"]',
+  '[role="combobox"]',
+  '[role="searchbox"]',
   '[contenteditable]',
-  PRIMARY_WORK,
-  '.elevator-filters',
-  '.filter-field',
   '.preset-chip',
+  '.filter-field',
+  '.view-page-search',
   '.estado-filter',
   '.owner-scope-filter',
-  '.view-page-search',
-  '.laura-panel',
-  '.dash-today',
-  '.dash-kpi-grid',
-  '.ops-card-header',
-  '.ops-feed-list',
-  '.dash-task-list',
-  '.dash-task-row',
-  '.list-row',
-  '.role-check',
-  '.role-task-row',
 ].join(', ')
 
-const RESTORE_ROOTS = [
+const DESK_ROOTS = [
+  '.dashboard-shell',
   '.dashboard-page',
   '.dashboard-main',
+  '.dashboard-sidebar',
+  '.dashboard-header',
   '.app-view-enter',
   '.operational-dashboard',
   '.dash-ops',
   '.view-page-header',
-  '.dashboard-sidebar',
+  '.role-desk',
 ].join(', ')
 
-function asElement(target: EventTarget | null): Element | null {
-  if (target instanceof Element) return target
-  if (target instanceof Text) return target.parentElement
+function asElement(target: EventTarget | Event | null): Element | null {
+  const node = target instanceof Event ? target.target : target
+  if (node instanceof Element) return node
+  if (node instanceof Text) return node.parentElement
   return null
 }
 
@@ -101,10 +98,48 @@ export function isPrimaryWorkAction(target: EventTarget | null): boolean {
   return Boolean(asElement(target)?.closest(PRIMARY_WORK))
 }
 
-/** Hueco vacío del panel: un segundo clic puede sacar las ventanas. */
-export function isEmptyDeskRestore(target: EventTarget | null): boolean {
-  const el = asElement(target)
+function overflows(el: HTMLElement, axis: 'x' | 'y'): boolean {
+  const style = getComputedStyle(el)
+  const overflow = axis === 'y' ? style.overflowY : style.overflowX
+  if (overflow !== 'auto' && overflow !== 'scroll' && overflow !== 'overlay') return false
+  return axis === 'y' ? el.scrollHeight > el.clientHeight + 1 : el.scrollWidth > el.clientWidth + 1
+}
+
+/** Arrastrar o pulsar la barra de scroll es una acción: no recoger ventanas. */
+export function isScrollbarClick(event: Event): boolean {
+  if (!('clientX' in event) || !('clientY' in event)) return false
+  const clientX = (event as PointerEvent).clientX
+  const clientY = (event as PointerEvent).clientY
+  let node: Element | null = asElement(event.target)
+  while (node) {
+    if (node instanceof HTMLElement) {
+      const rect = node.getBoundingClientRect()
+      const vBar = node.offsetWidth - node.clientWidth
+      const hBar = node.offsetHeight - node.clientHeight
+      if (overflows(node, 'y') && vBar > 0 && clientX >= rect.left + node.clientWidth && clientX <= rect.right) {
+        return true
+      }
+      if (overflows(node, 'x') && hBar > 0 && clientY >= rect.top + node.clientHeight && clientY <= rect.bottom) {
+        return true
+      }
+    }
+    node = node.parentElement
+  }
+  return false
+}
+
+/** Clic en fondo o zona muerta: no hay otra acción. */
+export function isIdleDeskClick(eventOrTarget: Event | EventTarget | null): boolean {
+  const event = eventOrTarget instanceof Event ? eventOrTarget : null
+  const el = asElement(eventOrTarget)
   if (!el) return false
-  if (el.closest(RESTORE_CONTROLS)) return false
-  return Boolean(el.closest(RESTORE_ROOTS))
+  if (el.closest(OS_FURNITURE)) return false
+  if (el.closest(DESK_ACTIONS)) return false
+  if (event && isScrollbarClick(event)) return false
+  return Boolean(el.closest(DESK_ROOTS))
+}
+
+/** @deprecated Usar isIdleDeskClick: recoger y restaurar son la misma zona. */
+export function isEmptyDeskRestore(eventOrTarget: Event | EventTarget | null): boolean {
+  return isIdleDeskClick(eventOrTarget)
 }

@@ -10,7 +10,9 @@ import {
   type PeticionPendiente,
   type TipoPeticionRow,
 } from '../lib/peticionesPendientes'
+import { isExpectedDemoIdError } from '../lib/crmUuid'
 import { DEMO_TICKETS_NOTICE, isDemoTicketId, mergeLiveAndDemoTickets } from '../lib/demoTickets'
+import { isLocalPreviewWorkshop } from '../lib/localPreview'
 import { PETICIONES_PATCHED_EVENT } from '../lib/ticketOps'
 import { withLoadDeadline } from '../lib/loadDeadline'
 import {
@@ -46,7 +48,7 @@ function requestKey(workshop: Workshop, range: DateRange): string {
 }
 
 async function fetchData(workshop: Workshop, range: DateRange): Promise<CacheEntry> {
-  if (import.meta.env.DEV && workshop.id === 'local-preview' && workshop.source === 'demo') {
+  if (isLocalPreviewWorkshop(workshop)) {
     return { timestamp: Date.now(), items: mergeLiveAndDemoTickets([], workshop, range), tipos: [] }
   }
   const resolved = await resolveAvioldTallerIdsDetailed(workshop)
@@ -125,7 +127,11 @@ export function useOperationalData(workshop: Workshop, range: DateRange) {
         const liveOnly = data.items.filter((row) => !isDemoTicketId(row.idpeticion))
         const apiNotice = getPeticionesSourceNotice()
         const hasDemo = liveOnly.length < data.items.length
-        setSourceNotice([apiNotice, hasDemo ? DEMO_TICKETS_NOTICE : null].filter(Boolean).join(' ') || null)
+        setSourceNotice(
+          isLocalPreviewWorkshop(workshop)
+            ? null
+            : [apiNotice, hasDemo ? DEMO_TICKETS_NOTICE : null].filter(Boolean).join(' ') || null,
+        )
         savePeticionesCopy(workshopCopyId(workshop), liveOnly)
         applyNames(data)
       } catch (e) {
@@ -136,7 +142,15 @@ export function useOperationalData(workshop: Workshop, range: DateRange) {
         if (merged.length) {
           setItems(merged)
           setError(null)
-          setSourceNotice(`${copy.length ? COPY_FALLBACK_NOTICE : DEMO_TICKETS_NOTICE} Motivo: ${reason}`)
+          if (isLocalPreviewWorkshop(workshop) || isExpectedDemoIdError(reason)) {
+            setSourceNotice(isLocalPreviewWorkshop(workshop) ? null : DEMO_TICKETS_NOTICE)
+          } else {
+            setSourceNotice(`${copy.length ? COPY_FALLBACK_NOTICE : DEMO_TICKETS_NOTICE} Motivo: ${reason}`)
+          }
+        } else if (isLocalPreviewWorkshop(workshop) || isExpectedDemoIdError(reason)) {
+          setItems([])
+          setSourceNotice(null)
+          setError(null)
         } else {
           setSourceNotice(null)
           setError(reason)

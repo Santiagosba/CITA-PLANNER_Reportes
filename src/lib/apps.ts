@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { resolvePlacement, type OsPlacement } from './osGeometry'
 import type { WinRect } from './osWindowDrag'
 
 /**
@@ -16,6 +17,7 @@ export type AppWindow = {
   id: AppId
   minimized: boolean
   maximized: boolean
+  placement: OsPlacement
   rect: WinRect
   preMaxRect: WinRect | null
   z: number
@@ -110,6 +112,7 @@ export const apps = {
           id,
           minimized: false,
           maximized: false,
+          placement: 'free',
           rect: defaultRect(id, state.windows.length),
           preMaxRect: null,
           z,
@@ -141,7 +144,7 @@ export const apps = {
   /** Minimiza a la barra de tareas; la barra se fija para que la app siempre tenga dónde caer. */
   minimize(id: AppId) {
     setWindows(
-      state.windows.map((w) => (w.id === id ? { ...w, minimized: true, maximized: false } : w)),
+      state.windows.map((w) => (w.id === id ? { ...w, minimized: true, maximized: false, placement: 'free' } : w)),
       {
         taskbarPinned: true,
         activeAppId: state.activeAppId === id ? null : state.activeAppId,
@@ -157,7 +160,7 @@ export const apps = {
       return
     }
     setWindows(
-      state.windows.map((w) => (w.minimized ? w : { ...w, minimized: true, maximized: false })),
+      state.windows.map((w) => (w.minimized ? w : { ...w, minimized: true, maximized: false, placement: 'free' })),
       { taskbarPinned: true, activeAppId: null },
     )
   },
@@ -211,7 +214,7 @@ export const apps = {
     const vh = window.innerHeight
     let changed = false
     const windows = state.windows.map((w) => {
-      if (w.maximized) return w
+      if (w.maximized || resolvePlacement(w.placement, w.maximized) !== 'free') return w
       const width = Math.min(w.rect.w, vw - margin * 2)
       const height = Math.min(w.rect.h, vh - margin * 2)
       const x = Math.max(margin, Math.min(w.rect.x, vw - width - margin))
@@ -224,17 +227,41 @@ export const apps = {
   },
 
   toggleMaximize(id: AppId) {
+    const win = state.windows.find((w) => w.id === id)
+    if (!win) return
+    apps.place(id, resolvePlacement(win.placement, win.maximized) === 'fill' ? 'free' : 'fill')
+  },
+
+  place(id: AppId, placement: OsPlacement) {
     setWindows(
       state.windows.map((w) => {
         if (w.id !== id) return w
-        if (w.maximized) return { ...w, maximized: false, rect: w.preMaxRect ?? w.rect, preMaxRect: null }
-        return { ...w, maximized: true, preMaxRect: w.rect }
+        const current = resolvePlacement(w.placement, w.maximized)
+        if (placement === 'free' || current === placement) {
+          return {
+            ...w,
+            placement: 'free',
+            maximized: false,
+            rect: w.preMaxRect ?? w.rect,
+            preMaxRect: null,
+          }
+        }
+        return {
+          ...w,
+          placement,
+          maximized: placement === 'fill',
+          preMaxRect: current === 'free' ? w.rect : (w.preMaxRect ?? w.rect),
+        }
       }),
     )
   },
 
   setRect(id: AppId, rect: WinRect) {
-    setWindows(state.windows.map((w) => (w.id === id ? { ...w, rect, maximized: false, preMaxRect: null } : w)))
+    setWindows(
+      state.windows.map((w) =>
+        w.id === id ? { ...w, rect, maximized: false, placement: 'free', preMaxRect: null } : w,
+      ),
+    )
   },
 
   /** Restaura todas las apps minimizadas (clic en el fondo con el escritorio recogido). */

@@ -2,6 +2,7 @@
  * operations: rutas por slug (`talleres_accesibles`), activación por web (`taller_web_activo`) y JWT.
  */
 
+import { isCrmUuid } from './crmUuid'
 import { supabase, supabaseOperations } from './supabase'
 import { isAviAdminProfile } from './aviAdminGate'
 import { isDemoAsesor } from './demoAsesores'
@@ -70,7 +71,7 @@ export async function fetchRouteBySlug(slug: string): Promise<ConnectRoute | nul
 }
 
 export async function fetchConnectRouteByContainerId(idtaller: string): Promise<ConnectRoute | null> {
-  if (!idtaller) return null
+  if (!isCrmUuid(idtaller)) return null
   const crmWebId = getCrmHubWebIdFromEnv()
   if (!crmWebId) return null
   try {
@@ -99,7 +100,7 @@ export async function fetchConnectRouteByContainerId(idtaller: string): Promise<
 }
 
 export async function fetchSlugForTaller(idtaller: string): Promise<string | null> {
-  if (!idtaller) return null
+  if (!isCrmUuid(idtaller)) return null
   try {
     const { data, error } = await supabaseOperations
       .from('talleres_accesibles')
@@ -120,7 +121,7 @@ export async function userMayAccessTaller(
   idtaller: string,
   legacyId?: string | null,
 ): Promise<boolean> {
-  if (!session?.user || !idtaller) return false
+  if (!session?.user || !isCrmUuid(idtaller)) return false
 
   const crmWebId = getCrmHubWebIdFromEnv()
   if (!crmWebId) return false

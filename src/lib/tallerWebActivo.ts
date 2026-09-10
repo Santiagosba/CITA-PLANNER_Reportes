@@ -2,6 +2,7 @@
  * operations.taller_web_activo: qué contenedor (idtaller) tiene qué web Hub (web_id → hub_webs.id) activa.
  */
 
+import { filterCrmUuids, isCrmUuid } from './crmUuid'
 import { supabaseOperations } from './supabase'
 import { normalizeHubWebUuid } from './hubWebEnv'
 
@@ -11,7 +12,7 @@ export async function isContainerActiveForHubWeb(
 ): Promise<boolean> {
   const tid = String(containerIdtaller || '').trim()
   const wid = normalizeHubWebUuid(webId)
-  if (!tid || !wid) return false
+  if (!isCrmUuid(tid) || !wid) return false
   try {
     const { data, error } = await supabaseOperations
       .from('taller_web_activo')
@@ -45,7 +46,7 @@ export async function fetchContainerIdsActiveForHubWeb(webId: string): Promise<s
 
 export async function filterContainerIdsActiveForHubWeb(webId: string, candidates: string[]): Promise<Set<string>> {
   const wid = normalizeHubWebUuid(webId)
-  const ids = [...new Set(candidates.map((x) => String(x || '').trim()).filter(Boolean))]
+  const ids = filterCrmUuids(candidates)
   if (!wid || ids.length === 0) return new Set()
   try {
     const { data, error } = await supabaseOperations

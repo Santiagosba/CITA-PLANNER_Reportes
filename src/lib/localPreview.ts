@@ -9,13 +9,25 @@ const KEY = 'avi_local_preview_v1'
 
 export const LOCAL_PREVIEW_ENABLED = import.meta.env.DEV
 
+export const LOCAL_PREVIEW_ID = 'local-preview'
+
 export const LOCAL_PREVIEW_WORKSHOP: Workshop = {
-  id: 'local-preview',
+  id: LOCAL_PREVIEW_ID,
   name: 'Taller local',
   city: 'Madrid',
   source: 'demo',
-  originalId: 'local-preview',
-  containerIdTaller: 'local-preview',
+  originalId: LOCAL_PREVIEW_ID,
+  containerIdTaller: LOCAL_PREVIEW_ID,
+}
+
+export function isLocalPreviewWorkshop(
+  workshop: Pick<Workshop, 'id' | 'originalId' | 'containerIdTaller' | 'source'> | null | undefined,
+): boolean {
+  if (!workshop) return false
+  if (workshop.source === 'demo') return true
+  return [workshop.id, workshop.originalId, workshop.containerIdTaller].some(
+    (value) => String(value ?? '').trim().toLowerCase() === LOCAL_PREVIEW_ID,
+  )
 }
 
 export type LocalPreviewState = {

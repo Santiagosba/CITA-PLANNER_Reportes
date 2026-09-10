@@ -5,6 +5,8 @@
 import { supabaseAviOld } from './supabase'
 import { fetchAllSupabasePages } from './supabaseFetchAll'
 import type { Workshop } from '../types'
+import { isLocalPreviewWorkshop } from './localPreview'
+import { filterCrmUuids, isCrmUuid } from './crmUuid'
 import { fetchContainerRow, fetchLicenciaModuleTalleres } from './licenciaGrupo'
 import { personFromCitaFields, phoneMatchKey, ticketClientName } from './ticketClient'
 import {
@@ -176,25 +178,27 @@ export function resolveAvioldTallerId(workshop: Workshop): string {
 }
 
 async function resolveHubTallerIds(workshop: Workshop): Promise<string[]> {
+  if (isLocalPreviewWorkshop(workshop)) return []
+
   const original = String(workshop.originalId || '').trim().toLowerCase()
   const container = String(workshop.containerIdTaller || '').trim().toLowerCase()
 
   // Taller hijo de licencia: originalId ya es el aviold.idtaller (si Hub lo conoce)
   if (original && container && original !== container) {
-    return [original]
+    return filterCrmUuids([original])
   }
 
   const containerId = container || original
-  if (containerId) {
+  if (containerId && isCrmUuid(containerId)) {
     const row = await fetchContainerRow(containerId)
     if (row?.idlicenciagrupo) {
       const talleres = await fetchLicenciaModuleTalleres(row.idlicenciagrupo, workshop.hubWebId)
-      const ids = talleres.map((t) => String(t.idtaller).trim().toLowerCase()).filter(Boolean)
+      const ids = filterCrmUuids(talleres.map((t) => t.idtaller))
       if (ids.length) return ids
     }
   }
 
-  return original ? [original] : []
+  return filterCrmUuids([original])
 }
 
 /**
@@ -203,6 +207,10 @@ async function resolveHubTallerIds(workshop: Workshop): Promise<string[]> {
  * 2) SQL Server Talleres → valida UUID o busca por nombre / expande Grupo
  */
 export async function resolveAvioldTallerIdsDetailed(workshop: Workshop): Promise<ResolvedTallerIds> {
+  if (isLocalPreviewWorkshop(workshop)) {
+    return { ids: [], talleres: [], via: 'hub' }
+  }
+
   const hubIds = await resolveHubTallerIds(workshop)
   if (!hubIds.length) {
     return { ids: [], talleres: [], via: 'hub' }
@@ -256,7 +264,7 @@ export async function fetchTiposPeticion(): Promise<TipoPeticionRow[]> {
 
 async function fetchCitasByIds(ids: string[]): Promise<Map<string, CitaResumen>> {
   const map = new Map<string, CitaResumen>()
-  const unique = [...new Set(ids.filter(Boolean))]
+  const unique = filterCrmUuids(ids)
   if (!unique.length) return map
 
   const chunkSize = 80
@@ -415,9 +423,7 @@ export async function fetchPendingPeticiones(
   filters: PeticionesFilters = {},
   options: { includeClientNames?: boolean } = {},
 ): Promise<PeticionPendiente[]> {
-  const ids = (Array.isArray(idtallerOrIds) ? idtallerOrIds : [idtallerOrIds])
-    .map((id) => id.trim().toLowerCase())
-    .filter(Boolean)
+  const ids = filterCrmUuids(Array.isArray(idtallerOrIds) ? idtallerOrIds : [idtallerOrIds])
   if (!ids.length) return []
 
   const rows = await withSqlFallback(
@@ -525,6 +531,7 @@ export type GestionPatch = {
 }
 
 export async function updatePeticionGestion(idpeticion: string, patch: GestionPatch): Promise<void> {
+  if (!isCrmUuid(idpeticion)) return
   if (isSqlServerPeticionesSource() && lastResolvedSource === 'sqlserver') {
     await sqlUpdatePeticionGestion(idpeticion, patch)
     return

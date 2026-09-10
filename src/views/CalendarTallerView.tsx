@@ -16,6 +16,7 @@ import {
 } from '../lib/calendarScale'
 import { useCitasTaller } from '../hooks/useCitasTaller'
 import type { CitaTaller } from '../lib/citasTaller'
+import { isDemoCitaId } from '../lib/demoTickets'
 import { isSlaCritico, matchesChannelText } from '../lib/tallerStations'
 import type { Workshop } from '../types'
 
@@ -104,6 +105,7 @@ function CitaChip({
         <>
           {cita.matricula ? <strong>{vehicleLabel(cita)}</strong> : null}
           <span>{customerLabel(cita)}</span>
+          {isDemoCitaId(cita.idcita) ? <span className="badge tone-info">Prueba</span> : null}
         </>
       )}
     </button>

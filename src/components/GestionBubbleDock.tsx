@@ -18,6 +18,22 @@ import { APP_META, apps, useActiveAppId, useApps, useTaskbarPinned, type AppId }
 import { AppIcon } from './AppWindows'
 import { useLiquidGlass } from '../hooks/useLiquidGlass'
 import {
+  expandSide,
+  rectForPlacement,
+  resolvePlacement,
+  snapMoveRect,
+  snapResizeRect,
+  type OsPlacement,
+} from '../lib/osGeometry'
+import {
+  clearOsSnapLines,
+  otherOsRects,
+  registerOsWindow,
+  setOsSnapLines,
+  unregisterOsWindow,
+  updateOsWindowRect,
+} from '../lib/osWindowRegistry'
+import {
   animateWinBox,
   applyScatterVars,
   applyWinMoveToElement,
@@ -29,6 +45,7 @@ import {
   sidesFromEdge,
   type Edge,
 } from '../lib/osWindowDrag'
+import WindowControls from './os/WindowControls'
 
 const POS_KEY = 'avi-call-agenda-pos'
 const SIZE_KEY = 'avi-call-agenda-size'
@@ -142,6 +159,7 @@ export default function GestionBubbleDock({
   onCloseAll,
 }: Props) {
   const [maximized, setMaximized] = useState(false)
+  const [placement, setPlacement] = useState<OsPlacement>('free')
   const preMaxRef = useRef<{ pos: Pos; size: Size } | null>(null)
   const maxFromRef = useRef<DOMRect | null>(null)
   const maxAnimationRef = useRef<Animation | null>(null)
@@ -234,7 +252,21 @@ export default function GestionBubbleDock({
       animation.cancel()
       el.classList.remove('is-size-tween')
     }
-  }, [maximized])
+  }, [maximized, placement])
+
+  useLayoutEffect(() => {
+    if (!mounted || deskVisual !== 'panel') {
+      unregisterOsWindow('taskbar')
+      return
+    }
+    registerOsWindow('taskbar', 'taskbar', { x: pos.x, y: pos.y, w: size.w, h: size.h })
+    return () => unregisterOsWindow('taskbar')
+  }, [mounted, deskVisual])
+
+  useLayoutEffect(() => {
+    if (!mounted || deskVisual !== 'panel') return
+    updateOsWindowRect('taskbar', { x: pos.x, y: pos.y, w: size.w, h: size.h })
+  }, [deskVisual, mounted, pos, size])
 
   useEffect(() => {
     const onResize = () => {
@@ -254,12 +286,15 @@ export default function GestionBubbleDock({
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  const toggleMaximize = useCallback(() => {
+  const placeBar = useCallback((next: OsPlacement) => {
     maxFromRef.current = rootRef.current?.getBoundingClientRect() ?? null
-    if (maximizedRef.current) {
+    const current = resolvePlacement(placement, maximizedRef.current)
+    if (next === 'free' || current === next) {
       const prev = preMaxRef.current
       preMaxRef.current = null
+      setPlacement('free')
       setMaximized(false)
+      maximizedRef.current = false
       if (prev) {
         const nextPos = clampPos(prev.pos.x, prev.pos.y, prev.size.w, prev.size.h)
         setPos(nextPos)
@@ -268,20 +303,28 @@ export default function GestionBubbleDock({
       }
       return
     }
-    preMaxRef.current = { pos: posRef.current, size: sizeRef.current }
-    const r = maximizedRect()
-    setMaximized(true)
+    if (current === 'free') preMaxRef.current = { pos: posRef.current, size: sizeRef.current }
+    setPlacement(next)
+    const filling = next === 'fill'
+    setMaximized(filling)
+    maximizedRef.current = filling
+    const r = filling ? maximizedRect() : rectForPlacement(next)
     setPos({ x: r.x, y: r.y })
     setSize({ w: r.w, h: r.h })
-  }, [])
+  }, [placement])
+
+  const toggleMaximize = useCallback(() => {
+    placeBar(resolvePlacement(placement, maximizedRef.current) === 'fill' ? 'free' : 'fill')
+  }, [placeBar, placement])
 
   /** Arrastrar o redimensionar a mano deshace el modo agrandado (como una ventana). */
   const leaveMaximized = useCallback(() => {
-    if (!maximizedRef.current) return
+    if (!maximizedRef.current && placement === 'free') return
     maximizedRef.current = false
     preMaxRef.current = null
     setMaximized(false)
-  }, [])
+    setPlacement('free')
+  }, [placement])
 
   const applyLive = useCallback((next: { x: number; y: number; w: number; h: number }) => {
     const el = rootRef.current
@@ -290,6 +333,7 @@ export default function GestionBubbleDock({
     posRef.current = { x: next.x, y: next.y }
     sizeRef.current = { w: next.w, h: next.h }
     applyWinRectToElement(el, next)
+    updateOsWindowRect('taskbar', next)
   }, [])
 
   const applyLiveMove = useCallback(
@@ -324,6 +368,7 @@ export default function GestionBubbleDock({
     setPos(nextPos)
     setSize(nextSize)
     persistLayout(nextPos, nextSize)
+    clearOsSnapLines()
     refreshLiquidGlass(el)
   }, [])
 
@@ -337,25 +382,25 @@ export default function GestionBubbleDock({
       if (d.mode === 'move') {
         const dx = e.clientX - d.ox
         const dy = e.clientY - d.oy
-        const next = clampPos(d.sx + dx, d.sy + dy, d.sw, d.sh)
-        applyLiveMove(
-          { x: d.sx, y: d.sy, w: d.sw, h: d.sh },
-          { ...next, w: d.sw, h: d.sh },
-        )
+        const raw = { x: d.sx + dx, y: d.sy + dy, w: d.sw, h: d.sh }
+        const snapped = snapMoveRect(raw, otherOsRects('taskbar'))
+        setOsSnapLines(snapped.lines)
+        applyLiveMove({ x: d.sx, y: d.sy, w: d.sw, h: d.sh }, snapped.rect)
         return
       }
 
       const origin = { x: d.sx, y: d.sy, w: d.sw, h: d.sh }
-      applyLive(
-        resizeRectFromPointer({
-          origin,
-          sides: sidesFromEdge(d.edge!),
-          clientX: e.clientX,
-          clientY: e.clientY,
-          minW: MIN_W,
-          minH: MIN_H,
-        }),
-      )
+      const resized = resizeRectFromPointer({
+        origin,
+        sides: sidesFromEdge(d.edge!),
+        clientX: e.clientX,
+        clientY: e.clientY,
+        minW: MIN_W,
+        minH: MIN_H,
+      })
+      const snapped = snapResizeRect(resized, sidesFromEdge(d.edge!), otherOsRects('taskbar'), undefined, MIN_W, MIN_H)
+      setOsSnapLines(snapped.lines)
+      applyLive(snapped.rect)
     }
 
     const onPointerMove = (e: PointerEvent) => {
@@ -577,30 +622,15 @@ export default function GestionBubbleDock({
           <div className="call-agenda-spine" aria-hidden>
             <GripVertical size={14} />
           </div>
-          <div className="lead-window-controls call-agenda-controls" role="toolbar" aria-label="Controles de la barra">
-            <button
-              type="button"
-              className="lead-traffic close call-agenda-clear"
-              title={closeLabel}
-              aria-label={closeLabel}
-              onClick={closeAction}
+          <div className="call-agenda-controls">
+            <WindowControls
+              placement={placement}
+              closeLabel={closeLabel}
+              minimizeLabel="Minimizar barra"
               disabled={busy}
-            />
-            <button
-              type="button"
-              className="lead-traffic minimize"
-              title="Minimizar barra"
-              aria-label="Minimizar barra"
-              onClick={onTuck}
-              disabled={busy || !onTuck}
-            />
-            <button
-              type="button"
-              className="lead-traffic zoom"
-              title={maximized ? 'Restaurar tamaño' : 'Agrandar barra'}
-              aria-label={maximized ? 'Restaurar tamaño' : 'Agrandar barra'}
-              onClick={toggleMaximize}
-              disabled={busy}
+              onClose={closeAction}
+              onMinimize={() => onTuck?.()}
+              onPlace={placeBar}
             />
           </div>
           <div className="call-agenda-panel-title">
@@ -778,7 +808,29 @@ export default function GestionBubbleDock({
       </div>
 
       {RESIZE_EDGES.map((edge) => (
-        <span key={edge} className={`os-resize-handle edge-${edge}`} onPointerDown={startResize(edge)} />
+        <span
+          key={edge}
+          className={`os-resize-handle edge-${edge}`}
+          onPointerDown={startResize(edge)}
+          onDoubleClick={(e) => {
+            e.stopPropagation()
+            const current = { x: posRef.current.x, y: posRef.current.y, w: sizeRef.current.w, h: sizeRef.current.h }
+            let next = current
+            for (const side of sidesFromEdge(edge)) {
+              next = expandSide(next, side, otherOsRects('taskbar'), MIN_W, MIN_H)
+            }
+            setPlacement('free')
+            setMaximized(false)
+            maximizedRef.current = false
+            const nextPos = clampPos(next.x, next.y, next.w, next.h)
+            setPos(nextPos)
+            setSize({ w: next.w, h: next.h })
+            persistLayout(nextPos, { w: next.w, h: next.h })
+            applyWinRectToElement(rootRef.current!, next)
+            updateOsWindowRect('taskbar', next)
+            refreshLiquidGlass(rootRef.current)
+          }}
+        />
       ))}
     </div>
   )

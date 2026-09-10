@@ -46,6 +46,7 @@ import {
   compareTicketsByOpenFirst,
 } from '../lib/doneFilter'
 import { buildOwnerScopeContext, matchesOwnerScope, matchesTaskOwnerScope, ownerScopeEmptyCopy, type OwnerScope } from '../lib/ownerScope'
+import { isDemoTicketId } from '../lib/demoTickets'
 import { computePeticionesStats, formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
 import { isSlaCritico } from '../lib/tallerStations'
 import type { Workshop } from '../types'
@@ -517,7 +518,10 @@ function DashTicketRow({ item, workshop, workspace, currentUser, appRole, onOpen
         )}
         <div>
           <TicketClientBlock peticion={item} size="sm" />
-          <span>{item.tipopeticion || 'Sin tipo'}</span>
+          <span>
+            {item.tipopeticion || 'Sin tipo'}
+            {isDemoTicketId(item.idpeticion) ? <span className="badge tone-info">Prueba</span> : null}
+          </span>
         </div>
       </div>
       <div className="dash-ticket-meta">

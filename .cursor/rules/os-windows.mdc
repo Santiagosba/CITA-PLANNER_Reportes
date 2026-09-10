@@ -1,0 +1,24 @@
+---
+description: Sistema de ventanas del escritorio CRM (gestos, snap, vidrio)
+globs: src/hooks/useOsWindow.ts,src/lib/osGeometry.ts,src/lib/osWindow*.ts,src/components/ToolWindow.tsx,src/components/LeadGestionDrawer.tsx,src/components/os/**/*.tsx,src/components/AppWindows.tsx,src/components/GestionBubbleDock.tsx
+alwaysApply: false
+---
+
+# Ventanas del escritorio
+
+Una sola máquina: `useOsWindow`. Fichas y apps no copian arrastre, resize ni fases.
+
+- Geometría y snap: `osGeometry.ts`. Registro en vivo: `osWindowRegistry.ts`.
+- Semáforo: `WindowControls` (verde = rellenar; hover = mitades). Cerrar no sale de la app.
+- Vidrio: un material. El cuerpo (`::before`) cubre también el borde. No reintroduzcas `--lg-rim` ni `display:none` en `.lead-os-frame::after`.
+- Mover por la barra de título. Doble clic título = rellenar. Doble clic borde = expandir ese lado.
+- Al arrastrar, alinear sin solapar. Redimensionar se detiene en el borde vecino.
+- Clic en zona muerta (`isIdleDeskClick`): recoger; el mismo clic con el escritorio recogido restaura. No en tickets, botones ni campos.
+
+```tsx
+// ❌ BAD — otro listener de pointermove en una ficha
+window.addEventListener('pointermove', onDrag)
+
+// ✅ GOOD
+const os = useOsWindow({ windowId: `ficha:${id}`, ... })
+```
