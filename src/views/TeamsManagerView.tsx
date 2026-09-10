@@ -1,6 +1,8 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Plus, Trash2, Users } from 'lucide-react'
+import ApiStatusBanner from '../components/ApiStatusBanner'
 import Card from '../components/ui/Card'
+import { HexLoaderScreen } from '../components/ui/HexLoader'
 import {
   catalogName,
   normalizeEmail,
@@ -20,35 +22,58 @@ type Props = {
 
 export default function TeamsManagerView({ workshop, currentUser, readOnly = false }: Props) {
   const workshopId = workshop.containerIdTaller || workshop.id
-  const { workspace, addTeam, updateTeam, deleteTeam, addAdvisor, addTaskType, addBoard } =
-    useAdvisorWorkspace(workshopId, currentUser, readOnly)
+  const { workspace, loading, persistError, addTeam, updateTeam, deleteTeam, addAdvisor, addTaskType, addBoard } =
+    useAdvisorWorkspace(workshopId, currentUser, true)
   const myTeamId = useMemo(() => {
     const me = personByEmail(workspace, currentUser.email)
     return me ? teamForPerson(workspace, me.id)?.id ?? null : null
   }, [workspace, currentUser.email])
   const [selectedId, setSelectedId] = useState<string | null>(myTeamId ?? workspace.teams[0]?.id ?? null)
   const [teamName, setTeamName] = useState('')
+  const [nameDraft, setNameDraft] = useState('')
   const [personName, setPersonName] = useState('')
   const [personEmail, setPersonEmail] = useState('')
   const [typeName, setTypeName] = useState('')
   const [boardName, setBoardName] = useState('')
+  const [notice, setNotice] = useState<string | null>(null)
 
   const selected = useMemo<AdvisorTeam | undefined>(
     () => workspace.teams.find((team) => team.id === selectedId) ?? workspace.teams[0],
     [selectedId, workspace.teams],
   )
 
+  useEffect(() => {
+    if (selectedId && workspace.teams.some((team) => team.id === selectedId)) return
+    setSelectedId(myTeamId ?? workspace.teams[0]?.id ?? null)
+  }, [workspace.teams, selectedId, myTeamId])
+
+  useEffect(() => {
+    setNameDraft(selected?.name ?? '')
+  }, [selected?.id, selected?.name])
+
   const onCreateTeam = (event: FormEvent) => {
     event.preventDefault()
-    addTeam(teamName)
+    const id = addTeam(teamName)
+    if (id) {
+      setSelectedId(id)
+      setNotice(`Equipo «${teamName.trim()}» creado.`)
+    }
     setTeamName('')
   }
 
   const onAddAdvisor = (event: FormEvent) => {
     event.preventDefault()
-    addAdvisor(personName, personEmail)
+    addAdvisor(personName, personEmail, selected?.id ?? null)
+    setNotice(`${personName.trim()} ya está en ${selected?.name || 'el taller'}.`)
     setPersonName('')
     setPersonEmail('')
+  }
+
+  const saveTeamName = () => {
+    if (!selected) return
+    const next = nameDraft.trim()
+    if (!next || next === selected.name) return
+    updateTeam(selected.id, { name: next })
   }
 
   const toggleMember = (personId: string) => {
@@ -75,8 +100,35 @@ export default function TeamsManagerView({ workshop, currentUser, readOnly = fal
     updateTeam(selected.id, { boardIds })
   }
 
+  const onDeleteTeam = () => {
+    if (!selected) return
+    if (workspace.teams.length <= 1) {
+      setNotice('Deja al menos un equipo en el taller.')
+      return
+    }
+    if (!window.confirm(`¿Borrar el equipo «${selected.name}»? Las tareas se quedan, pero sin este grupo.`)) return
+    const fallback = workspace.teams.find((team) => team.id !== selected.id)?.id ?? null
+    deleteTeam(selected.id)
+    setSelectedId(fallback)
+  }
+
+  if (loading && workspace.teams.length === 0) {
+    return (
+      <div className="dashboard-page role-desk">
+        <HexLoaderScreen size="md" label="Cargando equipos…" />
+      </div>
+    )
+  }
+
   return (
     <div className="dashboard-page role-desk">
+      {persistError ? (
+        <ApiStatusBanner
+          message="No se ha podido guardar en el taller. Los cambios quedan en este navegador."
+          variant="warning"
+        />
+      ) : null}
+
       <div className="role-desk-grid">
         <Card className="role-desk-col">
           <p className="section-eyebrow">Taller</p>
@@ -84,43 +136,47 @@ export default function TeamsManagerView({ workshop, currentUser, readOnly = fal
           <p className="section-subtitle">
             {readOnly
               ? 'Tu grupo y el resto de compañeros. Solo puedes consultarlos.'
-              : 'Crea equipos y elige quién entra en cada uno.'}
+              : 'Crea equipos y elige quién entra en cada uno. Los tipos y tableros de cada equipo son los que verá el asesor.'}
           </p>
 
-          <ul className="role-list">
-            {workspace.teams.map((team) => (
-              <li key={team.id}>
-                <button
-                  type="button"
-                  className={`list-row ${selected?.id === team.id ? 'is-active' : ''}`}
-                  onClick={() => setSelectedId(team.id)}
-                >
-                  <span className="list-row-title">{team.name}</span>
-                  <span className="list-row-meta">
-                    {team.memberIds.length} asesores · {team.taskTypeIds.length} tipos · {team.boardIds.length} tableros
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          {workspace.teams.length === 0 ? (
+            <p className="section-subtitle">Todavía no hay equipos.</p>
+          ) : (
+            <ul className="role-list">
+              {workspace.teams.map((team) => (
+                <li key={team.id}>
+                  <button
+                    type="button"
+                    className={`list-row ${selected?.id === team.id ? 'is-active' : ''}`}
+                    onClick={() => setSelectedId(team.id)}
+                  >
+                    <span className="list-row-title">{team.name}</span>
+                    <span className="list-row-meta">
+                      {team.memberIds.length} asesores · {team.taskTypeIds.length} tipos · {team.boardIds.length} tableros
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
 
           {readOnly ? null : (
-          <form className="role-inline-form" onSubmit={onCreateTeam}>
-            <label className="field-label" htmlFor="new-team-name">
-              Nuevo equipo
-            </label>
-            <input
-              id="new-team-name"
-              className="field-input"
-              value={teamName}
-              onChange={(event) => setTeamName(event.target.value)}
-              placeholder="Comercial, Triage…"
-            />
-            <button type="submit" className="client-submit" disabled={!teamName.trim()}>
-              <Plus size={16} aria-hidden />
-              Crear equipo
-            </button>
-          </form>
+            <form className="role-inline-form" onSubmit={onCreateTeam}>
+              <label className="field-label" htmlFor="new-team-name">
+                Nuevo equipo
+              </label>
+              <input
+                id="new-team-name"
+                className="field-input"
+                value={teamName}
+                onChange={(event) => setTeamName(event.target.value)}
+                placeholder="Comercial, Triage…"
+              />
+              <button type="submit" className="client-submit" disabled={!teamName.trim()}>
+                <Plus size={16} aria-hidden />
+                Crear equipo
+              </button>
+            </form>
           )}
         </Card>
 
@@ -139,14 +195,7 @@ export default function TeamsManagerView({ workshop, currentUser, readOnly = fal
                     <span className="badge tone-muted">Otro grupo</span>
                   )
                 ) : (
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    onClick={() => {
-                      deleteTeam(selected.id)
-                      setSelectedId(workspace.teams.find((team) => team.id !== selected.id)?.id ?? null)
-                    }}
-                  >
+                  <button type="button" className="ghost-button" onClick={onDeleteTeam}>
                     <Trash2 size={16} aria-hidden />
                     Borrar
                   </button>
@@ -161,8 +210,15 @@ export default function TeamsManagerView({ workshop, currentUser, readOnly = fal
                   <input
                     id="team-name"
                     className="field-input"
-                    value={selected.name}
-                    onChange={(event) => updateTeam(selected.id, { name: event.target.value })}
+                    value={nameDraft}
+                    onChange={(event) => setNameDraft(event.target.value)}
+                    onBlur={saveTeamName}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        saveTeamName()
+                      }
+                    }}
                   />
                 </>
               )}
@@ -170,6 +226,9 @@ export default function TeamsManagerView({ workshop, currentUser, readOnly = fal
               <h3 className="role-subhead">Asesores del equipo</h3>
               {readOnly ? (
                 <ul className="role-list">
+                  {selected.memberIds.length === 0 ? (
+                    <li className="section-subtitle">Este equipo no tiene asesores.</li>
+                  ) : null}
                   {selected.memberIds.map((memberId) => {
                     const person = personById(workspace, memberId)
                     if (!person) return null
@@ -185,6 +244,8 @@ export default function TeamsManagerView({ workshop, currentUser, readOnly = fal
                     )
                   })}
                 </ul>
+              ) : workspace.people.length === 0 ? (
+                <p className="section-subtitle">Añade un asesor a la derecha para poder marcarlo aquí.</p>
               ) : (
                 <ul className="role-check-list">
                   {workspace.people.map((person) => (
@@ -262,7 +323,7 @@ export default function TeamsManagerView({ workshop, currentUser, readOnly = fal
           <p className="section-subtitle">
             {readOnly
               ? 'Toda la gente del taller, también de otros grupos.'
-              : 'Añade gente y nuevos tipos o tableros para todos los equipos.'}
+              : 'Añade gente y nuevos tipos o tableros. El asesor nuevo entra en el equipo seleccionado.'}
           </p>
 
           {readOnly ? (
@@ -287,83 +348,86 @@ export default function TeamsManagerView({ workshop, currentUser, readOnly = fal
           ) : null}
 
           {readOnly ? null : (
-          <>
-          <form className="role-stack-form" onSubmit={onAddAdvisor}>
-            <label className="field-label" htmlFor="advisor-name">
-              Nuevo asesor
-            </label>
-            <input
-              id="advisor-name"
-              className="field-input"
-              value={personName}
-              onChange={(event) => setPersonName(event.target.value)}
-              placeholder="Nombre"
-            />
-            <input
-              className="field-input"
-              type="email"
-              value={personEmail}
-              onChange={(event) => setPersonEmail(event.target.value)}
-              placeholder="correo@taller.es"
-            />
-            <button type="submit" className="ghost-button" disabled={!personName.trim() || !personEmail.trim()}>
-              <Users size={16} aria-hidden />
-              Añadir asesor
-            </button>
-          </form>
+            <>
+              <form className="role-stack-form" onSubmit={onAddAdvisor}>
+                <label className="field-label" htmlFor="advisor-name">
+                  Nuevo asesor
+                </label>
+                <input
+                  id="advisor-name"
+                  className="field-input"
+                  value={personName}
+                  onChange={(event) => setPersonName(event.target.value)}
+                  placeholder="Nombre"
+                />
+                <input
+                  className="field-input"
+                  type="email"
+                  value={personEmail}
+                  onChange={(event) => setPersonEmail(event.target.value)}
+                  placeholder="correo@taller.es"
+                />
+                <button type="submit" className="ghost-button" disabled={!personName.trim() || !personEmail.trim()}>
+                  <Users size={16} aria-hidden />
+                  {selected ? `Añadir a ${selected.name}` : 'Añadir asesor'}
+                </button>
+              </form>
 
-          <form
-            className="role-inline-form"
-            onSubmit={(event) => {
-              event.preventDefault()
-              addTaskType(typeName)
-              setTypeName('')
-            }}
-          >
-            <label className="field-label" htmlFor="new-type">
-              Nuevo tipo de tarea
-            </label>
-            <input
-              id="new-type"
-              className="field-input"
-              value={typeName}
-              onChange={(event) => setTypeName(event.target.value)}
-              placeholder="Presupuesto, recambio…"
-            />
-            <button type="submit" className="ghost-button" disabled={!typeName.trim()}>
-              Añadir tipo
-            </button>
-          </form>
+              <form
+                className="role-inline-form"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  addTaskType(typeName)
+                  setTypeName('')
+                  setNotice('Tipo de tarea añadido a todos los equipos.')
+                }}
+              >
+                <label className="field-label" htmlFor="new-type">
+                  Nuevo tipo de tarea
+                </label>
+                <input
+                  id="new-type"
+                  className="field-input"
+                  value={typeName}
+                  onChange={(event) => setTypeName(event.target.value)}
+                  placeholder="Presupuesto, recambio…"
+                />
+                <button type="submit" className="ghost-button" disabled={!typeName.trim()}>
+                  Añadir tipo
+                </button>
+              </form>
 
-          <form
-            className="role-inline-form"
-            onSubmit={(event) => {
-              event.preventDefault()
-              addBoard(boardName)
-              setBoardName('')
-            }}
-          >
-            <label className="field-label" htmlFor="new-board">
-              Nuevo tablero
-            </label>
-            <input
-              id="new-board"
-              className="field-input"
-              value={boardName}
-              onChange={(event) => setBoardName(event.target.value)}
-              placeholder="Express, flotas…"
-            />
-            <button type="submit" className="ghost-button" disabled={!boardName.trim()}>
-              Añadir tablero
-            </button>
-          </form>
+              <form
+                className="role-inline-form"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  addBoard(boardName)
+                  setBoardName('')
+                  setNotice('Tablero añadido a todos los equipos.')
+                }}
+              >
+                <label className="field-label" htmlFor="new-board">
+                  Nuevo tablero
+                </label>
+                <input
+                  id="new-board"
+                  className="field-input"
+                  value={boardName}
+                  onChange={(event) => setBoardName(event.target.value)}
+                  placeholder="Express, flotas…"
+                />
+                <button type="submit" className="ghost-button" disabled={!boardName.trim()}>
+                  Añadir tablero
+                </button>
+              </form>
 
-          {selected ? (
-            <p className="list-row-meta">
-              Este equipo usa {selected.taskTypeIds.map((id) => catalogName(workspace.taskTypes, id)).join(', ') || 'ningún tipo'}.
-            </p>
-          ) : null}
-          </>
+              {notice ? <p className="section-subtitle">{notice}</p> : null}
+              {selected ? (
+                <p className="list-row-meta">
+                  Este equipo usa {selected.taskTypeIds.map((id) => catalogName(workspace.taskTypes, id)).join(', ') || 'ningún tipo'}.
+                </p>
+              ) : null}
+            </>
           )}
         </Card>
       </div>

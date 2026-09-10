@@ -22,6 +22,7 @@ import BotIdentityView from './BotIdentityView'
 import TeamsManagerView from './TeamsManagerView'
 import AssignTaskView from './AssignTaskView'
 import EmployeeStatsView from './EmployeeStatsView'
+import AiUsageView from './AiUsageView'
 import TodayTasksView from './TodayTasksView'
 import { mapSessionUserToCrmUser, type Workshop } from '../types'
 import { isGlobalAviAdmin } from '../lib/operationsConnect'
@@ -800,9 +801,18 @@ export default function DashboardShell({
           readOnly={appRole === 'asesor'}
         />
       ) : shellRoute === 'asignar-tarea' ? (
-        <AssignTaskView workshop={workshop} currentUser={currentUser} />
+        <AssignTaskView
+          workshop={workshop}
+          currentUser={currentUser}
+          onOpenTodayTasks={() => {
+            hideDeskWindows()
+            setShellRoute('tareas-hoy')
+          }}
+        />
       ) : shellRoute === 'stats-equipo' ? (
         <EmployeeStatsView workshop={workshop} currentUser={currentUser} />
+      ) : shellRoute === 'gasto-ia' ? (
+        <AiUsageView workshop={workshop} />
       ) : shellRoute === 'tareas-hoy' ? (
         <TodayTasksView workshop={workshop} currentUser={currentUser} appRole={appRole} onOpenLead={openLead} />
       ) : shellRoute === 'boards' ? (

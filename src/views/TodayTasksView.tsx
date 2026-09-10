@@ -35,7 +35,7 @@ type Props = {
 
 export default function TodayTasksView({ workshop, currentUser, appRole = 'asesor', onOpenLead }: Props) {
   const workshopId = workshop.containerIdTaller || workshop.id
-  const { workspace, setTaskStatus, setTaskAssignee } = useAdvisorWorkspace(workshopId, currentUser, true)
+  const { workspace, persistError, setTaskStatus, setTaskAssignee } = useAdvisorWorkspace(workshopId, currentUser, true)
   const today = localTodayIso()
   const range = resolveDateRange('mes', '', '')
   const { items, loading, error, sourceNotice } = useOperationalData(workshop, range)
@@ -77,6 +77,12 @@ export default function TodayTasksView({ workshop, currentUser, appRole = 'aseso
     <div className="dashboard-page role-desk">
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
       {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
+      {persistError ? (
+        <ApiStatusBanner
+          message="No se ha podido guardar en el taller. El cambio de la tarea queda en este navegador."
+          variant="warning"
+        />
+      ) : null}
 
       <section className="ops-kpi-grid" aria-label="Tus números de hoy">
         <article className="metric glass glass-lite">

@@ -389,6 +389,56 @@ export type CallCostStats = {
   series: CallCostDay[]
 }
 
+export type AiUsageReport = {
+  from: string
+  to: string
+  kpis: {
+    requests: number
+    tokens: number
+    estimatedCostUsd: number
+    errorCount: number
+  }
+  series: Array<{ date: string; requests: number; tokens: number; costUsd: number }>
+  byFeature: Array<{ feature: string; label: string; requests: number; tokens: number; costUsd: number }>
+  byModel: Array<{ model: string; requests: number; tokens: number; costUsd: number }>
+  features: Array<{ feature: string; label: string }>
+}
+
+export type AiUsageScope = 'taller' | 'cuenta'
+
+/** Uso y coste estimado de tokens OpenAI. */
+export async function fetchAiUsageReport(opts: {
+  from: string
+  to: string
+  idtaller?: string | null
+  feature?: string | null
+}): Promise<AiUsageReport & { scope: AiUsageScope }> {
+  const qs = new URLSearchParams()
+  qs.set('from', opts.from)
+  qs.set('to', opts.to)
+  if (opts.feature) qs.set('feature', opts.feature)
+  if (opts.idtaller) qs.set('idtaller', opts.idtaller)
+
+  if (opts.idtaller) {
+    try {
+      const report = await crmFetch<AiUsageReport>(`/api/consumo/ia-taller?${qs}`, {
+        endpointKey: 'GET /api/consumo/ia-taller',
+      })
+      return { ...report, scope: 'taller' }
+    } catch (error) {
+      const staleApi =
+        error instanceof CrmApiError &&
+        (error.status === 403 || error.status === 404 || error.endpointMissing)
+      if (!staleApi) throw error
+    }
+  }
+
+  const report = await crmFetch<AiUsageReport>(`/api/admin/ai-usage?${qs}`, {
+    endpointKey: 'GET /api/admin/ai-usage',
+  })
+  return { ...report, scope: 'cuenta' }
+}
+
 /** Totales y serie diaria de costes del softphone (`GET /api/calls/cost-stats`). */
 export function fetchCallCostStats(range?: { from?: string; to?: string }): Promise<CallCostStats> {
   const qs = new URLSearchParams()

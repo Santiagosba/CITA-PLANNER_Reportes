@@ -81,6 +81,11 @@ function pageCopy(
         title: 'Estadísticas',
         subtitle: 'Trabajo de cada asesor: tareas asignadas y consultas cerradas.',
       }
+    case 'gasto-ia':
+      return {
+        title: 'Gasto de IA',
+        subtitle: 'Tokens y coste estimado de OpenAI en este taller.',
+      }
     case 'tareas-hoy':
       return {
         title: 'Tareas de hoy',

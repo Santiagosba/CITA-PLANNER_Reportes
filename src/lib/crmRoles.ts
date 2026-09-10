@@ -50,6 +50,7 @@ export const ADMIN_SHELL_ROUTES: DashboardShellRoute[] = [
   'asignar-tarea',
   'tareas-hoy',
   'stats-equipo',
+  'gasto-ia',
   'boards',
   'laura',
   'bot-identity',
@@ -85,4 +86,9 @@ export function bindCrmAppRole(role: CrmAppRole | null): void {
 export function canSeeTelnyxCosts(role?: CrmAppRole | null): boolean {
   const resolved = role ?? boundCrmAppRole ?? readLocalPreview()?.role ?? null
   return resolved === 'admin'
+}
+
+/** El gasto de tokens de IA es del admin del taller, no del asesor. */
+export function canSeeAiCosts(role?: CrmAppRole | null): boolean {
+  return canSeeTelnyxCosts(role)
 }

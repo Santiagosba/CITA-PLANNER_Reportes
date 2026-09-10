@@ -10,6 +10,7 @@ export type DashboardShellRoute =
   | 'equipos'
   | 'asignar-tarea'
   | 'stats-equipo'
+  | 'gasto-ia'
   | 'tareas-hoy'
   | 'boards'
   | 'reportes'

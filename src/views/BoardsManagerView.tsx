@@ -32,7 +32,7 @@ import { buildOwnerScopeContext, matchesOwnerScope, type OwnerScope } from '../l
 import OwnerScopeFilter from '../components/OwnerScopeFilter'
 import TicketOwnerPicker from '../components/TicketOwnerPicker'
 import type { CrmAppRole } from '../lib/crmRoles'
-import type { AdvisorWorkspace } from '../lib/advisorWorkspace'
+import { boardsForTeam, personByEmail, teamForPerson, type AdvisorWorkspace } from '../lib/advisorWorkspace'
 import type { Workshop } from '../types'
 
 type DepartmentId = 'mechanics' | 'bodywork' | 'insurance' | 'parts' | 'sales'
@@ -556,6 +556,14 @@ export default function BoardsManagerView({
     () => buildOwnerScopeContext(workspace, currentUser.email),
     [workspace, currentUser.email],
   )
+  const visibleDepartments = useMemo(() => {
+    if (appRole === 'admin') return DEPARTMENTS
+    const me = personByEmail(workspace, currentUser.email)
+    const team = me ? teamForPerson(workspace, me.id) : undefined
+    if (!team) return DEPARTMENTS
+    const allowed = new Set(boardsForTeam(workspace, team).map((item) => item.id))
+    return DEPARTMENTS.filter((department) => allowed.has(department.id))
+  }, [appRole, workspace, currentUser.email])
   const scopedItems = useMemo(
     () => items.filter((item) => matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx)),
     [items, ownerScope, ownerCtx],
@@ -565,6 +573,11 @@ export default function BoardsManagerView({
     if (refreshToken > 0) void refresh()
   }, [refreshToken, refresh])
   const [activeDepartment, setActiveDepartment] = useState<DepartmentId>('mechanics')
+  useEffect(() => {
+    if (visibleDepartments.some((department) => department.id === activeDepartment)) return
+    const first = visibleDepartments[0]
+    if (first) setActiveDepartment(first.id)
+  }, [visibleDepartments, activeDepartment])
   const [priorities, setPriorities] = useState<PriorityMap>(() => loadJson(priorityKey(workshop.id), {}))
   const [manualEntries, setManualEntries] = useState<ManualEntry[]>(() =>
     loadJson(manualKey(workshop.id), []),
@@ -627,7 +640,8 @@ export default function BoardsManagerView({
     return map
   }, [scopedItems])
 
-  const active = DEPARTMENTS.find((department) => department.id === activeDepartment)!
+  const active =
+    visibleDepartments.find((department) => department.id === activeDepartment) ?? visibleDepartments[0] ?? DEPARTMENTS[0]
   const ActiveIcon = active.icon
 
   const departmentCounts = useMemo(() => {
@@ -960,8 +974,12 @@ export default function BoardsManagerView({
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
       {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
 
+      {visibleDepartments.length === 0 ? (
+        <p className="section-subtitle">Tu equipo no tiene tableros. El admin los asigna en Equipos.</p>
+      ) : null}
+
       <nav className="department-tabs custom-scrollbar-light" aria-label="Departamentos">
-        {DEPARTMENTS.map((department) => {
+        {visibleDepartments.map((department) => {
           const Icon = department.icon
           const selected = department.id === activeDepartment
           const count = departmentCounts[department.id]
