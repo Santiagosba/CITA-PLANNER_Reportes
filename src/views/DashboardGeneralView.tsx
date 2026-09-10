@@ -1,5 +1,6 @@
+import PaginatedItems from '../components/PaginatedItems'
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowRight, CalendarCheck2, CheckCircle2, ClipboardList, Percent, Wrench } from 'lucide-react'
+import { AlertTriangle, ArrowRight, CalendarCheck2, CheckCircle2, ClipboardList, Percent, Radio, Wrench } from 'lucide-react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
 import {
   formatLauraPct,
@@ -10,6 +11,7 @@ import {
   mixToPieSlices,
   mixToRadarAxes,
 } from '../components/LauraCharts'
+import EstadoDoneFilter from '../components/EstadoDoneFilter'
 import OwnerScopeFilter from '../components/OwnerScopeFilter'
 import TicketClientBlock from '../components/TicketClientBlock'
 import TicketOwnerPicker from '../components/TicketOwnerPicker'
@@ -41,7 +43,14 @@ import {
   isTaskDueOnOrBefore,
   localTodayIso,
   personById,
+  type AdvisorWorkspace,
 } from '../lib/advisorWorkspace'
+import {
+  compareTasksByOpenFirst,
+  compareTicketsByOpenFirst,
+  matchesEstadoDone,
+  type EstadoFilter,
+} from '../lib/doneFilter'
 import { teammatesForReassign } from '../lib/ticketOps'
 import { buildOwnerScopeContext, matchesOwnerScope, matchesTaskOwnerScope, ownerScopeEmptyCopy, type OwnerScope } from '../lib/ownerScope'
 import { computePeticionesStats, formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
@@ -73,11 +82,12 @@ export default function DashboardGeneralView({
   const { workspace, setTaskStatus, setTaskAssignee } = useAdvisorWorkspace(workshopId, currentUser, true)
   const [scale, setScale] = useState<CalendarScale>('dia')
   const [ownerScope, setOwnerScope] = useState<OwnerScope>(appRole === 'asesor' ? 'grupo' : 'todas')
+  const [estado, setEstado] = useState<EstadoFilter>('faltan')
   const today = localTodayIso()
   const anchor = useMemo(() => new Date(`${today}T12:00:00`), [today])
   const period = useMemo(() => calendarPeriod(scale, anchor), [scale, anchor])
-  const yearRange = useMemo(() => resolveDateRange('anio', '', ''), [])
-  const { items, loading, error, sourceNotice, refresh } = useOperationalData(workshop, yearRange)
+  const lifetimeRange = useMemo(() => resolveDateRange('todas', '', ''), [])
+  const { items, loading, error, sourceNotice, refresh, refreshSilent } = useOperationalData(workshop, lifetimeRange)
   const ownerCtx = useMemo(
     () => buildOwnerScopeContext(workspace, currentUser.email),
     [workspace, currentUser.email],
@@ -90,6 +100,13 @@ export default function DashboardGeneralView({
   useEffect(() => {
     if (refreshToken > 0) void refresh()
   }, [refreshToken, refresh])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshSilent()
+    }, 20_000)
+    return () => window.clearInterval(timer)
+  }, [refreshSilent])
 
   const periodItems = useMemo(
     () => filterReceivedInRange(items, period.from, period.to),
@@ -137,34 +154,50 @@ export default function DashboardGeneralView({
     [teamRows],
   )
 
-  const todayTasks = useMemo(
+  const todayTasksAll = useMemo(
     () =>
-      workspace.tasks.filter((task) => {
-        if (!matchesTaskOwnerScope(task, ownerScope, workspace, ownerCtx)) return false
-        if (task.status === 'hecho') return task.dueDate === today
-        return isTaskDueOnOrBefore(task, today)
-      }),
+      workspace.tasks
+        .filter((task) => {
+          if (!matchesTaskOwnerScope(task, ownerScope, workspace, ownerCtx)) return false
+          if (task.status === 'hecho') return task.dueDate === today
+          return isTaskDueOnOrBefore(task, today)
+        })
+        .sort((a, b) => compareTasksByOpenFirst(a, b, today)),
     [workspace, ownerScope, ownerCtx, today],
   )
-  const pendingTasks = todayTasks.filter((task) => task.status === 'pendiente')
+  const todayTasks = useMemo(
+    () => todayTasksAll.filter((task) => matchesEstadoDone(task.status === 'hecho', estado)),
+    [todayTasksAll, estado],
+  )
+  const pendingTasks = todayTasksAll.filter((task) => task.status === 'pendiente')
   const overdueTasks = pendingTasks.filter((task) => task.dueDate < today)
-  const todayTickets = useMemo(() => {
-    const rows = items.filter((item) => {
-      const received = receivedAt(item)
-      if (!received || toDateInputValue(received) !== today) return false
-      return matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx)
-    })
-    return rows.sort((a, b) => {
-      const aOpen = a.gestionado ? 1 : 0
-      const bOpen = b.gestionado ? 1 : 0
-      if (aOpen !== bOpen) return aOpen - bOpen
-      const aSla = !a.gestionado && (isSlaCritico(a.fechainicio) || isSlaCritico(a.cita?.fecha)) ? 0 : 1
-      const bSla = !b.gestionado && (isSlaCritico(b.fechainicio) || isSlaCritico(b.cita?.fecha)) ? 0 : 1
-      if (aSla !== bSla) return aSla - bSla
-      return String(b.fechainicio || '').localeCompare(String(a.fechainicio || ''))
-    })
+  const todayTicketsAll = useMemo(() => {
+    return items
+      .filter((item) => {
+        const received = receivedAt(item)
+        if (!received || toDateInputValue(received) !== today) return false
+        return matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx)
+      })
+      .sort(compareTicketsByOpenFirst)
   }, [items, today, ownerScope, ownerCtx])
-  const openTodayTickets = todayTickets.filter((item) => !item.gestionado)
+  const todayTickets = useMemo(
+    () => todayTicketsAll.filter((item) => matchesEstadoDone(Boolean(item.gestionado), estado)),
+    [todayTicketsAll, estado],
+  )
+  const openTodayTickets = todayTicketsAll.filter((item) => !item.gestionado)
+
+  const historyTicketsAll = useMemo(
+    () =>
+      items
+        .filter((item) => matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx))
+        .sort(compareTicketsByOpenFirst),
+    [items, ownerScope, ownerCtx],
+  )
+  const historyTickets = useMemo(
+    () => historyTicketsAll.filter((item) => matchesEstadoDone(Boolean(item.gestionado), estado)),
+    [historyTicketsAll, estado],
+  )
+  const lifetimeStats = useMemo(() => computePeticionesStats(historyTicketsAll), [historyTicketsAll])
 
   const openLinked = (peticionId: string | null) => {
     if (!peticionId) return
@@ -197,6 +230,7 @@ export default function DashboardGeneralView({
           </div>
         </div>
         <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Tickets y tareas" />
+        <EstadoDoneFilter value={estado} onChange={setEstado} label="Hechos o no" />
         <p className="dash-period-label">{period.label}</p>
       </div>
 
@@ -226,7 +260,7 @@ export default function DashboardGeneralView({
           helper={
             overdueTasks.length > 0
               ? `${overdueTasks.length} atrasada(s)`
-              : `${todayTasks.length - pendingTasks.length} ya hechas`
+              : `${todayTasksAll.length - pendingTasks.length} ya hechas`
           }
           tone={overdueTasks.length > 0 ? 'warning' : 'brand'}
           onClick={onOpenTodayTasks ?? onOpenTriage}
@@ -264,8 +298,8 @@ export default function DashboardGeneralView({
             <h2 className="ops-card-title">Tareas y tickets de este día</h2>
             <p className="section-subtitle">
               {appRole === 'admin'
-                ? 'Lo que el taller debe cerrar hoy: tareas asignadas y consultas que han entrado.'
-                : 'Los tickets y tareas de tu equipo. Si un compañero está de baja o el cliente lo atendió otro, pásaselo.'}
+                ? 'Primero lo que falta: tareas asignadas y consultas de hoy. El filtro de arriba cambia entre no hechos y hechos.'
+                : 'Primero lo que falta en tu equipo. Si un compañero está de baja o el cliente lo atendió otro, pásaselo.'}
             </p>
           </div>
           <div className="dash-today-links">
@@ -287,15 +321,20 @@ export default function DashboardGeneralView({
             </div>
             {todayTasks.length === 0 ? (
               <p className="section-subtitle ops-empty">
-                {workspace.tasks.length > 0
-                  ? ownerScope === 'mias'
-                    ? 'Hoy no tienes tareas.'
-                    : ownerScopeEmptyCopy(ownerScope)
-                  : 'Hoy no hay tareas.'}
+                {todayTasksAll.length > 0
+                  ? estado === 'hechas'
+                    ? 'Hoy no hay tareas hechas con este filtro.'
+                    : 'Hoy no hay tareas por hacer. Mira «Hechos» o «Todas».'
+                  : workspace.tasks.length > 0
+                    ? ownerScope === 'mias'
+                      ? 'Hoy no tienes tareas.'
+                      : ownerScopeEmptyCopy(ownerScope)
+                    : 'Hoy no hay tareas.'}
               </p>
             ) : (
-              <ul className="dash-task-list">
-                {todayTasks.map((task) => {
+              <PaginatedItems items={todayTasks} label="Tareas de hoy" resetKey={workshopId + ownerScope + estado}>
+{(visible) => (<ul className="dash-task-list">
+                {visible.map((task) => {
                   const overdue = task.status === 'pendiente' && task.dueDate < today
                   const owner = personById(workspace, task.assigneeId)
                   const linked = task.peticionId ? items.find((row) => row.idpeticion === task.peticionId) : undefined
@@ -350,7 +389,8 @@ export default function DashboardGeneralView({
                     </li>
                   )
                 })}
-              </ul>
+              </ul>)}
+</PaginatedItems>
             )}
           </section>
           <section className="dash-today-col" aria-label="Tickets de hoy">
@@ -364,67 +404,89 @@ export default function DashboardGeneralView({
               <HexLoaderScreen size="md" label="Cargando tickets…" />
             ) : todayTickets.length === 0 ? (
               <p className="section-subtitle ops-empty">
-                {items.length > 0 ? ownerScopeEmptyCopy(ownerScope) : 'Hoy no han entrado tickets.'}
+                {todayTicketsAll.length > 0
+                  ? estado === 'hechas'
+                    ? 'Hoy no hay tickets hechos con este filtro.'
+                    : 'Hoy no hay tickets por hacer. Mira «Hechos» o «Todas».'
+                  : items.length > 0
+                    ? ownerScopeEmptyCopy(ownerScope)
+                    : 'Hoy no han entrado tickets.'}
               </p>
             ) : (
-              <ul className="ops-feed-list dash-today-tickets">
-                {todayTickets.map((item) => {
-                  const sla = !item.gestionado && (isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha))
-                  const cita = item.cita
-                  return (
-                    <li
-                      key={item.idpeticion}
-                      className="ops-feed-row dash-ticket-row"
-                      role={onOpenLead ? 'button' : undefined}
-                      tabIndex={onOpenLead ? 0 : undefined}
-                      onClick={() => onOpenLead?.(item)}
-                      onKeyDown={(e) => {
-                        if (!onOpenLead) return
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
-                          onOpenLead(item)
-                        }
-                      }}
-                    >
-                      <div className="ops-feed-identity">
-                        {cita?.matricula ? (
-                          <VehiclePlate value={cita.matricula} compact />
-                        ) : cita ? (
-                          <span className="ops-feed-placeholder">SIN MATRÍCULA</span>
-                        ) : (
-                          <span className="ops-feed-placeholder is-muted">SIN CITA</span>
-                        )}
-                        <div>
-                          <TicketClientBlock peticion={item} size="sm" />
-                          <span>{item.tipopeticion || 'Sin tipo'}</span>
-                        </div>
-                      </div>
-                      <div className="dash-ticket-meta">
-                        <TicketOwnerPicker
-                          workshop={workshop}
-                          workspace={workspace}
-                          currentUser={currentUser}
-                          appRole={appRole}
-                          peticion={item}
-                          compact
-                        />
-                        <span className={`badge ${item.gestionado ? 'tone-positive' : sla ? 'tone-negative' : 'tone-warning'}`}>
-                          {item.gestionado ? 'Hecha' : sla ? 'SLA' : 'Falta'}
-                        </span>
-                        <time>{formatFecha(item.fechainicio)}</time>
-                      </div>
-                    </li>
-                  )
-                })}
-              </ul>
+              <PaginatedItems items={todayTickets} label="Tickets de hoy" resetKey={workshopId + ownerScope + estado}>
+{(visible) => (<ul className="ops-feed-list dash-today-tickets">
+                {visible.map((item) => (
+                  <DashTicketRow
+                    key={item.idpeticion}
+                    item={item}
+                    workshop={workshop}
+                    workspace={workspace}
+                    currentUser={currentUser}
+                    appRole={appRole}
+                    onOpenLead={onOpenLead}
+                  />
+                ))}
+              </ul>)}
+</PaginatedItems>
             )}
           </section>
         </div>
       </Card>
 
+      <Card className="dash-today dash-history" padding="none">
+        <div className="ops-card-header">
+          <div>
+            <p className="section-eyebrow">Historial</p>
+            <h2 className="ops-card-title">Hechos y no hechos · todo el tiempo</h2>
+            <p className="section-subtitle">
+              Conteos de todo el histórico. Se actualiza al marcar un ticket y periódicamente mientras esta pestaña está visible.
+            </p>
+          </div>
+          <div className="dash-history-live" aria-live="polite">
+            <span className="badge tone-neutral dash-live-badge">
+              <Radio size={14} aria-hidden />
+              En vivo
+            </span>
+            <span className={`badge ${lifetimeStats.porHacer > 0 ? 'tone-warning' : 'tone-positive'}`}>
+              {loading ? '—' : lifetimeStats.porHacer} no hechos
+            </span>
+            <span className="badge tone-positive">{loading ? '—' : lifetimeStats.hechas} hechos</span>
+          </div>
+        </div>
+        {loading ? (
+          <HexLoaderScreen size="md" label="Cargando el historial…" />
+        ) : historyTickets.length === 0 ? (
+          <p className="section-subtitle ops-empty dash-history-empty">
+            {historyTicketsAll.length > 0
+              ? estado === 'hechas'
+                ? 'No hay tickets hechos con este filtro.'
+                : 'No hay tickets por hacer. Mira «Hechos» o «Todas».'
+              : items.length > 0
+                ? ownerScopeEmptyCopy(ownerScope)
+                : 'Aún no hay tickets en el historial.'}
+          </p>
+        ) : (
+          <PaginatedItems items={historyTickets} label="Historial" resetKey={workshopId + ownerScope + estado}>
+{(visible) => (<ul className="ops-feed-list dash-today-tickets dash-history-list">
+            {visible.map((item) => (
+              <DashTicketRow
+                key={item.idpeticion}
+                item={item}
+                workshop={workshop}
+                workspace={workspace}
+                currentUser={currentUser}
+                appRole={appRole}
+                onOpenLead={onOpenLead}
+              />
+            ))}
+          </ul>)}
+</PaginatedItems>
+        )}
+      </Card>
+
       <Card className="laura-panel" padding="md">
         {loading ? (
-          <HexLoaderScreen size="md" label="Cargando el año en curso…" />
+          <HexLoaderScreen size="md" label="Cargando el historial…" />
         ) : (
           <LauraPareto
             eyebrow={period.label}
@@ -528,5 +590,62 @@ function MetricCard({ icon: Icon, label, value, helper, tone, onClick }: MetricP
       <span className="ops-kpi-helper">{helper}</span>
       <ArrowRight size={15} className="ops-kpi-arrow" />
     </button>
+  )
+}
+
+type DashTicketRowProps = {
+  item: PeticionPendiente
+  workshop: Workshop
+  workspace: AdvisorWorkspace
+  currentUser: { name: string; email: string }
+  appRole: CrmAppRole
+  onOpenLead?: (peticion: PeticionPendiente) => void
+}
+
+function DashTicketRow({ item, workshop, workspace, currentUser, appRole, onOpenLead }: DashTicketRowProps) {
+  const sla = !item.gestionado && (isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha))
+  const cita = item.cita
+  return (
+    <li
+      className="ops-feed-row dash-ticket-row"
+      role={onOpenLead ? 'button' : undefined}
+      tabIndex={onOpenLead ? 0 : undefined}
+      onClick={() => onOpenLead?.(item)}
+      onKeyDown={(e) => {
+        if (!onOpenLead) return
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onOpenLead(item)
+        }
+      }}
+    >
+      <div className="ops-feed-identity">
+        {cita?.matricula ? (
+          <VehiclePlate value={cita.matricula} compact />
+        ) : cita ? (
+          <span className="ops-feed-placeholder">SIN MATRÍCULA</span>
+        ) : (
+          <span className="ops-feed-placeholder is-muted">SIN CITA</span>
+        )}
+        <div>
+          <TicketClientBlock peticion={item} size="sm" />
+          <span>{item.tipopeticion || 'Sin tipo'}</span>
+        </div>
+      </div>
+      <div className="dash-ticket-meta">
+        <TicketOwnerPicker
+          workshop={workshop}
+          workspace={workspace}
+          currentUser={currentUser}
+          appRole={appRole}
+          peticion={item}
+          compact
+        />
+        <span className={`badge ${item.gestionado ? 'tone-positive' : sla ? 'tone-negative' : 'tone-warning'}`}>
+          {item.gestionado ? 'Hecho' : sla ? 'SLA' : 'No hecho'}
+        </span>
+        <time>{formatFecha(item.fechainicio)}</time>
+      </div>
+    </li>
   )
 }

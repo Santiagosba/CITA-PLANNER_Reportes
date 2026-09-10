@@ -51,6 +51,7 @@ export type AdvisorWorkspace = {
 }
 
 const STORAGE_PREFIX = 'avi_advisor_workspace_v1:'
+export const ADVISOR_WORKSPACE_CHANGED = 'avi-advisor-workspace-changed'
 
 export function normalizeEmail(email: string): string {
   return String(email || '').trim().toLowerCase()
@@ -171,7 +172,7 @@ export function seedAdvisorWorkspace(): AdvisorWorkspace {
   }
 }
 
-function storageKey(workshopId: string): string {
+export function advisorWorkspaceStorageKey(workshopId: string): string {
   return `${STORAGE_PREFIX}${workshopId}`
 }
 
@@ -250,11 +251,11 @@ function buildDemoPracticeTasks(workspace: AdvisorWorkspace, previous: AssignedT
         taskTypeId: workspace.taskTypes[n % workspace.taskTypes.length]?.id || 'tt-llamada',
         boardId: workspace.boards[advisorIndex % workspace.boards.length]?.id || null,
         teamId: 'team-prueba',
-        assigneeId: prior?.assigneeId || asesor.id,
+        assigneeId: prior?.assigneeId ?? personByEmail(workspace, asesor.email)?.id ?? asesor.id,
         dueDate: today,
         createdAt: prior?.createdAt || new Date().toISOString(),
         createdByEmail: 'santy@gmail.com',
-        status: 'pendiente' as const,
+        status: prior?.status ?? 'pendiente',
         peticionId: `demo-ticket-${slug}-${String(n).padStart(2, '0')}`,
       }
     })
@@ -265,9 +266,8 @@ function ensureDemoPracticeTasks(workspace: AdvisorWorkspace): AdvisorWorkspace 
   const today = localTodayIso()
   const demoTasks = workspace.tasks.filter((task) => task.id.startsWith('demo-task-'))
   const expected = DEMO_ASESORES.length * 4
-  const allClosed = demoTasks.length > 0 && demoTasks.every((task) => task.status === 'hecho')
 
-  if (demoTasks.length === expected && !allClosed) {
+  if (demoTasks.length === expected) {
     return {
       ...workspace,
       tasks: workspace.tasks.map((task) => {
@@ -278,20 +278,14 @@ function ensureDemoPracticeTasks(workspace: AdvisorWorkspace): AdvisorWorkspace 
     }
   }
 
-  const others = workspace.tasks
-    .filter((task) => !task.id.startsWith('demo-task-'))
-    .map((task) =>
-      task.id.startsWith('task-local-') && (allClosed || task.status === 'hecho')
-        ? { ...task, status: 'pendiente' as const, dueDate: today }
-        : task,
-    )
+  const others = workspace.tasks.filter((task) => !task.id.startsWith('demo-task-'))
   return { ...workspace, tasks: [...others, ...buildDemoPracticeTasks(workspace, demoTasks)] }
 }
 
 export function loadAdvisorWorkspace(workshopId: string): AdvisorWorkspace {
   if (!workshopId || typeof localStorage === 'undefined') return ensureDemoPracticeTeam(seedAdvisorWorkspace())
   try {
-    const raw = localStorage.getItem(storageKey(workshopId))
+    const raw = localStorage.getItem(advisorWorkspaceStorageKey(workshopId))
     if (!raw) return ensureDemoPracticeTeam(seedAdvisorWorkspace())
     const parsed = JSON.parse(raw) as unknown
     if (!isWorkspace(parsed)) return ensureDemoPracticeTeam(seedAdvisorWorkspace())
@@ -304,7 +298,10 @@ export function loadAdvisorWorkspace(workshopId: string): AdvisorWorkspace {
 
 export function saveAdvisorWorkspace(workshopId: string, workspace: AdvisorWorkspace): void {
   if (!workshopId || typeof localStorage === 'undefined') return
-  localStorage.setItem(storageKey(workshopId), JSON.stringify(workspace))
+  localStorage.setItem(advisorWorkspaceStorageKey(workshopId), JSON.stringify(workspace))
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(ADVISOR_WORKSPACE_CHANGED, { detail: { workshopId } }))
+  }
 }
 
 export function ensurePersonInWorkspace(

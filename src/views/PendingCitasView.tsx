@@ -1,6 +1,8 @@
+import PaginatedItems from '../components/PaginatedItems'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, Columns3, Search, Table2 } from 'lucide-react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
+import { withLoadDeadline } from '../lib/loadDeadline'
 import PendingCitasToolbar, { type EstadoFilter } from '../components/PendingCitasToolbar'
 import PeticionRow from '../components/PeticionRow'
 import type { ActionStatus } from '../components/ui/ActionButton'
@@ -22,6 +24,8 @@ import {
   computePeticionesStats,
   downloadCsv,
   fetchPendingPeticiones,
+  enrichPeticionClientNames,
+  mergePeticionClientNames,
   fetchTiposPeticion,
   formatFecha,
   getPeticionesSourceNotice,
@@ -46,6 +50,7 @@ import {
 } from '../lib/workingCopy'
 import { invalidateOperationalData } from '../hooks/useOperationalData'
 import { DEMO_TICKETS_NOTICE, isDemoTicketId, mergeLiveAndDemoTickets } from '../lib/demoTickets'
+import { compareTicketsByOpenFirst } from '../lib/doneFilter'
 import { applyPeticionPatch, PETICIONES_PATCHED_EVENT } from '../lib/ticketOps'
 import TicketOwnerPicker from '../components/TicketOwnerPicker'
 import type { CrmAppRole } from '../lib/crmRoles'
@@ -151,12 +156,15 @@ export default function PendingCitasView({
     }
   }, [workshopKey])
 
+  const loadVersion = useRef(0)
   const load = useCallback(async (silent = false) => {
+    const version = ++loadVersion.current
     if (!silent) setLoading(true)
     setError(null)
     setSourceNotice(null)
     try {
-      const resolved = await getResolvedTallerIds()
+      const resolved = await withLoadDeadline(getResolvedTallerIds())
+      if (version !== loadVersion.current) return
       if (!resolved.ids.length) {
         const demo = mergeLiveAndDemoTickets([], workshop, dateRange)
         if (demo.length) {
@@ -172,11 +180,16 @@ export default function PendingCitasView({
         setItems([])
         return
       }
-      const live = await fetchPendingPeticiones(resolved.ids, {
+      const live = await withLoadDeadline(fetchPendingPeticiones(resolved.ids, {
         tipoPeticionId: tipoFilter === '' ? null : tipoFilter,
         from: dateRange.from,
         to: dateRange.to,
-      })
+      }, { includeClientNames: false }))
+      if (version !== loadVersion.current) return
+      void withLoadDeadline(enrichPeticionClientNames(live, resolved.ids, dateRange)).then((enriched) => {
+        if (version !== loadVersion.current) return
+        setItems((current) => mergePeticionClientNames(current, enriched))
+      }).catch(() => { /* Optional names must not discard successfully loaded tickets. */ })
       const rows = mergeLiveAndDemoTickets(live, workshop, dateRange)
       setItems(rows)
       savePeticionesCopy(workshopCopyId(workshop), live)
@@ -187,12 +200,13 @@ export default function PendingCitasView({
         return faltan[0]?.idpeticion ?? rows[0]?.idpeticion ?? null
       })
     } catch (e) {
+      if (version !== loadVersion.current) return
       const copy = loadPeticionesCopy(workshopCopyId(workshop)) ?? []
       const rows = mergeLiveAndDemoTickets(copy, workshop, dateRange)
       if (rows.length) {
         setItems(rows)
         setError(null)
-        setSourceNotice(copy.length ? COPY_FALLBACK_NOTICE : DEMO_TICKETS_NOTICE)
+        setSourceNotice(`${copy.length ? COPY_FALLBACK_NOTICE : DEMO_TICKETS_NOTICE} Motivo: ${e instanceof Error ? e.message : 'No se pudieron actualizar los datos.'}`)
         setSelectedId((prev) => {
           if (prev && rows.some((r) => r.idpeticion === prev)) return prev
           return rows.find((r) => !r.gestionado)?.idpeticion ?? rows[0]?.idpeticion ?? null
@@ -202,12 +216,13 @@ export default function PendingCitasView({
         setError(e instanceof Error ? e.message : 'No se pudieron cargar las citas')
       }
     } finally {
-      setLoading(false)
+      if (version === loadVersion.current) setLoading(false)
     }
   }, [getResolvedTallerIds, tipoFilter, dateRange.from, dateRange.to, workshop])
 
   useEffect(() => {
     void load()
+    return () => { loadVersion.current++ }
   }, [load])
 
   useEffect(() => {
@@ -242,14 +257,18 @@ export default function PendingCitasView({
   const stats = useMemo(() => computePeticionesStats(scopedItems), [scopedItems])
 
   const filteredItems = useMemo(() => {
-    return scopedItems.filter((p) => {
-      if (estado === 'hechas' && !p.gestionado) return false
-      if (estado === 'faltan' && p.gestionado) return false
-      return true
-    })
+    return scopedItems
+      .filter((p) => {
+        if (estado === 'hechas' && !p.gestionado) return false
+        if (estado === 'faltan' && p.gestionado) return false
+        return true
+      })
+      .sort(compareTicketsByOpenFirst)
   }, [scopedItems, estado])
   const faltanItems = useMemo(() => filteredItems.filter((p) => !p.gestionado), [filteredItems])
   const agendaGroups = useMemo(() => groupPeticionesByAgendaDay(filteredItems), [filteredItems])
+  const agendaItems = useMemo(() => agendaGroups.flatMap((group) => group.items), [agendaGroups])
+  const pageFilterKey = JSON.stringify([workshopKey, estado, ownerScope, callerFilter, tipoFilter, dateRange.from, dateRange.to, channel, slaOnly, reportSoloPendientes])
   const reportItems = useMemo(() => {
     if (reportSoloPendientes) return filteredItems.filter(isPeticionPendiente)
     return filteredItems
@@ -526,13 +545,14 @@ export default function PendingCitasView({
                     ? 'Prueba «Todas» o cambia el dueño.'
                     : estado === 'hechas'
                       ? `Faltan ${stats.porHacer} por terminar.`
-                      : `Hay ${stats.hechas} hechas. Cambia el filtro a «Hechas» o «Todas» para verlas.`
+                      : `Hay ${stats.hechas} hechos. Cambia el filtro a «Hechos» o «Todas» para verlos.`
                   : 'Prueba «Ver todo» o amplía el rango de fechas.'}
               </p>
             </Card>
           ) : (
-            <div className="panel-stack">
-              {agendaGroups.map((group, groupIndex) => (
+            <PaginatedItems items={agendaItems} label="Consultas" resetKey={pageFilterKey}>
+            {(visible) => <div className="panel-stack">
+              {groupPeticionesByAgendaDay(visible).map((group, groupIndex) => (
                 <section
                   key={group.label}
                   className={`agenda-day-group${groupIndex < 6 ? ' triage-group-enter' : ''}`}
@@ -572,7 +592,8 @@ export default function PendingCitasView({
                   </ul>
                 </section>
               ))}
-            </div>
+            </div>}
+            </PaginatedItems>
           )}
         </div>
       ) : (
@@ -600,7 +621,8 @@ export default function PendingCitasView({
             </Card>
           ) : (
             <Card padding="sm" className="glass glass-lite report-table-wrap custom-scrollbar-light">
-              <table className="report-table">
+              <PaginatedItems items={reportItems} label="Informe" resetKey={pageFilterKey}>
+              {(visible) => <table className="report-table">
                 <thead>
                   <tr>
                     <th>Cliente</th>
@@ -613,7 +635,7 @@ export default function PendingCitasView({
                   </tr>
                 </thead>
                 <tbody>
-                  {reportItems.map((p, index) => {
+                  {visible.map((p, index) => {
                     const c = p.cita
                     const hecha = Boolean(p.gestionado)
                     return (
@@ -658,7 +680,8 @@ export default function PendingCitasView({
                     )
                   })}
                 </tbody>
-              </table>
+              </table>}
+              </PaginatedItems>
             </Card>
           )}
         </div>

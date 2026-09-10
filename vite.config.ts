@@ -1,4 +1,4 @@
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type ProxyOptions } from 'vite';
 import react from '@vitejs/plugin-react';
 
 /** Destino del proxy /api. sslip.io de Dokploy aún no tiene certificado: forzar HTTP. */
@@ -7,6 +7,8 @@ function sqlApiProxyOrigin(env: Record<string, string>, fallbackPort: string): s
   try {
     const url = new URL(raw)
     if (url.hostname.endsWith('.sslip.io')) url.protocol = 'http:'
+    // The local API listens on IPv4; avoid resolving localhost to ::1.
+    if (url.hostname === 'localhost') url.hostname = '127.0.0.1'
     return url.origin
   } catch {
     return `http://localhost:${fallbackPort}`
@@ -27,7 +29,7 @@ export default defineConfig(({ mode }) => {
 
   // api-crm y la API SQL no comparten rutas, así que un único origen puede servir
   // la SPA y repartir /api entre las dos. Lo usa `npm run preview` detrás del túnel.
-  const proxy = {
+  const proxy: Record<string, ProxyOptions> = {
     '^/api/(webrtc|call|calls)(/|$)': {
       target: `http://localhost:${crmPort}`,
       changeOrigin: true,
@@ -40,6 +42,13 @@ export default defineConfig(({ mode }) => {
     '/api': {
       target: sqlProxyTarget,
       changeOrigin: true,
+      configure(proxy) {
+        proxy.on('error', (_error, _request, response) => {
+          if (!('writeHead' in response) || response.headersSent || response.writableEnded) return
+          response.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8', 'Retry-After': '1' })
+          response.end(JSON.stringify({ code: 'api-down', error: 'La API SQL no está disponible o se está reiniciando. Vuelve a intentarlo en unos segundos.' }))
+        })
+      },
     },
   };
 

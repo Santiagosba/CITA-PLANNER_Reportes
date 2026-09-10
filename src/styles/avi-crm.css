@@ -4169,6 +4169,42 @@ html.dark .hex-loader-aura,
   align-items: flex-start;
 }
 
+.dash-history-live {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dash-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dash-live-badge svg {
+  animation: dash-live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes dash-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.dash-history-empty {
+  padding: 16px;
+}
+
+.dash-history-list {
+  max-height: min(560px, 70vh);
+}
+
 .dash-today-links {
   display: flex;
   flex-wrap: wrap;
@@ -4439,8 +4475,13 @@ html.dark .hex-loader-aura,
 
 @media (max-width: 720px) {
   .dash-today .ops-card-header,
-  .dash-today-links {
+  .dash-today-links,
+  .dash-history-live {
     width: 100%;
+  }
+
+  .dash-history-live {
+    justify-content: flex-start;
   }
 
   .dash-today-links {

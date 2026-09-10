@@ -21,7 +21,9 @@ import {
   ownerScopeEmptyCopy,
   type OwnerScope,
 } from '../lib/ownerScope'
+import EstadoDoneFilter from '../components/EstadoDoneFilter'
 import OwnerScopeFilter from '../components/OwnerScopeFilter'
+import { compareTasksByOpenFirst, matchesEstadoDone, type EstadoFilter } from '../lib/doneFilter'
 import type { Workshop } from '../types'
 
 type Props = {
@@ -38,6 +40,7 @@ export default function TodayTasksView({ workshop, currentUser, appRole = 'aseso
   const range = resolveDateRange('mes', '', '')
   const { items, loading, error, sourceNotice } = useOperationalData(workshop, range)
   const [ownerScope, setOwnerScope] = useState<OwnerScope>(appRole === 'asesor' ? 'grupo' : 'todas')
+  const [estado, setEstado] = useState<EstadoFilter>('faltan')
   useEffect(() => {
     setOwnerScope(appRole === 'asesor' ? 'grupo' : 'todas')
   }, [appRole])
@@ -46,17 +49,23 @@ export default function TodayTasksView({ workshop, currentUser, appRole = 'aseso
     [workspace, currentUser.email],
   )
 
-  const tasks = useMemo(
+  const tasksAll = useMemo(
     () =>
-      workspace.tasks.filter((task) => {
-        if (!matchesTaskOwnerScope(task, ownerScope, workspace, ownerCtx)) return false
-        if (task.status === 'hecho') return task.dueDate === today
-        return isTaskDueOnOrBefore(task, today)
-      }),
+      workspace.tasks
+        .filter((task) => {
+          if (!matchesTaskOwnerScope(task, ownerScope, workspace, ownerCtx)) return false
+          if (task.status === 'hecho') return task.dueDate === today
+          return isTaskDueOnOrBefore(task, today)
+        })
+        .sort((a, b) => compareTasksByOpenFirst(a, b, today)),
     [workspace, ownerScope, ownerCtx, today],
   )
-  const pending = tasks.filter((task) => task.status === 'pendiente')
-  const done = tasks.filter((task) => task.status === 'hecho')
+  const tasks = useMemo(
+    () => tasksAll.filter((task) => matchesEstadoDone(task.status === 'hecho', estado)),
+    [tasksAll, estado],
+  )
+  const pending = tasksAll.filter((task) => task.status === 'pendiente')
+  const done = tasksAll.filter((task) => task.status === 'hecho')
 
   const openLinked = (peticionId: string | null) => {
     if (!peticionId) return
@@ -101,15 +110,20 @@ export default function TodayTasksView({ workshop, currentUser, appRole = 'aseso
 
         <div className="elevator-filters glass glass-lite" style={{ marginBottom: 'var(--space-4)' }}>
           <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Tareas" />
+          <EstadoDoneFilter value={estado} onChange={setEstado} label="Hechas o no" />
         </div>
 
         {loading && tasks.length === 0 ? (
           <HexLoaderScreen size="md" label="Cargando tus tareas…" />
         ) : tasks.length === 0 ? (
           <p className="section-subtitle">
-            {ownerScope === 'mias'
-              ? 'Hoy no tienes tareas. Cuando el admin te asigne una, saldrá aquí.'
-              : ownerScopeEmptyCopy(ownerScope)}
+            {tasksAll.length > 0
+              ? estado === 'hechas'
+                ? 'Hoy no hay tareas hechas con este filtro.'
+                : 'Hoy no hay tareas por hacer. Mira «Hechos» o «Todas».'
+              : ownerScope === 'mias'
+                ? 'Hoy no tienes tareas. Cuando el admin te asigne una, saldrá aquí.'
+                : ownerScopeEmptyCopy(ownerScope)}
           </p>
         ) : (
           <ul className="role-list">

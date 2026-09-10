@@ -56,7 +56,7 @@ export function loadCitasCopy(workshopId: string): CitaTaller[] | null {
 }
 
 export const COPY_FALLBACK_NOTICE =
-  'Usando la copia local de este taller. Cuando conectemos la app del compañero, se actualizará.'
+  'Mostrando la última copia guardada de este taller. Los datos pueden estar desactualizados.'
 
 export function patchPeticionInCopy(
   workshopId: string,

@@ -9,6 +9,7 @@ import type { GestionPatch, PeticionPendiente, PeticionesFilters, TipoPeticionRo
 import type { CitaTaller } from './citasTaller'
 import { supabase } from './supabase'
 import { handleExpiredSession } from './sessionGuard'
+import { fetchSqlResponse } from './sqlTransport'
 
 function browserCannotCall(raw: string): boolean {
   try {
@@ -60,19 +61,31 @@ function applySqlAuth(headers: Headers, token: string | undefined) {
 }
 
 async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+  let sentToken: string | undefined
   const run = async () => {
     const headers = new Headers(init?.headers)
     const { data } = await supabase.auth.getSession()
-    applySqlAuth(headers, data.session?.access_token)
-    return fetch(input, { ...init, headers })
+    sentToken = data.session?.access_token
+    const publicHealth = /\/api\/health(?:\/(?:live|config))?(?:\?|$)/.test(input)
+    if (!publicHealth && (!sentToken || sentToken.startsWith('demo-'))) {
+      throw new SqlServerApiError('Tu sesión ha caducado. Vuelve a entrar.', 'session-expired')
+    }
+    applySqlAuth(headers, sentToken)
+    return fetchSqlResponse(input, { ...init, headers })
   }
   try {
     let res = await run()
-    if (res.status === 401 && (await handleExpiredSession())) {
-      res = await run()
+    if (res.status === 401) {
+      if (!(await handleExpiredSession(sentToken))) {
+        throw new SqlServerApiError('Tu sesión ha caducado. Vuelve a entrar.', 'session-expired')
+      }
+      const { data } = await supabase.auth.getSession()
+      // No repetir un token que el servidor ya ha rechazado.
+      if (data.session?.access_token && data.session.access_token !== sentToken) res = await run()
     }
     return res
-  } catch {
+  } catch (error) {
+    if (error instanceof SqlServerApiError) throw error
     throw new SqlServerApiError(apiDownMessage(), 'api-down')
   }
 }

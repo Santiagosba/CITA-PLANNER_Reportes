@@ -155,8 +155,11 @@ async function crmFetch<T>(path: string, init: CrmFetchOptions = {}): Promise<T>
     if (res.status === 401 && token && !(await handleExpiredSession())) {
       throw new CrmApiError('Tu sesión ha caducado. Vuelve a entrar.', 401)
     }
-    const apiError =
+    const apiErrorRaw =
       body && typeof body === 'object' && 'error' in body ? String((body as { error: unknown }).error) : ''
+    const apiError = /timeout exceeded when trying to connect/i.test(apiErrorRaw)
+      ? 'api-crm no llega a su base Postgres. Reinicia esa app en Dokploy o revisa SUPABASE_DB_URL.'
+      : apiErrorRaw
     // Express responde a rutas inexistentes con HTML («Cannot GET …»), nunca con `{ error }`.
     const endpointMissing = res.status === 404 && !apiError
     if (endpointMissing && endpointKey) unsupportedEndpoints.add(endpointKey)

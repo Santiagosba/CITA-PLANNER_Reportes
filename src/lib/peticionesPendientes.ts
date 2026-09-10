@@ -234,6 +234,7 @@ export async function resolveAvioldTallerIdsDetailed(workshop: Workshop): Promis
       }
     }
   } catch (e) {
+    if (e instanceof SqlServerApiError && (e.code === 'api-down' || e.code === 'session-expired')) throw e
     console.warn('[peticionesPendientes] resolve SQL Talleres:', e)
   }
 
@@ -412,6 +413,7 @@ function mapPeticionRow(
 export async function fetchPendingPeticiones(
   idtallerOrIds: string | string[],
   filters: PeticionesFilters = {},
+  options: { includeClientNames?: boolean } = {},
 ): Promise<PeticionPendiente[]> {
   const ids = (Array.isArray(idtallerOrIds) ? idtallerOrIds : [idtallerOrIds])
     .map((id) => id.trim().toLowerCase())
@@ -427,10 +429,29 @@ export async function fetchPendingPeticiones(
     },
     async () => fetchPendingPeticionesFromSupabase(ids, filters),
   )
+  if (options.includeClientNames === false) return rows
+  return enrichPeticionClientNames(rows, ids, filters)
+}
+
+/** Optional enrichment: callers can display tickets before loading calendar names. */
+export async function enrichPeticionClientNames(
+  rows: PeticionPendiente[],
+  ids: string[],
+  filters: { from?: string; to?: string } = {},
+): Promise<PeticionPendiente[]> {
   const missingNames = rows.some((item) => !ticketClientName(item) && phoneMatchKey(item.caller))
   if (!missingNames) return rows
   const citas = await fetchCitasForNameMatch(ids, { from: filters.from, to: filters.to })
   return attachClientNamesFromCitas(rows, citas)
+}
+
+/** Merge names only: a late calendar response must not revert ticket edits. */
+export function mergePeticionClientNames(current: PeticionPendiente[], enriched: PeticionPendiente[]): PeticionPendiente[] {
+  const names = new Map(enriched.map((row) => [row.idpeticion, ticketClientName(row)]))
+  return current.map((row) => {
+    const name = names.get(row.idpeticion)
+    return name && !ticketClientName(row) ? { ...row, clienteNombre: name } : row
+  })
 }
 
 async function fetchPendingPeticionesFromSupabase(
@@ -582,16 +603,14 @@ export function downloadCsv(content: string, filename: string): void {
   URL.revokeObjectURL(url)
 }
 
+const ticketDateFormatter = new Intl.DateTimeFormat('es-ES', {
+  day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+})
+
 export function formatFecha(iso: string | null | undefined): string {
   if (!iso) return '—'
   try {
-    return new Date(iso).toLocaleString('es-ES', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
+    return ticketDateFormatter.format(new Date(iso))
   } catch {
     return iso
   }

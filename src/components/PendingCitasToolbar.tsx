@@ -5,9 +5,11 @@ import { CHANNEL_OPTIONS } from '../lib/tallerStations'
 import type { PeticionesStats } from '../lib/peticionesPendientes'
 import type { OwnerScope } from '../lib/ownerScope'
 import Button from './ui/Button'
+import EstadoDoneFilter from './EstadoDoneFilter'
 import OwnerScopeFilter from './OwnerScopeFilter'
+import type { EstadoFilter } from '../lib/doneFilter'
 
-export type EstadoFilter = 'todas' | 'faltan' | 'hechas'
+export type { EstadoFilter }
 
 const PERIOD_CHIPS: { id: DateRangePreset; label: string }[] = [
   { id: 'semana', label: 'Semana' },
@@ -90,32 +92,7 @@ export default function PendingCitasToolbar({
       ) : null}
 
       <div className="elevator-filters glass glass-lite">
-        <div className="filter-field">
-          <span className="filter-field-label">Estado</span>
-          <div className="estado-filter" role="group" aria-label="Estado de las consultas">
-            <button
-              type="button"
-              className={`preset-chip ${estado === 'todas' ? 'is-active' : ''}`}
-              onClick={() => onEstadoChange('todas')}
-            >
-              Todas
-            </button>
-            <button
-              type="button"
-              className={`preset-chip ${estado === 'faltan' ? 'is-active' : ''}`}
-              onClick={() => onEstadoChange('faltan')}
-            >
-              Faltan
-            </button>
-            <button
-              type="button"
-              className={`preset-chip ${estado === 'hechas' ? 'is-active' : ''}`}
-              onClick={() => onEstadoChange('hechas')}
-            >
-              Hechas
-            </button>
-          </div>
-        </div>
+        <EstadoDoneFilter value={estado} onChange={onEstadoChange} />
         <OwnerScopeFilter value={ownerScope} onChange={onOwnerScopeChange} />
         <label className="filter-field queue-filter-search">
           <span className="filter-field-label">Buscar</span>
