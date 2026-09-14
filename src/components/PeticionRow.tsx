@@ -102,7 +102,6 @@ function PeticionRow({
                 </span>
               ))}
             </span>
-            {p.descripcion ? <span className="prow-desc">{p.descripcion}</span> : null}
           </span>
           <span className="prow-aside">
             <span className="prow-time">{formatAgendaTime(p.fechainicio)}</span>

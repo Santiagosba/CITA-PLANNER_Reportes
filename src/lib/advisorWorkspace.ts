@@ -54,6 +54,14 @@ export type AdvisorWorkspace = {
 const STORAGE_PREFIX = 'avi_advisor_workspace_v1:'
 export const ADVISOR_WORKSPACE_CHANGED = 'avi-advisor-workspace-changed'
 
+export const SHOWCASE_ADVISORS: AdvisorPerson[] = [
+  { id: 'demo-asesor-marta', name: 'Marta Gil', email: 'marta.gil@taller.demo' },
+  { id: 'demo-asesor-nuria', name: 'Nuria Beltrán', email: 'nuria.beltran@taller.demo' },
+]
+
+export const TEAM_RECEPCION_ID = 'team-recepcion'
+export const TEAM_COMERCIAL_ID = 'team-comercial'
+
 export function normalizeEmail(email: string): string {
   return String(email || '').trim().toLowerCase()
 }
@@ -77,7 +85,7 @@ export function isExampleAssignedTask(task: Pick<AssignedTask, 'id' | 'peticionI
   return id.startsWith('task-local-') || id.startsWith('demo-task-') || peticionId.startsWith('demo-ticket-')
 }
 
-function keepExampleTasksFor(workshopId: string): boolean {
+export function keepExampleAssignedTasks(workshopId: string): boolean {
   return workshopId === 'local-preview'
 }
 
@@ -96,7 +104,7 @@ function exampleAssignedTasks(): AssignedTask[] {
       notes: 'Ejemplo local. Entra como Ana para verla en Tareas.',
       taskTypeId: 'tt-llamada',
       boardId: 'mechanics',
-      teamId: 'team-prueba',
+      teamId: TEAM_RECEPCION_ID,
       assigneeId: 'demo-asesor-ana',
       dueDate: today,
       createdAt,
@@ -111,7 +119,7 @@ function exampleAssignedTasks(): AssignedTask[] {
       notes: 'Del grupo: asignada a Luis.',
       taskTypeId: 'tt-cita',
       boardId: 'parts',
-      teamId: 'team-prueba',
+      teamId: TEAM_COMERCIAL_ID,
       assigneeId: 'demo-asesor-luis',
       dueDate: today,
       createdAt,
@@ -126,7 +134,7 @@ function exampleAssignedTasks(): AssignedTask[] {
       notes: 'De otra compañera, fuera del grupo de Ana.',
       taskTypeId: 'tt-peritaje',
       boardId: 'insurance',
-      teamId: 'team-prueba',
+      teamId: TEAM_RECEPCION_ID,
       assigneeId: 'demo-asesor-carmen',
       dueDate: today,
       createdAt,
@@ -141,8 +149,38 @@ function exampleAssignedTasks(): AssignedTask[] {
       notes: 'Nadie la ha cogido todavía.',
       taskTypeId: 'tt-whatsapp',
       boardId: null,
-      teamId: 'team-prueba',
+      teamId: TEAM_RECEPCION_ID,
       assigneeId: '',
+      dueDate: today,
+      createdAt,
+      completedAt: null,
+      createdByEmail: 'santy@gmail.com',
+      status: 'pendiente',
+      peticionId: null,
+    },
+    {
+      id: 'task-local-5',
+      title: 'WhatsApp de Marta: foto del testigo',
+      notes: 'De Recepción. Entra como Marta para verla.',
+      taskTypeId: 'tt-whatsapp',
+      boardId: 'mechanics',
+      teamId: TEAM_RECEPCION_ID,
+      assigneeId: 'demo-asesor-marta',
+      dueDate: today,
+      createdAt,
+      completedAt: null,
+      createdByEmail: 'santy@gmail.com',
+      status: 'pendiente',
+      peticionId: null,
+    },
+    {
+      id: 'task-local-6',
+      title: 'Seguimiento comercial de Nuria',
+      notes: 'De Comercial. Entra como Nuria para verla.',
+      taskTypeId: 'tt-seguimiento',
+      boardId: 'sales',
+      teamId: TEAM_COMERCIAL_ID,
+      assigneeId: 'demo-asesor-nuria',
       dueDate: today,
       createdAt,
       completedAt: null,
@@ -153,12 +191,7 @@ function exampleAssignedTasks(): AssignedTask[] {
   ]
 }
 
-export function seedAdvisorWorkspace(opts?: { examples?: boolean }): AdvisorWorkspace {
-  const people: AdvisorPerson[] = DEMO_ASESORES.map((asesor) => ({
-    id: asesor.id,
-    name: `${asesor.firstName} ${asesor.lastName}`.trim(),
-    email: normalizeEmail(asesor.email),
-  }))
+function seedCatalog() {
   const taskTypes: CatalogItem[] = [
     { id: 'tt-llamada', name: 'Llamada' },
     { id: 'tt-cita', name: 'Cita' },
@@ -173,18 +206,46 @@ export function seedAdvisorWorkspace(opts?: { examples?: boolean }): AdvisorWork
     { id: 'parts', name: 'Recambios & Flotas' },
     { id: 'sales', name: 'Ventas VN / VO' },
   ]
+  return { taskTypes, boards }
+}
+
+function seedPeople(): AdvisorPerson[] {
+  const fromDemo = DEMO_ASESORES.map((asesor) => ({
+    id: asesor.id,
+    name: `${asesor.firstName} ${asesor.lastName}`.trim(),
+    email: normalizeEmail(asesor.email),
+  }))
+  return [...fromDemo, ...SHOWCASE_ADVISORS]
+}
+
+function showcaseTeams(taskTypes: CatalogItem[], boards: CatalogItem[]): AdvisorTeam[] {
+  const type = (id: string) => taskTypes.find((item) => item.id === id)?.id
+  const board = (id: string) => boards.find((item) => item.id === id)?.id
+  return [
+    {
+      id: TEAM_RECEPCION_ID,
+      name: 'Recepción',
+      memberIds: ['demo-asesor-ana', 'demo-asesor-carmen', 'demo-asesor-marta'],
+      taskTypeIds: ['tt-llamada', 'tt-whatsapp', 'tt-peritaje'].map(type).filter(Boolean) as string[],
+      boardIds: ['mechanics', 'bodywork', 'insurance'].map(board).filter(Boolean) as string[],
+    },
+    {
+      id: TEAM_COMERCIAL_ID,
+      name: 'Comercial',
+      memberIds: ['demo-asesor-luis', 'demo-asesor-nuria'],
+      taskTypeIds: ['tt-cita', 'tt-seguimiento'].map(type).filter(Boolean) as string[],
+      boardIds: ['sales', 'parts'].map(board).filter(Boolean) as string[],
+    },
+  ]
+}
+
+export function seedAdvisorWorkspace(opts?: { examples?: boolean }): AdvisorWorkspace {
+  const people = seedPeople()
+  const { taskTypes, boards } = seedCatalog()
   return {
     version: 1,
     people,
-    teams: [
-      {
-        id: 'team-prueba',
-        name: 'Equipo de prueba',
-        memberIds: people.map((person) => person.id),
-        taskTypeIds: taskTypes.map((item) => item.id),
-        boardIds: boards.map((item) => item.id),
-      },
-    ],
+    teams: showcaseTeams(taskTypes, boards),
     taskTypes,
     boards,
     tasks: opts?.examples ? exampleAssignedTasks() : [],
@@ -210,19 +271,88 @@ function isWorkspace(value: unknown): value is AdvisorWorkspace {
 
 function ensureDemoPeople(workspace: AdvisorWorkspace): AdvisorWorkspace {
   let people = workspace.people
-  for (const asesor of DEMO_ASESORES) {
-    const email = normalizeEmail(asesor.email)
-    if (people.some((person) => normalizeEmail(person.email) === email)) continue
-    people = [
-      ...people,
-      {
-        id: asesor.id,
-        name: `${asesor.firstName} ${asesor.lastName}`.trim(),
-        email,
-      },
-    ]
+  const extras: AdvisorPerson[] = [
+    ...DEMO_ASESORES.map((asesor) => ({
+      id: asesor.id,
+      name: `${asesor.firstName} ${asesor.lastName}`.trim(),
+      email: normalizeEmail(asesor.email),
+    })),
+    ...SHOWCASE_ADVISORS,
+  ]
+  for (const advisor of extras) {
+    const email = normalizeEmail(advisor.email)
+    if (people.some((person) => normalizeEmail(person.email) === email || person.id === advisor.id)) continue
+    people = [...people, advisor]
   }
   return people === workspace.people ? workspace : { ...workspace, people }
+}
+
+/** Añade Recepción y Comercial si faltan, sin borrar equipos que el admin ya haya creado. */
+export function ensureShowcaseTeams(workspace: AdvisorWorkspace): AdvisorWorkspace {
+  const withPeople = ensureDemoPeople(workspace)
+  const catalog = seedCatalog()
+  const wanted = showcaseTeams(
+    withPeople.taskTypes.length ? withPeople.taskTypes : catalog.taskTypes,
+    withPeople.boards.length ? withPeople.boards : catalog.boards,
+  )
+  const missing = wanted.filter((team) => !withPeople.teams.some((row) => row.id === team.id))
+  let teams = withPeople.teams
+  if (missing.length > 0) {
+    const taken = new Set(missing.flatMap((team) => team.memberIds))
+    teams = [
+      ...teams.map((team) =>
+        team.id === 'team-prueba'
+          ? { ...team, memberIds: team.memberIds.filter((id) => !taken.has(id)) }
+          : team,
+      ),
+      ...missing,
+    ]
+    teams = teams.filter((team) => team.id !== 'team-prueba' || team.memberIds.length > 0)
+  }
+  teams = teams.map((team) => {
+    const seed = wanted.find((row) => row.id === team.id)
+    if (!seed) return team
+    const memberIds = team.memberIds.length ? team.memberIds : seed.memberIds
+    const taskTypeIds = team.taskTypeIds.length ? team.taskTypeIds : seed.taskTypeIds
+    const boardIds = team.boardIds.length ? team.boardIds : seed.boardIds
+    if (memberIds === team.memberIds && taskTypeIds === team.taskTypeIds && boardIds === team.boardIds) {
+      return team
+    }
+    return { ...team, memberIds, taskTypeIds, boardIds }
+  })
+  if (missing.length === 0 && withPeople === workspace && teams === withPeople.teams) {
+    return reconcileTeamMembers(workspace)
+  }
+  return reconcileTeamMembers({ ...withPeople, teams })
+}
+
+/** Si el id del miembro ya no existe, lo apunta a la persona con el mismo correo. */
+export function reconcileTeamMembers(workspace: AdvisorWorkspace): AdvisorWorkspace {
+  const known = [
+    ...DEMO_ASESORES.map((asesor) => ({
+      id: asesor.id,
+      email: normalizeEmail(asesor.email),
+    })),
+    ...SHOWCASE_ADVISORS.map((asesor) => ({
+      id: asesor.id,
+      email: normalizeEmail(asesor.email),
+    })),
+  ]
+  const resolveId = (id: string): string => {
+    if (personById(workspace, id)) return id
+    const hint = known.find((row) => row.id === id)
+    const live = hint ? personByEmail(workspace, hint.email) : undefined
+    return live?.id ?? id
+  }
+  let changed = false
+  const teams = workspace.teams.map((team) => {
+    const memberIds = [...new Set(team.memberIds.map(resolveId))]
+    if (memberIds.length !== team.memberIds.length || memberIds.some((id, index) => id !== team.memberIds[index])) {
+      changed = true
+    }
+    return memberIds === team.memberIds ? team : { ...team, memberIds }
+  })
+  return changed ? { ...workspace, teams } : workspace
 }
 
 function ensureDefaultCatalog(workspace: AdvisorWorkspace): AdvisorWorkspace {
@@ -254,13 +384,25 @@ export function hydrateAdvisorWorkspace(
   workspace: AdvisorWorkspace,
   opts?: { keepExamples?: boolean },
 ): AdvisorWorkspace {
-  const next = refreshDemoTaskDates(ensureDefaultCatalog(ensureDemoPeople(workspace)))
+  const next = refreshDemoTaskDates(
+    reconcileTeamMembers(ensureDefaultCatalog(ensureShowcaseTeams(workspace))),
+  )
   return opts?.keepExamples ? next : dropExampleTasks(next)
 }
 
 export function parseAdvisorWorkspace(value: unknown): AdvisorWorkspace | null {
   if (!isWorkspace(value)) return null
   return hydrateAdvisorWorkspace(value)
+}
+
+export function rawWorkspaceNeedsShowcase(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return true
+  const teams = (value as { teams?: unknown }).teams
+  if (!Array.isArray(teams)) return true
+  const ids = new Set(
+    teams.map((row) => (row && typeof row === 'object' ? String((row as { id?: unknown }).id ?? '') : '')),
+  )
+  return !ids.has(TEAM_RECEPCION_ID) || !ids.has(TEAM_COMERCIAL_ID)
 }
 
 export function rawWorkspaceHasExampleTasks(value: unknown): boolean {
@@ -278,7 +420,7 @@ export function rawWorkspaceHasExampleTasks(value: unknown): boolean {
 }
 
 export function loadAdvisorWorkspace(workshopId: string): AdvisorWorkspace {
-  const keepExamples = keepExampleTasksFor(workshopId)
+  const keepExamples = keepExampleAssignedTasks(workshopId)
   const seed = () => seedAdvisorWorkspace({ examples: keepExamples })
   if (!workshopId || typeof localStorage === 'undefined') return hydrateAdvisorWorkspace(seed(), { keepExamples })
   try {
@@ -330,7 +472,56 @@ export function catalogName(items: CatalogItem[], id: string | null | undefined)
 }
 
 export function teamForPerson(workspace: AdvisorWorkspace, personId: string): AdvisorTeam | undefined {
-  return workspace.teams.find((team) => team.memberIds.includes(personId))
+  return teamsForPerson(workspace, personId)[0]
+}
+
+export function teamsForPerson(workspace: AdvisorWorkspace, personId: string): AdvisorTeam[] {
+  if (!personId) return []
+  const person = personById(workspace, personId)
+  const email = normalizeEmail(person?.email ?? '')
+  return workspace.teams.filter((team) => isPersonOnTeam(workspace, team, personId, email))
+}
+
+export function teamsForEmail(workspace: AdvisorWorkspace, email: string): AdvisorTeam[] {
+  const key = normalizeEmail(email)
+  if (!key) return []
+  const person = personByEmail(workspace, key)
+  return workspace.teams.filter((team) => isPersonOnTeam(workspace, team, person?.id ?? '', key))
+}
+
+export function isPersonOnTeam(
+  workspace: AdvisorWorkspace,
+  team: AdvisorTeam,
+  personId: string,
+  email = '',
+): boolean {
+  if (personId && team.memberIds.includes(personId)) return true
+  const key = normalizeEmail(email)
+  if (!key) return false
+  if (team.memberIds.some((id) => normalizeEmail(personById(workspace, id)?.email ?? '') === key)) {
+    return true
+  }
+  const known = [...DEMO_ASESORES.map((row) => ({ id: row.id, email: row.email })), ...SHOWCASE_ADVISORS].find(
+    (row) => normalizeEmail(row.email) === key || row.id === personId,
+  )
+  return Boolean(known && team.memberIds.includes(known.id))
+}
+
+export function teamMemberEmails(workspace: AdvisorWorkspace, team: AdvisorTeam): string[] {
+  const emails = new Set<string>()
+  for (const id of team.memberIds) {
+    const person = personById(workspace, id)
+    if (person?.email) emails.add(normalizeEmail(person.email))
+    const known = [...DEMO_ASESORES, ...SHOWCASE_ADVISORS].find((row) => row.id === id)
+    if (known) emails.add(normalizeEmail(known.email))
+  }
+  return [...emails]
+}
+
+export function teamNamesForPerson(workspace: AdvisorWorkspace, personId: string): string {
+  return teamsForPerson(workspace, personId)
+    .map((team) => team.name)
+    .join(', ')
 }
 
 export function typesForTeam(workspace: AdvisorWorkspace, team: AdvisorTeam | undefined): CatalogItem[] {
@@ -433,13 +624,50 @@ export function removeTeam(workspace: AdvisorWorkspace, teamId: string): Advisor
   }
 }
 
+/** Un asesor puede estar en varios equipos. */
 export function addPersonToTeam(workspace: AdvisorWorkspace, personId: string, teamId: string): AdvisorWorkspace {
   if (!personId || !teamId) return workspace
   return {
     ...workspace,
+    teams: workspace.teams.map((team) =>
+      team.id === teamId && !team.memberIds.includes(personId)
+        ? { ...team, memberIds: [...team.memberIds, personId] }
+        : team,
+    ),
+  }
+}
+
+export function removePersonFromTeam(workspace: AdvisorWorkspace, personId: string, teamId: string): AdvisorWorkspace {
+  if (!personId || !teamId) return workspace
+  return {
+    ...workspace,
+    teams: workspace.teams.map((team) =>
+      team.id === teamId && team.memberIds.includes(personId)
+        ? { ...team, memberIds: team.memberIds.filter((id) => id !== personId) }
+        : team,
+    ),
+  }
+}
+
+export function togglePersonOnTeam(workspace: AdvisorWorkspace, personId: string, teamId: string): AdvisorWorkspace {
+  const team = workspace.teams.find((row) => row.id === teamId)
+  if (!team) return workspace
+  return team.memberIds.includes(personId)
+    ? removePersonFromTeam(workspace, personId, teamId)
+    : addPersonToTeam(workspace, personId, teamId)
+}
+
+/** Deja al asesor solo en ese equipo. `teamId` vacío lo saca de todos. */
+export function setPersonTeam(workspace: AdvisorWorkspace, personId: string, teamId: string | null): AdvisorWorkspace {
+  if (!personId) return workspace
+  return {
+    ...workspace,
     teams: workspace.teams.map((team) => {
-      if (team.id !== teamId || team.memberIds.includes(personId)) return team
-      return { ...team, memberIds: [...team.memberIds, personId] }
+      const has = team.memberIds.includes(personId)
+      if (team.id === teamId) {
+        return has ? team : { ...team, memberIds: [...team.memberIds, personId] }
+      }
+      return has ? { ...team, memberIds: team.memberIds.filter((id) => id !== personId) } : team
     }),
   }
 }

@@ -1199,7 +1199,7 @@ html.dark .login-asesor-card {
 
 .view-page-popover-row-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
 }
@@ -2486,6 +2486,8 @@ html.dark .hex-loader-aura,
 }
 
 .prow-name {
+  flex: 1 1 200px;
+  min-width: 0;
   color: var(--fog-strong);
   font-size: var(--font-lg);
   font-weight: 600;
@@ -4425,6 +4427,15 @@ html.dark .hex-loader-aura,
   max-width: 100%;
 }
 
+.dash-today-tickets .ticket-client-need {
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: unset;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
 .dash-ticket-meta {
   display: flex;
   flex-wrap: wrap;
@@ -4436,9 +4447,9 @@ html.dark .hex-loader-aura,
 
 .dash-ticket-meta .ticket-owner-picker,
 .dash-ticket-meta .ticket-owner-readonly {
-  flex: 1 1 132px;
+  flex: 1 1 168px;
   min-width: 0;
-  max-width: 220px;
+  max-width: 280px;
 }
 
 .dash-ticket-meta .field-select {
@@ -4478,6 +4489,106 @@ html.dark .hex-loader-aura,
 .ticket-owner-error {
   color: var(--color-danger);
   font-size: 12px;
+}
+
+.ticket-owner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ticket-owner-actions .ghost-button {
+  min-height: var(--tap-target);
+}
+
+.dash-assign-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-assign-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.dash-assign-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.dash-assign-head .ops-card-title {
+  margin: 0;
+  font-size: var(--font-lg);
+}
+
+.dash-assign-head .ghost-button {
+  min-height: var(--tap-target);
+  padding-inline: 16px;
+}
+
+.dash-assign-grid {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(140px, 1fr) minmax(200px, 1.4fr) minmax(140px, 0.8fr);
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.dash-assign-task {
+  grid-column: 1 / 4;
+}
+
+.dash-assign-submit {
+  grid-column: 4;
+  min-height: var(--tap-target);
+}
+
+.dash-assign-panel .field-label,
+.dashboard-shell .dash-assign-panel .field-label,
+.dashboard-shell.is-light .dash-assign-panel .field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  color: var(--fog-strong);
+  font-size: var(--font-sm);
+}
+
+.dash-assign-panel .field-input,
+.dash-assign-panel .field-select {
+  max-width: none;
+}
+
+.dash-assign-preview,
+.dash-assign-notice {
+  margin: 0;
+  font-size: var(--font-sm);
+}
+
+.dash-assign-preview {
+  color: var(--muted);
+}
+
+.dash-assign-notice {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+@media (max-width: 980px) {
+  .dash-assign-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dash-assign-ticket,
+  .dash-assign-task {
+    grid-column: 1 / -1;
+  }
+
+  .dash-assign-submit {
+    grid-column: 1 / -1;
+  }
 }
 
 .prow-head .ticket-owner-picker {
@@ -7738,7 +7849,7 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
 
 .lead-modal-client-id {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   min-width: 0;
   flex: 1 1 160px;
@@ -15696,6 +15807,10 @@ body > .os-desk-layer.dashboard-shell {
   justify-content: center;
 }
 
+.local-preview-switch .field-input {
+  min-height: var(--tap-target);
+}
+
 .local-preview-switch .ghost-button.is-active {
   border-color: var(--color-brand);
   background: var(--color-brand-soft);
@@ -15728,12 +15843,29 @@ body > .os-desk-layer.dashboard-shell {
   line-height: 1.3;
 }
 
+.ticket-client-need {
+  margin: 4px 0 0;
+  color: var(--fog-strong);
+  font-weight: 650;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .ticket-client.is-sm .ticket-client-name {
   font-size: var(--font-md);
 }
 
 .ticket-client.is-sm .ticket-client-phone {
   font-size: 12px;
+}
+
+.ticket-client.is-sm .ticket-client-need {
+  font-size: var(--font-md);
 }
 
 .ticket-client.is-md .ticket-client-name {
@@ -15744,12 +15876,20 @@ body > .os-desk-layer.dashboard-shell {
   font-size: 13px;
 }
 
+.ticket-client.is-md .ticket-client-need {
+  font-size: var(--font-md);
+}
+
 .ticket-client.is-lg .ticket-client-name {
   font-size: var(--font-xl);
 }
 
 .ticket-client.is-lg .ticket-client-phone {
   font-size: var(--font-sm);
+}
+
+.ticket-client.is-lg .ticket-client-need {
+  font-size: var(--font-md);
 }
 
 .prow-name .ticket-client-name {
@@ -15762,6 +15902,10 @@ body > .os-desk-layer.dashboard-shell {
 
 .lead-modal-client .ticket-client-phone {
   font-size: var(--font-sm);
+}
+
+.lead-modal-client .ticket-client-need {
+  font-size: var(--font-md);
 }
 
 .kanban-card .ticket-client {
@@ -15784,12 +15928,14 @@ body > .os-desk-layer.dashboard-shell {
 }
 
 .owner-scope-filter,
-.cita-link-filter {
+.cita-link-filter,
+.team-filter {
   min-width: 0;
 }
 
 .owner-scope-filter .estado-filter,
-.cita-link-filter .estado-filter {
+.cita-link-filter .estado-filter,
+.team-filter .estado-filter {
   flex-wrap: wrap;
 }
 

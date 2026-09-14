@@ -2,10 +2,12 @@ import type { CrmAppRole } from './crmRoles'
 import {
   normalizeEmail,
   personByEmail,
+  teamsForEmail,
   type AdvisorPerson,
   type AdvisorWorkspace,
 } from './advisorWorkspace'
 import { isDemoTicketId, patchDemoTicket } from './demoTickets'
+import { suggestTicketOwner } from './ticketOwnerSuggest'
 import {
   classifyOwnerEmail,
   buildOwnerScopeContext,
@@ -29,12 +31,15 @@ export function teammatesForReassign(
   const me = personByEmail(workspace, email)
   if (!me) return []
   const memberIds = new Set<string>()
-  for (const team of workspace.teams) {
-    if (!team.memberIds.includes(me.id)) continue
+  for (const team of teamsForEmail(workspace, email)) {
     for (const id of team.memberIds) memberIds.add(id)
   }
   if (memberIds.size === 0) return [me]
-  return workspace.people.filter((person) => memberIds.has(person.id))
+  const fromIds = workspace.people.filter((person) => memberIds.has(person.id))
+  if (fromIds.length) return fromIds
+  return workspace.people.filter((person) =>
+    teamsForEmail(workspace, person.email).some((team) => memberIds.has(team.id) || team.memberIds.includes(person.id)),
+  )
 }
 
 export function canReassignTicket(
@@ -110,4 +115,36 @@ export async function reassignTicketOwner(
     gestionemail: email,
     gestionobservaciones: peticion.gestionobservaciones ?? undefined,
   })
+}
+
+/** El asesor coge un ticket suelto o del equipo. */
+export async function claimTicket(
+  workshop: Workshop,
+  workspace: AdvisorWorkspace,
+  actor: { email: string },
+  role: CrmAppRole,
+  peticion: PeticionPendiente,
+): Promise<Partial<PeticionPendiente>> {
+  return reassignTicketOwner(workshop, workspace, actor, role, peticion, actor.email)
+}
+
+/** Lo deja para el asesor que le tocaría, o suelto si no hay uno claro. */
+export async function releaseTicketToRightOwner(
+  workshop: Workshop,
+  workspace: AdvisorWorkspace,
+  actor: { email: string },
+  role: CrmAppRole,
+  peticion: PeticionPendiente,
+  tickets: PeticionPendiente[] = [],
+): Promise<Partial<PeticionPendiente>> {
+  const suggested = suggestTicketOwner(
+    workspace,
+    { ...peticion, gestionemail: '' },
+    tickets,
+  )
+  const next =
+    suggested && normalizeEmail(suggested.person.email) !== normalizeEmail(actor.email)
+      ? suggested.person.email
+      : ''
+  return reassignTicketOwner(workshop, workspace, actor, role, peticion, next)
 }

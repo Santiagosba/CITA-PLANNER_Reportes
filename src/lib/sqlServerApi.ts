@@ -245,3 +245,4 @@ export async function sqlUpdatePeticionGestion(idpeticion: string, patch: Gestio
     }),
   )
 }
+

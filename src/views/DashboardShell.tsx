@@ -59,7 +59,8 @@ type Props = {
   onClearWorkshop: () => void
   isDarkMode: boolean
   onToggleTheme: () => void
-  onLocalPreviewRole?: (role: CrmAppRole) => void
+  onLocalPreviewRole?: (role: CrmAppRole, advisorId?: string) => void
+  previewAdvisorId?: string
 }
 
 type GestionSession = {
@@ -188,6 +189,7 @@ export default function DashboardShell({
   isDarkMode,
   onToggleTheme,
   onLocalPreviewRole,
+  previewAdvisorId,
 }: Props) {
   const appRole = resolveCrmAppRole(sessionUser)
   const [shellRoute, setShellRoute] = useState<DashboardShellRoute>(() => defaultRouteForRole(appRole))
@@ -754,6 +756,7 @@ export default function DashboardShell({
       asesorRole={crmAppRoleLabel(appRole)}
       appRole={appRole}
       onLocalPreviewRole={onLocalPreviewRole}
+      previewAdvisorId={previewAdvisorId}
     >
       <ViewPageHeader
         route={shellRoute}
@@ -795,6 +798,11 @@ export default function DashboardShell({
           onOpenBoards={() => {
             hideDeskWindows()
             setShellRoute('boards')
+          }}
+          onOpenAssign={(teamId) => {
+            hideDeskWindows()
+            if (teamId) sessionStorage.setItem('avi_assign_team', teamId)
+            setShellRoute('asignar-tarea')
           }}
           onOpenLead={openLead}
           refreshToken={gestionBump}

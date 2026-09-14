@@ -24,6 +24,7 @@ import type { DashboardShellRoute } from './Sidebar'
 import { SoftphoneStatusChip } from './SoftphoneDock'
 import { BOT_CONFIG_EVENT, loadActiveBotProfile } from '../lib/botProfiles'
 import type { CrmAppRole } from '../lib/crmRoles'
+import { LOCAL_PREVIEW_ASESORES } from '../lib/localPreview'
 
 const ADMIN_NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] = [
   { id: 'dashboard-general', label: 'Dashboard general', icon: LayoutDashboard },
@@ -134,7 +135,8 @@ type Props = {
   asesorName?: string | null
   asesorRole?: string | null
   appRole?: CrmAppRole
-  onLocalPreviewRole?: (role: CrmAppRole) => void
+  onLocalPreviewRole?: (role: CrmAppRole, advisorId?: string) => void
+  previewAdvisorId?: string
   children: ReactNode
 }
 
@@ -154,6 +156,7 @@ export default function AppShell({
   asesorRole,
   appRole = 'asesor',
   onLocalPreviewRole,
+  previewAdvisorId,
   children,
 }: Props) {
   const navItems = appRole === 'admin' ? ADMIN_NAV : ASESOR_NAV
@@ -284,12 +287,31 @@ export default function AppShell({
                 <button
                   type="button"
                   className={`ghost-button ${appRole === 'asesor' ? 'is-active' : ''}`}
-                  onClick={() => onLocalPreviewRole('asesor')}
+                  onClick={() => onLocalPreviewRole('asesor', previewAdvisorId)}
                   aria-pressed={appRole === 'asesor'}
                 >
                   Asesor
                 </button>
               </div>
+              {appRole === 'asesor' ? (
+                <label className="field-label" htmlFor="local-preview-advisor">
+                  Ver como asesor
+                </label>
+              ) : null}
+              {appRole === 'asesor' ? (
+                <select
+                  id="local-preview-advisor"
+                  className="field-input"
+                  value={previewAdvisorId || LOCAL_PREVIEW_ASESORES[0]?.id || ''}
+                  onChange={(event) => onLocalPreviewRole('asesor', event.target.value)}
+                >
+                  {LOCAL_PREVIEW_ASESORES.map((asesor) => (
+                    <option key={asesor.id} value={asesor.id}>
+                      {asesor.name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
             </div>
           ) : null}
           <SoftphoneStatusChip />

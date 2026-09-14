@@ -114,14 +114,17 @@ export default function EmployeeStatsView({ workshop, currentUser }: Props) {
               </thead>
               <tbody>
                 {rows.map((row) => {
-                  const team = workspace.teams.find((item) => item.memberIds.includes(row.person.id))
+                  const teamNames = workspace.teams
+                    .filter((item) => item.memberIds.includes(row.person.id))
+                    .map((item) => item.name)
+                    .join(', ')
                   return (
                     <tr key={row.person.id}>
                       <td>
                         <strong>{row.person.name}</strong>
                         <small>{row.person.email}</small>
                       </td>
-                      <td>{team?.name || 'Sin equipo'}</td>
+                      <td>{teamNames || 'Sin equipo'}</td>
                       <td>{row.assigned}</td>
                       <td>{row.pending}</td>
                       <td>{row.done}</td>

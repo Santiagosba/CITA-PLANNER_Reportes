@@ -13,7 +13,7 @@ interface LoginViewProps {
   externalNotice?: { kind: 'error' | 'info'; message: string } | null
   onDismissNotice?: () => void
   onDemoLogin?: (asesor: DemoAsesor) => void | Promise<void>
-  onLocalPreview?: (role: 'admin' | 'asesor') => void
+  onLocalPreview?: (role: 'admin' | 'asesor', advisorId?: string) => void
 }
 
 export default function LoginView({
@@ -115,13 +115,30 @@ export default function LoginView({
                   <small>Equipos, asignar y estadísticas</small>
                 </span>
               </button>
-              <button type="button" className="login-asesor-card" onClick={() => onLocalPreview('asesor')}>
+              <button
+                type="button"
+                className="login-asesor-card"
+                onClick={() => onLocalPreview('asesor', 'demo-asesor-ana')}
+              >
                 <span className="login-asesor-avatar" aria-hidden>
                   AR
                 </span>
                 <span className="login-asesor-copy">
-                  <strong>Entrar como Ana (asesora)</strong>
-                  <small>Dashboard, triage y tu equipo</small>
+                  <strong>Entrar como Ana (Recepción)</strong>
+                  <small>Llamadas, WhatsApp y peritaje</small>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="login-asesor-card"
+                onClick={() => onLocalPreview('asesor', 'demo-asesor-luis')}
+              >
+                <span className="login-asesor-avatar" aria-hidden>
+                  LM
+                </span>
+                <span className="login-asesor-copy">
+                  <strong>Entrar como Luis (Comercial)</strong>
+                  <small>Citas y seguimiento</small>
                 </span>
               </button>
             </div>

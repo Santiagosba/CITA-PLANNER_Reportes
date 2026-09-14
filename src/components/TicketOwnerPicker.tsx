@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { UserRound } from 'lucide-react'
 import type { CrmAppRole } from '../lib/crmRoles'
-import { normalizeEmail, type AdvisorWorkspace } from '../lib/advisorWorkspace'
-import { canReassignTicket, reassignTicketOwner, teammatesForReassign } from '../lib/ticketOps'
+import { normalizeEmail, teamsForPerson, type AdvisorPerson, type AdvisorWorkspace } from '../lib/advisorWorkspace'
+import {
+  canReassignTicket,
+  claimTicket,
+  reassignTicketOwner,
+  releaseTicketToRightOwner,
+  teammatesForReassign,
+} from '../lib/ticketOps'
 import { ownerSuggestCopy, suggestTicketOwner } from '../lib/ticketOwnerSuggest'
 import type { PeticionPendiente } from '../lib/peticionesPendientes'
 import type { Workshop } from '../types'
@@ -20,6 +26,19 @@ type Props = {
 
 const assignedOnOpen = new Set<string>()
 
+function groupedTeammates(workspace: AdvisorWorkspace, people: AdvisorPerson[]) {
+  const seen = new Set<string>()
+  const groups = workspace.teams
+    .map((team) => {
+      const members = people.filter((person) => team.memberIds.includes(person.id))
+      members.forEach((person) => seen.add(person.id))
+      return { team, members }
+    })
+    .filter((group) => group.members.length > 0)
+  const loose = people.filter((person) => !seen.has(person.id))
+  return { groups, loose }
+}
+
 export default function TicketOwnerPicker({
   workshop,
   workspace,
@@ -35,6 +54,7 @@ export default function TicketOwnerPicker({
   const allowed = canReassignTicket(workspace, currentUser.email, appRole, peticion)
   const people = teammatesForReassign(workspace, currentUser.email, appRole)
   const value = normalizeEmail(peticion.gestionemail || '')
+  const myEmail = normalizeEmail(currentUser.email)
   const suggested = useMemo(
     () => suggestTicketOwner(workspace, peticion, tickets),
     [workspace, peticion, tickets],
@@ -48,9 +68,11 @@ export default function TicketOwnerPicker({
     suggested?.person.name ||
     (value ? value : 'Sin dueño')
   const empty = !value
+  const mine = Boolean(value && value === myEmail)
   const showSuggest = empty && suggestedAllowed && Boolean(suggested)
   const label = showSuggest ? 'Le tocaría' : 'Dueño del ticket'
   const applying = useRef(false)
+  const grouped = useMemo(() => groupedTeammates(workspace, people), [workspace, people])
 
   const onChange = async (next: string) => {
     setBusy(true)
@@ -59,6 +81,30 @@ export default function TicketOwnerPicker({
       await reassignTicketOwner(workshop, workspace, currentUser, appRole, peticion, next)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo pasar el ticket.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onClaim = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await claimTicket(workshop, workspace, currentUser, appRole, peticion)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo coger el ticket.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onRelease = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      await releaseTicketToRightOwner(workshop, workspace, currentUser, appRole, peticion, tickets)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo dejar el ticket.')
     } finally {
       setBusy(false)
     }
@@ -74,17 +120,46 @@ export default function TicketOwnerPicker({
     })
   }, [layout, allowed, value, suggestedAllowed, suggestedEmail, peticion.idpeticion])
 
-  const options = (
+  const optionGroups = (
     <>
       <option value="">Sin dueño</option>
-      {people.map((person) => (
-        <option key={person.id} value={normalizeEmail(person.email)}>
-          {person.name}
-          {showSuggest && suggestedEmail === normalizeEmail(person.email) ? ' · le tocaría' : ''}
-        </option>
+      {grouped.groups.map(({ team, members }) => (
+        <optgroup key={team.id} label={team.name}>
+          {members.map((person) => (
+            <option key={`${team.id}-${person.id}`} value={normalizeEmail(person.email)}>
+              {person.name}
+              {showSuggest && suggestedEmail === normalizeEmail(person.email) ? ' · le tocaría' : ''}
+            </option>
+          ))}
+        </optgroup>
       ))}
+      {grouped.loose.length > 0 ? (
+        <optgroup label="Sin equipo">
+          {grouped.loose.map((person) => (
+            <option key={person.id} value={normalizeEmail(person.email)}>
+              {person.name}
+            </option>
+          ))}
+        </optgroup>
+      ) : null}
     </>
   )
+
+  const actions =
+    allowed && appRole === 'asesor' ? (
+      <div className="ticket-owner-actions">
+        {empty ? (
+          <button type="button" className="ghost-button" disabled={busy} onClick={() => void onClaim()}>
+            Coger
+          </button>
+        ) : null}
+        {mine || (!empty && value !== myEmail) ? (
+          <button type="button" className="ghost-button" disabled={busy} onClick={() => void onRelease()}>
+            No es mío
+          </button>
+        ) : null}
+      </div>
+    ) : null
 
   if (layout === 'card') {
     return (
@@ -106,11 +181,12 @@ export default function TicketOwnerPicker({
               aria-label={label}
               onChange={(e) => void onChange(e.target.value)}
             >
-              {options}
+              {optionGroups}
             </select>
           ) : (
             <strong className="ticket-owner-card-name">{currentName}</strong>
           )}
+          {actions}
           {showSuggest && suggested ? (
             <span className="ticket-owner-hint">{ownerSuggestCopy(suggested.reason, suggested.person.name)}</span>
           ) : null}
@@ -121,9 +197,22 @@ export default function TicketOwnerPicker({
   }
 
   if (!allowed) {
+    const teamLabel = people
+      .find((person) => normalizeEmail(person.email) === displayEmail)
+      ? teamsForPerson(
+          workspace,
+          people.find((person) => normalizeEmail(person.email) === displayEmail)?.id ?? '',
+        )
+          .map((team) => team.name)
+          .join(', ')
+      : ''
     return (
       <span className={`ticket-owner-readonly${showSuggest ? ' is-suggested' : ''}`}>
-        {showSuggest && suggested ? `${suggested.person.name} · le tocaría` : currentName}
+        {showSuggest && suggested
+          ? `${suggested.person.name} · le tocaría`
+          : teamLabel
+            ? `${currentName} · ${teamLabel}`
+            : currentName}
       </span>
     )
   }
@@ -142,8 +231,9 @@ export default function TicketOwnerPicker({
         aria-label={showSuggest && suggested ? `Le tocaría ${suggested.person.name}` : 'Pasar ticket a otro asesor'}
         onChange={(e) => void onChange(e.target.value)}
       >
-        {options}
+        {optionGroups}
       </select>
+      {actions}
       {error ? <span className="ticket-owner-error">{error}</span> : null}
     </label>
   )

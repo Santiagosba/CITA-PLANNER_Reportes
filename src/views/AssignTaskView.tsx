@@ -15,6 +15,7 @@ import {
 } from '../lib/advisorWorkspace'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
 import { useOperationalData } from '../hooks/useOperationalData'
+import { reassignTicketOwner } from '../lib/ticketOps'
 import type { Workshop } from '../types'
 
 type Props = {
@@ -33,7 +34,16 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
   const range = resolveDateRange('mes', '', '')
   const { items, loading, error, sourceNotice } = useOperationalData(workshop, range)
 
-  const [teamId, setTeamId] = useState(workspace.teams[0]?.id ?? '')
+  const [teamId, setTeamId] = useState(() => {
+    try {
+      const stored = sessionStorage.getItem('avi_assign_team')
+      if (stored) sessionStorage.removeItem('avi_assign_team')
+      if (stored && workspace.teams.some((row) => row.id === stored)) return stored
+    } catch {
+      /* ignore */
+    }
+    return workspace.teams[0]?.id ?? ''
+  })
   const [assigneeId, setAssigneeId] = useState('')
   const [taskTypeId, setTaskTypeId] = useState('')
   const [boardId, setBoardId] = useState('')
@@ -92,7 +102,7 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
 
   const canSubmit = Boolean(title.trim() && assigneeId && taskTypeId && dueDate && members.length > 0)
 
-  const onSubmit = (event: FormEvent) => {
+  const onSubmit = async (event: FormEvent) => {
     event.preventDefault()
     const assignee = personById(workspace, assigneeId)
     if (!assignee || !title.trim() || !taskTypeId || !dueDate) return
@@ -108,10 +118,21 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
       createdByEmail: currentUser.email,
       peticionId: linked?.idpeticion ?? null,
     })
+    if (linked) {
+      try {
+        await reassignTicketOwner(workshop, workspace, currentUser, 'admin', linked, assignee.email)
+      } catch {
+        /* la tarea ya está */
+      }
+    }
     setTitle('')
     setNotes('')
     setPeticionId('')
-    setNotice(`Tarea asignada a ${assignee.name}.`)
+    setNotice(
+      linked
+        ? `Tarea y ticket asignados a ${assignee.name}.`
+        : `Tarea asignada a ${assignee.name}.`,
+    )
   }
 
   return (
@@ -129,14 +150,16 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
         <Card>
           <p className="section-eyebrow">Asignación</p>
           <h2 className="ops-card-title">Asignar tarea</h2>
-          <p className="section-subtitle">Elige equipo, asesor y día. La tarea aparece en su bandeja de hoy.</p>
+          <p className="section-subtitle">
+            Elige equipo y asesor. Si vinculas una consulta, el ticket también pasa a esa persona.
+          </p>
 
           {workspaceLoading && workspace.teams.length === 0 ? (
             <HexLoaderScreen size="sm" label="Cargando equipos…" />
           ) : workspace.teams.length === 0 ? (
             <p className="section-subtitle">Crea un equipo en Equipos antes de asignar tareas.</p>
           ) : (
-            <form className="role-stack-form" onSubmit={onSubmit}>
+            <form className="role-stack-form" onSubmit={(event) => void onSubmit(event)}>
               <label className="field-label" htmlFor="assign-team">
                 Equipo
               </label>

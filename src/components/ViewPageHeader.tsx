@@ -69,7 +69,7 @@ function pageCopy(
           }
         : {
             title: 'Equipos',
-            subtitle: 'Crea equipos de asesores y asígnales tipos de tarea y tableros.',
+            subtitle: 'Crea asesores y equipos. Una persona puede estar en varios grupos.',
           }
     case 'asignar-tarea':
       return {
@@ -344,7 +344,7 @@ export default function ViewPageHeader({
                             </span>
                           </span>
                           <span className="view-page-popover-row-meta">
-                            <span>{item.tipopeticion || item.descripcion || 'Sin detalle'}</span>
+                            <span>{item.tipopeticion || 'Sin tipo'}</span>
                             <time>{formatFecha(item.fechainicio)}</time>
                           </span>
                         </button>

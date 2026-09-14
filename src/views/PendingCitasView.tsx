@@ -41,6 +41,7 @@ import TicketClientBlock from '../components/TicketClientBlock'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
 import { citaLinkEmptyCopy, matchesCitaLink, type CitaLinkFilter } from '../lib/citaLinkFilter'
 import { buildOwnerScopeContext, matchesOwnerScope, ownerScopeEmptyCopy, type OwnerScope } from '../lib/ownerScope'
+import { matchesTeamFilter, TEAM_FILTER_ALL, visibleTeamsForUser, type TeamFilterId } from '../lib/teamScope'
 import {
   COPY_FALLBACK_NOTICE,
   loadPeticionesCopy,
@@ -99,11 +100,16 @@ export default function PendingCitasView({
   const [slaOnly, setSlaOnly] = useState(initialSlaOnly)
   const [estado, setEstado] = useState<EstadoFilter>('faltan')
   const [ownerScope, setOwnerScope] = useState<OwnerScope>(appRole === 'asesor' ? 'grupo' : 'todas')
+  const [teamFilter, setTeamFilter] = useState<TeamFilterId>(TEAM_FILTER_ALL)
   const workshopId = workshop.containerIdTaller || workshop.id
   const { workspace } = useAdvisorWorkspace(workshopId, currentUser, true)
   const ownerCtx = useMemo(
     () => buildOwnerScopeContext(workspace, currentUser.email),
     [workspace, currentUser.email],
+  )
+  const visibleTeams = useMemo(
+    () => visibleTeamsForUser(workspace, currentUser.email, appRole),
+    [workspace, currentUser.email, appRole],
   )
   const [agendaDay, setAgendaDay] = useState(() => {
     const now = new Date()
@@ -263,12 +269,13 @@ export default function PendingCitasView({
       const text = `${p.tipopeticion || ''} ${p.descripcion || ''} ${p.cita?.marca || ''} ${p.cita?.modelo || ''} ${p.cita?.asunto || ''}`
       if (!matchesChannelText(text, channel)) return false
       if (slaOnly && !isSlaCritico(p.fechainicio) && !isSlaCritico(p.cita?.fecha)) return false
+      if (!matchesTeamFilter(workspace, p, teamFilter, appRole, currentUser.email)) return false
       if (!matchesOwnerScope(p.gestionemail, ownerScope, ownerCtx)) return false
       if (!matchesCitaLink(p, citaLink)) return false
       if (!matchesTicketSearch(p, callerFilter)) return false
       return true
     },
-    [channel, slaOnly, ownerScope, ownerCtx, citaLink, callerFilter],
+    [channel, slaOnly, workspace, teamFilter, appRole, currentUser.email, ownerScope, ownerCtx, citaLink, callerFilter],
   )
 
   const scopedItems = useMemo(() => items.filter(matchesScopeFilters), [items, matchesScopeFilters])
@@ -286,7 +293,7 @@ export default function PendingCitasView({
   const faltanItems = useMemo(() => filteredItems.filter((p) => !p.gestionado), [filteredItems])
   const agendaGroups = useMemo(() => groupPeticionesByAgendaDay(filteredItems), [filteredItems])
   const agendaItems = useMemo(() => agendaGroups.flatMap((group) => group.items), [agendaGroups])
-  const pageFilterKey = JSON.stringify([workshopKey, estado, ownerScope, citaLink, callerFilter, tipoFilter, dateRange.from, dateRange.to, channel, slaOnly])
+  const pageFilterKey = JSON.stringify([workshopKey, estado, ownerScope, teamFilter, citaLink, callerFilter, tipoFilter, dateRange.from, dateRange.to, channel, slaOnly])
   const reportItems = filteredItems
   const selected = useMemo(
     () => filteredItems.find((p) => p.idpeticion === selectedId) ?? null,
@@ -444,6 +451,9 @@ export default function PendingCitasView({
         estado={estado}
         ownerScope={ownerScope}
         onOwnerScopeChange={setOwnerScope}
+        teams={visibleTeams}
+        teamFilter={teamFilter}
+        onTeamFilterChange={setTeamFilter}
         citaLink={citaLink}
         onCitaLinkChange={setCitaLink}
         search={callerFilter}

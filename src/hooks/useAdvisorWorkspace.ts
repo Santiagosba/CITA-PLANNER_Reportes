@@ -12,6 +12,7 @@ import {
   removeTeam,
   setAssignedTaskAssignee,
   setAssignedTaskStatus,
+  togglePersonOnTeam,
   type AdvisorTeam,
   type AdvisorWorkspace,
   type AssignedTask,
@@ -118,6 +119,8 @@ export function useAdvisorWorkspace(
       deleteTeam: (teamId: string) => commit((latest) => removeTeam(latest, teamId)),
       addAdvisor: (name: string, email: string, teamId?: string | null) =>
         commit((latest) => addPerson(latest, name, email, teamId)),
+      toggleAdvisorTeam: (personId: string, teamId: string) =>
+        commit((latest) => togglePersonOnTeam(latest, personId, teamId)),
       addTaskType: (name: string) => commit((latest) => addCatalogItem(latest, 'taskTypes', name)),
       addBoard: (name: string) => commit((latest) => addCatalogItem(latest, 'boards', name)),
       assignTask: (input: Omit<AssignedTask, 'id' | 'createdAt' | 'completedAt' | 'status'> & { status?: AssignedTaskStatus }) =>

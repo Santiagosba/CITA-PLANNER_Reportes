@@ -1,17 +1,22 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Plus, Trash2, Users } from 'lucide-react'
+import { Eye, EyeOff, Plus, Trash2, Users } from 'lucide-react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
+import ActionButton, { type ActionStatus } from '../components/ui/ActionButton'
 import Card from '../components/ui/Card'
 import { HexLoaderScreen } from '../components/ui/HexLoader'
+import { MIN_ACCOUNT_PASSWORD, passwordError, updateAccountPassword } from '../lib/accountPasswords'
 import {
   catalogName,
   normalizeEmail,
   personByEmail,
   personById,
   teamForPerson,
+  teamNamesForPerson,
+  teamsForPerson,
   type AdvisorTeam,
 } from '../lib/advisorWorkspace'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
+import { isLocalPreviewWorkshop } from '../lib/localPreview'
 import type { Workshop } from '../types'
 
 type Props = {
@@ -22,8 +27,9 @@ type Props = {
 
 export default function TeamsManagerView({ workshop, currentUser, readOnly = false }: Props) {
   const workshopId = workshop.containerIdTaller || workshop.id
-  const { workspace, loading, persistError, addTeam, updateTeam, deleteTeam, addAdvisor, addTaskType, addBoard } =
+  const { workspace, loading, persistError, addTeam, updateTeam, deleteTeam, addAdvisor, toggleAdvisorTeam, addTaskType, addBoard } =
     useAdvisorWorkspace(workshopId, currentUser, true)
+  const localPreview = isLocalPreviewWorkshop(workshop)
   const myTeamId = useMemo(() => {
     const me = personByEmail(workspace, currentUser.email)
     return me ? teamForPerson(workspace, me.id)?.id ?? null : null
@@ -33,23 +39,40 @@ export default function TeamsManagerView({ workshop, currentUser, readOnly = fal
   const [nameDraft, setNameDraft] = useState('')
   const [personName, setPersonName] = useState('')
   const [personEmail, setPersonEmail] = useState('')
+  const [personPassword, setPersonPassword] = useState('')
+  const [personConfirm, setPersonConfirm] = useState('')
+  const [personTeamId, setPersonTeamId] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [createStatus, setCreateStatus] = useState<ActionStatus>('idle')
+  const [createError, setCreateError] = useState<string | null>(null)
   const [typeName, setTypeName] = useState('')
   const [boardName, setBoardName] = useState('')
   const [notice, setNotice] = useState<string | null>(null)
 
+  const listedTeams = useMemo(() => {
+    if (!readOnly) return workspace.teams
+    const me = personByEmail(workspace, currentUser.email)
+    if (!me) return []
+    return teamsForPerson(workspace, me.id)
+  }, [readOnly, workspace, currentUser.email])
+
   const selected = useMemo<AdvisorTeam | undefined>(
-    () => workspace.teams.find((team) => team.id === selectedId) ?? workspace.teams[0],
-    [selectedId, workspace.teams],
+    () => listedTeams.find((team) => team.id === selectedId) ?? listedTeams[0],
+    [selectedId, listedTeams],
   )
 
   useEffect(() => {
-    if (selectedId && workspace.teams.some((team) => team.id === selectedId)) return
-    setSelectedId(myTeamId ?? workspace.teams[0]?.id ?? null)
-  }, [workspace.teams, selectedId, myTeamId])
+    if (selectedId && listedTeams.some((team) => team.id === selectedId)) return
+    setSelectedId(myTeamId ?? listedTeams[0]?.id ?? null)
+  }, [listedTeams, selectedId, myTeamId])
 
   useEffect(() => {
     setNameDraft(selected?.name ?? '')
   }, [selected?.id, selected?.name])
+
+  useEffect(() => {
+    setPersonTeamId(selected?.id ?? workspace.teams[0]?.id ?? '')
+  }, [selected?.id, workspace.teams])
 
   const onCreateTeam = (event: FormEvent) => {
     event.preventDefault()
@@ -61,12 +84,54 @@ export default function TeamsManagerView({ workshop, currentUser, readOnly = fal
     setTeamName('')
   }
 
-  const onAddAdvisor = (event: FormEvent) => {
-    event.preventDefault()
-    addAdvisor(personName, personEmail, selected?.id ?? null)
-    setNotice(`${personName.trim()} ya está en ${selected?.name || 'el taller'}.`)
+  const resetCreateForm = () => {
     setPersonName('')
     setPersonEmail('')
+    setPersonPassword('')
+    setPersonConfirm('')
+    setShowPassword(false)
+  }
+
+  const onAddAdvisor = async (event: FormEvent) => {
+    event.preventDefault()
+    const name = personName.trim()
+    const email = normalizeEmail(personEmail)
+    const teamId = personTeamId || selected?.id || null
+    const team = workspace.teams.find((row) => row.id === teamId)
+    if (!name || !email.includes('@')) {
+      setCreateError('Escribe el nombre y un correo válido.')
+      return
+    }
+    if (!localPreview) {
+      const invalid = passwordError(personPassword, personConfirm)
+      if (invalid) {
+        setCreateError(invalid)
+        return
+      }
+    }
+
+    setCreateStatus('loading')
+    setCreateError(null)
+    addAdvisor(name, email, teamId)
+    if (teamId) setSelectedId(teamId)
+
+    if (localPreview) {
+      setCreateStatus('success')
+      setNotice(`${name} ya está en ${team?.name || 'el taller'}. En local no se crea cuenta de entrada.`)
+      resetCreateForm()
+      return
+    }
+
+    try {
+      await updateAccountPassword(email, personPassword)
+      setCreateStatus('success')
+      setNotice(`${name} ya está en ${team?.name || 'el taller'}. Puede entrar con ese correo y contraseña.`)
+      resetCreateForm()
+    } catch (error) {
+      setCreateStatus('idle')
+      setCreateError(error instanceof Error ? error.message : 'No se pudo crear la cuenta de entrada.')
+      setNotice(`${name} ya está en el equipo. Ponle la contraseña en Contraseñas.`)
+    }
   }
 
   const saveTeamName = () => {
@@ -78,10 +143,7 @@ export default function TeamsManagerView({ workshop, currentUser, readOnly = fal
 
   const toggleMember = (personId: string) => {
     if (!selected) return
-    const memberIds = selected.memberIds.includes(personId)
-      ? selected.memberIds.filter((id) => id !== personId)
-      : [...selected.memberIds, personId]
-    updateTeam(selected.id, { memberIds })
+    toggleAdvisorTeam(personId, selected.id)
   }
 
   const toggleType = (typeId: string) => {
@@ -136,14 +198,16 @@ export default function TeamsManagerView({ workshop, currentUser, readOnly = fal
           <p className="section-subtitle">
             {readOnly
               ? 'Tu grupo y el resto de compañeros. Solo puedes consultarlos.'
-              : 'Crea equipos y elige quién entra en cada uno. Los tipos y tableros de cada equipo son los que verá el asesor.'}
+              : 'Crea equipos y marca quién entra en cada uno. Una persona puede estar en varios. Los tipos y tableros son los de sus grupos.'}
           </p>
 
-          {workspace.teams.length === 0 ? (
-            <p className="section-subtitle">Todavía no hay equipos.</p>
+            {listedTeams.length === 0 ? (
+            <p className="section-subtitle">
+              {readOnly ? 'Aún no estás en ningún equipo.' : 'Todavía no hay equipos.'}
+            </p>
           ) : (
             <ul className="role-list">
-              {workspace.teams.map((team) => (
+              {listedTeams.map((team) => (
                 <li key={team.id}>
                   <button
                     type="button"
@@ -245,24 +309,31 @@ export default function TeamsManagerView({ workshop, currentUser, readOnly = fal
                   })}
                 </ul>
               ) : workspace.people.length === 0 ? (
-                <p className="section-subtitle">Añade un asesor a la derecha para poder marcarlo aquí.</p>
+                <p className="section-subtitle">Crea un asesor a la derecha para poder marcarlo aquí.</p>
               ) : (
                 <ul className="role-check-list">
-                  {workspace.people.map((person) => (
-                    <li key={person.id}>
-                      <label className="role-check">
-                        <input
-                          type="checkbox"
-                          checked={selected.memberIds.includes(person.id)}
-                          onChange={() => toggleMember(person.id)}
-                        />
-                        <span>
-                          <strong>{person.name}</strong>
-                          <small>{person.email}</small>
-                        </span>
-                      </label>
-                    </li>
-                  ))}
+                  {workspace.people.map((person) => {
+                    const here = selected.memberIds.includes(person.id)
+                    const names = teamNamesForPerson(workspace, person.id)
+                    return (
+                      <li key={person.id}>
+                        <label className="role-check">
+                          <input
+                            type="checkbox"
+                            checked={here}
+                            onChange={() => toggleMember(person.id)}
+                          />
+                          <span>
+                            <strong>{person.name}</strong>
+                            <small>
+                              {person.email}
+                              {names ? ` · ${names}` : ' · Sin equipo'}
+                            </small>
+                          </span>
+                        </label>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
 
@@ -318,26 +389,28 @@ export default function TeamsManagerView({ workshop, currentUser, readOnly = fal
         </Card>
 
         <Card className="role-desk-col">
-          <p className="section-eyebrow">{readOnly ? 'Taller' : 'Plantilla'}</p>
-          <h2 className="ops-card-title">{readOnly ? 'Compañeros' : 'Asesores y catálogo'}</h2>
+          <p className="section-eyebrow">{readOnly ? 'Taller' : 'Cuentas'}</p>
+          <h2 className="ops-card-title">{readOnly ? 'Compañeros' : 'Crear asesor'}</h2>
           <p className="section-subtitle">
             {readOnly
               ? 'Toda la gente del taller, también de otros grupos.'
-              : 'Añade gente y nuevos tipos o tableros. El asesor nuevo entra en el equipo seleccionado.'}
+              : 'Nombre, correo, contraseña y un equipo de entrada. Luego puedes marcarle más grupos.'}
           </p>
 
           {readOnly ? (
             <ul className="role-list">
-              {workspace.people.map((person) => {
+              {workspace.people
+                .filter((person) => listedTeams.some((team) => team.memberIds.includes(person.id)))
+                .map((person) => {
                 const isMe = normalizeEmail(person.email) === normalizeEmail(currentUser.email)
-                const team = teamForPerson(workspace, person.id)
+                const names = teamNamesForPerson(workspace, person.id)
                 return (
                   <li key={person.id} className="role-task-row glass glass-lite">
                     <div>
                       <p className="list-row-title">{person.name}</p>
                       <p className="list-row-meta">
                         {person.email}
-                        {team ? ` · ${team.name}` : ''}
+                        {names ? ` · ${names}` : ''}
                       </p>
                     </div>
                     {isMe ? <span className="badge tone-positive">Tú</span> : null}
@@ -349,30 +422,117 @@ export default function TeamsManagerView({ workshop, currentUser, readOnly = fal
 
           {readOnly ? null : (
             <>
-              <form className="role-stack-form" onSubmit={onAddAdvisor}>
+              <form className="role-stack-form" onSubmit={(event) => void onAddAdvisor(event)}>
                 <label className="field-label" htmlFor="advisor-name">
-                  Nuevo asesor
+                  Nombre
                 </label>
                 <input
                   id="advisor-name"
                   className="field-input"
                   value={personName}
-                  onChange={(event) => setPersonName(event.target.value)}
-                  placeholder="Nombre"
+                  onChange={(event) => {
+                    setPersonName(event.target.value)
+                    setCreateError(null)
+                    setCreateStatus('idle')
+                  }}
+                  placeholder="Marta Gil"
+                  autoComplete="name"
                 />
+                <label className="field-label" htmlFor="advisor-email">
+                  Correo
+                </label>
                 <input
+                  id="advisor-email"
                   className="field-input"
                   type="email"
                   value={personEmail}
-                  onChange={(event) => setPersonEmail(event.target.value)}
-                  placeholder="correo@taller.es"
+                  onChange={(event) => {
+                    setPersonEmail(event.target.value)
+                    setCreateError(null)
+                    setCreateStatus('idle')
+                  }}
+                  placeholder="marta@taller.es"
+                  autoComplete="off"
                 />
-                <button type="submit" className="ghost-button" disabled={!personName.trim() || !personEmail.trim()}>
+                {localPreview ? (
+                  <p className="list-row-meta">En la prueba local no hace falta contraseña.</p>
+                ) : (
+                  <>
+                    <label className="field-label" htmlFor="advisor-password">
+                      Contraseña
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="advisor-password"
+                        className="field-input pr-14"
+                        type={showPassword ? 'text' : 'password'}
+                        value={personPassword}
+                        onChange={(event) => {
+                          setPersonPassword(event.target.value)
+                          setCreateError(null)
+                        }}
+                        minLength={MIN_ACCOUNT_PASSWORD}
+                        autoComplete="new-password"
+                      />
+                      <button
+                        type="button"
+                        className="ghost-button absolute right-1 top-1/2 min-h-0 -translate-y-1/2 border-0 bg-transparent px-2 py-2"
+                        aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                        onClick={() => setShowPassword((current) => !current)}
+                      >
+                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                      </button>
+                    </div>
+                    <label className="field-label" htmlFor="advisor-confirm">
+                      Repite la contraseña
+                    </label>
+                    <input
+                      id="advisor-confirm"
+                      className="field-input"
+                      type={showPassword ? 'text' : 'password'}
+                      value={personConfirm}
+                      onChange={(event) => {
+                        setPersonConfirm(event.target.value)
+                        setCreateError(null)
+                      }}
+                      minLength={MIN_ACCOUNT_PASSWORD}
+                      autoComplete="new-password"
+                    />
+                  </>
+                )}
+                <label className="field-label" htmlFor="advisor-team">
+                  Equipo
+                </label>
+                <select
+                  id="advisor-team"
+                  className="field-input"
+                  value={personTeamId}
+                  onChange={(event) => setPersonTeamId(event.target.value)}
+                >
+                  {workspace.teams.length === 0 ? <option value="">Sin equipo todavía</option> : null}
+                  {workspace.teams.map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </select>
+                {createError ? (
+                  <p className="alert alert-error" role="alert">
+                    {createError}
+                  </p>
+                ) : null}
+                <ActionButton
+                  type="submit"
+                  status={createStatus}
+                  successLabel="Creado"
+                  disabled={!personName.trim() || !personEmail.trim()}
+                >
                   <Users size={16} aria-hidden />
-                  {selected ? `Añadir a ${selected.name}` : 'Añadir asesor'}
-                </button>
+                  Crear asesor
+                </ActionButton>
               </form>
 
+              <h3 className="role-subhead">Tipos y tableros</h3>
               <form
                 className="role-inline-form"
                 onSubmit={(event) => {

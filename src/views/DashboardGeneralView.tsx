@@ -16,6 +16,8 @@ import {
 } from '../components/LauraCharts'
 import CitaLinkFilterControl from '../components/CitaLinkFilter'
 import OwnerScopeFilter from '../components/OwnerScopeFilter'
+import TeamAssignPanel from '../components/TeamAssignPanel'
+import TeamFilter from '../components/TeamFilter'
 import TicketClientBlock from '../components/TicketClientBlock'
 import TicketOwnerPicker from '../components/TicketOwnerPicker'
 import { HexLoaderScreen } from '../components/ui/HexLoader'
@@ -44,10 +46,19 @@ import {
   volumeChartTitle,
   volumeForScale,
 } from '../lib/dashboardAnalytics'
-import { localTodayIso, type AdvisorWorkspace } from '../lib/advisorWorkspace'
+import { isPersonOnTeam, localTodayIso, type AdvisorWorkspace } from '../lib/advisorWorkspace'
 import { compareTicketsByOpenFirst } from '../lib/doneFilter'
 import { citaLinkEmptyCopy, matchesCitaLink, ticketHasCita, type CitaLinkFilter } from '../lib/citaLinkFilter'
 import { buildOwnerScopeContext, matchesOwnerScope, ownerScopeEmptyCopy, type OwnerScope } from '../lib/ownerScope'
+import {
+  matchesTeamFilter,
+  TEAM_FILTER_ALL,
+  teamFilterEmptyCopy,
+  ticketTeamLabel,
+  teamWorkloadRows,
+  visibleTeamsForUser,
+  type TeamFilterId,
+} from '../lib/teamScope'
 import { isDemoCitaId, isDemoTicketId } from '../lib/demoTickets'
 import { isLocalPreviewWorkshop } from '../lib/localPreview'
 import { computePeticionesStats, formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
@@ -63,6 +74,7 @@ type Props = {
   onOpenTodayTasks?: () => void
   onOpenBoards?: () => void
   onOpenLead?: (peticion: PeticionPendiente) => void
+  onOpenAssign?: (teamId?: string) => void
   refreshToken?: number
 }
 
@@ -75,12 +87,14 @@ export default function DashboardGeneralView({
   onOpenTodayTasks,
   onOpenBoards,
   onOpenLead,
+  onOpenAssign,
   refreshToken = 0,
 }: Props) {
   const workshopId = workshop.containerIdTaller || workshop.id
-  const { workspace } = useAdvisorWorkspace(workshopId, currentUser, true)
+  const { workspace, assignTask } = useAdvisorWorkspace(workshopId, currentUser, true)
   const [scale, setScale] = useState<CalendarScale>('mes')
   const [ownerScope, setOwnerScope] = useState<OwnerScope>(appRole === 'asesor' ? 'grupo' : 'todas')
+  const [teamFilter, setTeamFilter] = useState<TeamFilterId>(TEAM_FILTER_ALL)
   const [citaLink, setCitaLink] = useState<CitaLinkFilter>('todas')
   const today = localTodayIso()
   const anchor = useMemo(() => new Date(`${today}T12:00:00`), [today])
@@ -93,13 +107,21 @@ export default function DashboardGeneralView({
     () => new Map(tipos.map((tipo) => [tipo.idtipopeticion, tipo.tipopeticion])),
     [tipos],
   )
-  const liveItems = useMemo(() => {
-    if (isLocalPreviewWorkshop(workshop)) return items
-    return items.filter((item) => !isDemoTicketId(item.idpeticion))
-  }, [items, workshop])
+  const liveItems = items
   const ownerCtx = useMemo(
     () => buildOwnerScopeContext(workspace, currentUser.email),
     [workspace, currentUser.email],
+  )
+  const visibleTeams = useMemo(
+    () => visibleTeamsForUser(workspace, currentUser.email, appRole),
+    [workspace, currentUser.email, appRole],
+  )
+  const teamItems = useMemo(
+    () =>
+      liveItems.filter((item) =>
+        matchesTeamFilter(workspace, item, teamFilter, appRole, currentUser.email),
+      ),
+    [liveItems, workspace, teamFilter, appRole, currentUser.email],
   )
 
   useEffect(() => {
@@ -118,13 +140,13 @@ export default function DashboardGeneralView({
   }, [refreshSilent])
 
   const periodItems = useMemo(
-    () => filterReceivedInRange(liveItems, period.from, period.to),
-    [liveItems, period.from, period.to],
+    () => filterReceivedInRange(teamItems, period.from, period.to),
+    [teamItems, period.from, period.to],
   )
   const stats = useMemo(() => computePeticionesStats(periodItems), [periodItems])
   const closedNow = useMemo(
-    () => closedInRangeCount(liveItems, period.from, period.to),
-    [liveItems, period.from, period.to],
+    () => closedInRangeCount(teamItems, period.from, period.to),
+    [teamItems, period.from, period.to],
   )
   const slaCount = useMemo(
     () =>
@@ -140,19 +162,29 @@ export default function DashboardGeneralView({
     [periodItems],
   )
 
-  const volume = useMemo(() => volumeForScale(liveItems, scale, anchor), [liveItems, scale, anchor])
+  const volume = useMemo(() => volumeForScale(teamItems, scale, anchor), [teamItems, scale, anchor])
   const mixRows = useMemo(
     () => (scale === 'dia' ? channelMix(periodItems) : typeMix(periodItems, tiposById)),
     [scale, periodItems, tiposById],
   )
   const teamMosaicRows = useMemo(
+    () => (appRole === 'admin' ? teamWorkloadRows(periodItems, workspace, appRole, currentUser.email) : []),
+    [appRole, periodItems, workspace, currentUser.email],
+  )
+  const advisorMosaicPeople = useMemo(() => {
+    if (teamFilter === TEAM_FILTER_ALL) return workspace.people
+    const team = workspace.teams.find((row) => row.id === teamFilter)
+    if (!team) return workspace.people
+    return workspace.people.filter((person) => isPersonOnTeam(workspace, team, person.id, person.email))
+  }, [teamFilter, workspace])
+  const advisorMosaicRows = useMemo(
     () =>
       appRole === 'admin'
-        ? advisorWorkload(periodItems, workspace.people)
+        ? advisorWorkload(periodItems, advisorMosaicPeople)
             .filter((row) => row.recibidas > 0)
             .map((row) => ({ key: row.key, label: row.label, value: row.recibidas }))
         : [],
-    [appRole, periodItems, workspace.people],
+    [appRole, periodItems, advisorMosaicPeople],
   )
   const pieSlices = useMemo(() => mixToPieSlices(mixRows), [mixRows])
   const radarAxes = useMemo(() => mixToRadarAxes(mixRows), [mixRows])
@@ -180,11 +212,11 @@ export default function DashboardGeneralView({
 
   const historyTicketsAll = useMemo(
     () =>
-      liveItems
+      teamItems
         .filter((item) => matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx))
         .filter((item) => matchesCitaLink(item, citaLink))
         .sort(compareTicketsByOpenFirst),
-    [liveItems, ownerScope, ownerCtx, citaLink],
+    [teamItems, ownerScope, ownerCtx, citaLink],
   )
   const historyPendingTickets = useMemo(
     () => historyTicketsAll.filter((item) => !item.gestionado),
@@ -229,7 +261,8 @@ export default function DashboardGeneralView({
             ))}
           </div>
         </div>
-        <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Tickets" />
+        <TeamFilter teams={visibleTeams} value={teamFilter} onChange={setTeamFilter} />
+        <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Dueño" />
         <CitaLinkFilterControl value={citaLink} onChange={setCitaLink} />
         <p className="dash-period-label">{period.label}</p>
       </div>
@@ -287,6 +320,18 @@ export default function DashboardGeneralView({
         />
       </section>
 
+      {appRole === 'admin' ? (
+        <TeamAssignPanel
+          workshop={workshop}
+          workspace={workspace}
+          currentUser={currentUser}
+          teamFilter={teamFilter}
+          looseTickets={liveItems.filter((item) => !item.gestionado && !item.gestionemail)}
+          assignTask={assignTask}
+          onOpenAssign={onOpenAssign}
+        />
+      ) : null}
+
       {onOpenBoards ? (
         <aside className="dash-boards-jump glass glass-lite">
           <div className="dash-boards-jump-icon" aria-hidden>
@@ -335,13 +380,15 @@ export default function DashboardGeneralView({
                 : historyTicketsAll.length === 0
                   ? citaLink !== 'todas'
                     ? citaLinkEmptyCopy(citaLink)
-                    : ownerScopeEmptyCopy(ownerScope)
+                    : teamFilter !== TEAM_FILTER_ALL
+                      ? teamFilterEmptyCopy(teamFilter)
+                      : ownerScopeEmptyCopy(ownerScope)
                   : 'No hay tickets por hacer.'
             }
             items={historyPendingTickets}
             loading={loading}
             listClassName="dash-history-list"
-            resetKey={`${workshopId}-hist-pend-${ownerScope}-${citaLink}`}
+            resetKey={`${workshopId}-hist-pend-${ownerScope}-${citaLink}-${teamFilter}`}
             {...ticketRow}
           />
           <DashTicketColumn
@@ -350,14 +397,16 @@ export default function DashboardGeneralView({
               historyTicketsAll.length === 0
                 ? citaLink !== 'todas'
                   ? citaLinkEmptyCopy(citaLink)
-                  : ownerScopeEmptyCopy(ownerScope)
+                  : teamFilter !== TEAM_FILTER_ALL
+                    ? teamFilterEmptyCopy(teamFilter)
+                    : ownerScopeEmptyCopy(ownerScope)
                 : 'No hay tickets hechos.'
             }
             items={historyDoneTickets}
             loading={loading}
             done
             listClassName="dash-history-list"
-            resetKey={`${workshopId}-hist-hechos-${ownerScope}-${citaLink}`}
+            resetKey={`${workshopId}-hist-hechos-${ownerScope}-${citaLink}-${teamFilter}`}
             {...ticketRow}
           />
         </div>
@@ -463,22 +512,40 @@ export default function DashboardGeneralView({
       </Card>
 
       {appRole === 'admin' ? (
-        <Card className="laura-panel" padding="md">
-          <LauraChartCardHeader eyebrow="Equipo" title="Mosaico · Trabajo por asesor">
-            <span className="badge tone-neutral">{scaleLabel}</span>
-          </LauraChartCardHeader>
-          {loading ? (
-            <HexLoaderScreen size="md" label="Cargando el trabajo del equipo…" />
-          ) : (
-            <LauraMosaic
-              caption={`${period.label}. Cada pieza es una persona.`}
-              rows={teamMosaicRows}
-              valueLabel="Consultas"
-              helper="Cuanto más grande es la pieza, más consultas ha llevado esa persona."
-              empty="Añade asesores en Equipos o espera a que gestionen consultas."
-            />
-          )}
-        </Card>
+        <>
+          <Card className="laura-panel" padding="md">
+            <LauraChartCardHeader eyebrow="Equipos" title="Mosaico · Trabajo por equipo">
+              <span className="badge tone-neutral">{scaleLabel}</span>
+            </LauraChartCardHeader>
+            {loading ? (
+              <HexLoaderScreen size="md" label="Cargando el trabajo de los equipos…" />
+            ) : (
+              <LauraMosaic
+                caption={`${period.label}. Cada pieza es un equipo que has creado.`}
+                rows={teamMosaicRows}
+                valueLabel="Consultas"
+                helper="Pulsa un equipo arriba para ver solo sus tickets."
+                empty="Crea equipos en Equipos y asígnales asesores."
+              />
+            )}
+          </Card>
+          <Card className="laura-panel" padding="md">
+            <LauraChartCardHeader eyebrow="Asesores" title="Mosaico · Trabajo por asesor">
+              <span className="badge tone-neutral">{scaleLabel}</span>
+            </LauraChartCardHeader>
+            {loading ? (
+              <HexLoaderScreen size="md" label="Cargando el trabajo del equipo…" />
+            ) : (
+              <LauraMosaic
+                caption={`${period.label}. Cada pieza es una persona.`}
+                rows={advisorMosaicRows}
+                valueLabel="Consultas"
+                helper="Cuanto más grande es la pieza, más consultas ha llevado esa persona."
+                empty="Añade asesores en Equipos o espera a que gestionen consultas."
+              />
+            )}
+          </Card>
+        </>
       ) : null}
     </div>
   )
@@ -568,6 +635,7 @@ function MetricCard({ icon: Icon, label, value, helper, tone, onClick }: MetricP
 
 function DashTicketRow({ item, workshop, workspace, currentUser, appRole, onOpenLead, tickets }: DashTicketRowProps) {
   const sla = !item.gestionado && (isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha))
+  const teamLabel = ticketTeamLabel(workspace, item)
   return (
     <li
       className={`ops-feed-row dash-ticket-row${item.gestionado ? ' is-done' : ''}`}
@@ -588,6 +656,7 @@ function DashTicketRow({ item, workshop, workspace, currentUser, appRole, onOpen
           <TicketClientBlock peticion={item} size="sm" />
           <span>
             {item.tipopeticion || 'Sin tipo'}
+            {teamLabel ? <span className="badge tone-neutral">{teamLabel}</span> : null}
             {isDemoTicketId(item.idpeticion) ? <span className="badge tone-info">Prueba</span> : null}
           </span>
         </div>

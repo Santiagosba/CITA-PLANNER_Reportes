@@ -79,9 +79,61 @@ test('completed demo tasks stay completed after reopening the dashboard', () => 
   assert.ok(lib.loadAdvisorWorkspace('one').tasks.every((task) => task.status === 'hecho'))
 })
 
+test('showcase teams assign each advisor to one group', () => {
+  const { lib } = setup()
+  const workspace = lib.seedAdvisorWorkspace({ examples: true })
+  assert.ok(workspace.teams.some((team) => team.id === lib.TEAM_RECEPCION_ID))
+  assert.ok(workspace.teams.some((team) => team.id === lib.TEAM_COMERCIAL_ID))
+  assert.equal(lib.teamForPerson(workspace, 'demo-asesor-ana')?.id, lib.TEAM_RECEPCION_ID)
+  assert.equal(lib.teamForPerson(workspace, 'demo-asesor-luis')?.id, lib.TEAM_COMERCIAL_ID)
+  const both = lib.addPersonToTeam(workspace, 'demo-asesor-ana', lib.TEAM_COMERCIAL_ID)
+  assert.equal(lib.teamsForPerson(both, 'demo-asesor-ana').length, 2)
+  const moved = lib.setPersonTeam(workspace, 'demo-asesor-ana', lib.TEAM_COMERCIAL_ID)
+  assert.equal(lib.teamForPerson(moved, 'demo-asesor-ana')?.id, lib.TEAM_COMERCIAL_ID)
+  assert.equal(moved.teams.find((team) => team.id === lib.TEAM_RECEPCION_ID).memberIds.includes('demo-asesor-ana'), false)
+})
+
+test('team filter keeps loose tickets for the matching group', () => {
+  const { lib } = setup()
+  const source = readFileSync(new URL('../src/lib/teamScope.ts', import.meta.url), 'utf8')
+  const exports = {}
+  const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } })
+  vm.runInNewContext(outputText, { exports, require: (name) => {
+    if (name === './advisorWorkspace') return lib
+    throw new Error(name)
+  } })
+  const workspace = lib.seedAdvisorWorkspace()
+  const loose = { gestionemail: '', tipopeticion: 'WhatsApp' }
+  const ana = { gestionemail: 'ana@demo.test', tipopeticion: 'WhatsApp' }
+  const luis = { gestionemail: 'luis@demo.test', tipopeticion: 'Cita' }
+  const voz = { gestionemail: '', tipopeticion: 'Voz Laura' }
+  const citaMec = { gestionemail: '', tipopeticion: 'Cita mecánica' }
+  const itv = { gestionemail: '', tipopeticion: 'ITV' }
+  assert.equal(exports.matchesTeamFilter(workspace, ana, lib.TEAM_RECEPCION_ID, 'admin', 'santy@gmail.com'), true)
+  assert.equal(exports.matchesTeamFilter(workspace, luis, lib.TEAM_RECEPCION_ID, 'admin', 'santy@gmail.com'), false)
+  assert.equal(exports.matchesTeamFilter(workspace, loose, lib.TEAM_RECEPCION_ID, 'asesor', 'ana@demo.test'), true)
+  assert.equal(exports.matchesTeamFilter(workspace, luis, exports.TEAM_FILTER_ALL, 'asesor', 'ana@demo.test'), false)
+  assert.equal(exports.matchesTeamFilter(workspace, voz, lib.TEAM_RECEPCION_ID, 'admin', 'santy@gmail.com'), true)
+  assert.equal(exports.matchesTeamFilter(workspace, citaMec, lib.TEAM_COMERCIAL_ID, 'admin', 'santy@gmail.com'), true)
+  assert.equal(exports.matchesTeamFilter(workspace, itv, lib.TEAM_RECEPCION_ID, 'admin', 'santy@gmail.com'), true)
+})
+
+test('ensureShowcaseTeams keeps extra teams and adds the two demo groups', () => {
+  const { lib } = setup()
+  const seed = lib.seedAdvisorWorkspace()
+  const custom = {
+    ...seed,
+    teams: [{ id: 'team-extra', name: 'Flotas', memberIds: [], taskTypeIds: [], boardIds: [] }],
+  }
+  const next = lib.ensureShowcaseTeams(custom)
+  assert.ok(next.teams.some((team) => team.id === 'team-extra'))
+  assert.ok(next.teams.some((team) => team.id === lib.TEAM_RECEPCION_ID))
+  assert.ok(next.teams.some((team) => team.id === lib.TEAM_COMERCIAL_ID))
+})
+
 test('daily selection includes overdue tasks, excludes future tasks and other advisors', () => {
   const { lib } = setup()
-  const workspace = lib.loadAdvisorWorkspace('one')
+  const workspace = lib.seedAdvisorWorkspace({ examples: true })
   const first = workspace.tasks[0]
   workspace.tasks = [
     { ...first, id: 'today', dueDate: '2026-09-10' },

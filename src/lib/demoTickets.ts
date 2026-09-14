@@ -6,7 +6,7 @@
 import { DEMO_ASESORES } from './demoAsesores'
 import type { CitaTaller } from './citasTaller'
 import { toDateInputValue } from './dateRangePresets'
-import { normalizeEmail } from './advisorWorkspace'
+import { normalizeEmail, SHOWCASE_ADVISORS } from './advisorWorkspace'
 import type { PeticionPendiente } from './peticionesPendientes'
 import type { Workshop } from '../types'
 
@@ -14,7 +14,14 @@ export const DEMO_TICKETS_PER_ADVISOR = 35
 export const DEMO_TICKET_PREFIX = 'demo-ticket-'
 export const DEMO_CITA_PREFIX = 'demo-cita-'
 export const DEMO_TICKETS_NOTICE =
-  'Junto a los tickets reales de la API hay 35 de prueba por asesor (Ana, Luis y Carmen), para demos. Se pueden pasar entre el equipo y no se guardan en el taller real.'
+  'Junto a los tickets reales de la API hay 35 de prueba por asesor (Recepción y Comercial), para demos. Se pueden pasar entre el equipo y no se guardan en el taller real.'
+
+function demoTicketAdvisors(): { email: string }[] {
+  return [
+    ...DEMO_ASESORES.map((asesor) => ({ email: asesor.email })),
+    ...SHOWCASE_ADVISORS.map((asesor) => ({ email: asesor.email })),
+  ]
+}
 
 const STORE_PREFIX = 'avi_demo_tickets_v3:'
 
@@ -86,6 +93,8 @@ export function demoAdvisorSlug(email: string): string {
   if (key.startsWith('ana.')) return 'ana'
   if (key.startsWith('luis.')) return 'luis'
   if (key.startsWith('carmen.')) return 'carmen'
+  if (key.startsWith('marta.')) return 'marta'
+  if (key.startsWith('nuria.')) return 'nuria'
   return key.split('@')[0]?.replace(/[^a-z0-9]/g, '') || 'asesor'
 }
 
@@ -161,7 +170,7 @@ function buildTicket(
 
 export function generateDemoTickets(workshop: Workshop): PeticionPendiente[] {
   const rows: PeticionPendiente[] = []
-  DEMO_ASESORES.forEach((asesor, advisorIndex) => {
+  demoTicketAdvisors().forEach((asesor, advisorIndex) => {
     const slug = demoAdvisorSlug(asesor.email)
     const email = normalizeEmail(asesor.email)
     const contentOrder = seededShuffle(
@@ -175,6 +184,52 @@ export function generateDemoTickets(workshop: Workshop): PeticionPendiente[] {
   return seededShuffle(rows, 424242)
 }
 
+function ticketLocalDay(row: Pick<PeticionPendiente, 'fechainicio' | 'fechacreacion'>): string {
+  const raw = row.fechainicio || row.fechacreacion
+  if (!raw) return ''
+  const date = new Date(raw)
+  return Number.isNaN(date.getTime()) ? '' : toDateInputValue(date)
+}
+
+function shiftStamp(value: string | null | undefined, days: number): string | null {
+  if (!value) return value ?? null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  date.setDate(date.getDate() + days)
+  return date.toISOString()
+}
+
+/** Si el lote es de otro día, mueve las fechas a hoy para que el periodo (día/mes) las vea. */
+export function refreshDemoTicketDates(rows: PeticionPendiente[]): PeticionPendiente[] {
+  const today = toDateInputValue(new Date())
+  const newest = rows.reduce((max, row) => {
+    const key = ticketLocalDay(row)
+    return key > max ? key : max
+  }, '')
+  if (!newest || newest >= today) return rows
+  const days = Math.round(
+    (new Date(`${today}T12:00:00`).getTime() - new Date(`${newest}T12:00:00`).getTime()) / 86_400_000,
+  )
+  if (days <= 0) return rows
+  return rows.map((row) => ({
+    ...row,
+    fechainicio: shiftStamp(row.fechainicio, days) ?? row.fechainicio,
+    fechacreacion: shiftStamp(row.fechacreacion, days) ?? row.fechacreacion,
+    fechafin: row.fechafin ? shiftStamp(row.fechafin, days) : row.fechafin,
+    gestionfecha: row.gestionfecha ? shiftStamp(row.gestionfecha, days) : row.gestionfecha,
+    cita: row.cita
+      ? { ...row.cita, fecha: shiftStamp(row.cita.fecha, days) ?? row.cita.fecha }
+      : row.cita,
+  }))
+}
+
+function demoTicketsNeedRebuild(rows: PeticionPendiente[]): boolean {
+  const advisors = demoTicketAdvisors()
+  if (rows.length !== advisors.length * DEMO_TICKETS_PER_ADVISOR) return true
+  const have = new Set(rows.map((row) => normalizeEmail(row.gestionemail || '')).filter(Boolean))
+  return advisors.some((asesor) => !have.has(normalizeEmail(asesor.email)))
+}
+
 export function loadDemoTickets(workshop: Workshop): PeticionPendiente[] {
   if (typeof localStorage === 'undefined') return generateDemoTickets(workshop)
   const key = storeKey(workshop)
@@ -182,18 +237,17 @@ export function loadDemoTickets(workshop: Workshop): PeticionPendiente[] {
     const raw = localStorage.getItem(key)
     if (raw) {
       const parsed = JSON.parse(raw) as unknown
-      const expected = DEMO_ASESORES.length * DEMO_TICKETS_PER_ADVISOR
-      if (Array.isArray(parsed) && parsed.length === expected) return parsed as PeticionPendiente[]
+      if (Array.isArray(parsed) && parsed.length && !demoTicketsNeedRebuild(parsed as PeticionPendiente[])) {
+        const rows = refreshDemoTicketDates(parsed as PeticionPendiente[])
+        if (rows !== parsed) saveDemoTickets(workshop, rows)
+        return rows
+      }
     }
   } catch {
     /* ignore */
   }
   const rows = generateDemoTickets(workshop)
-  try {
-    localStorage.setItem(key, JSON.stringify(rows))
-  } catch {
-    /* quota */
-  }
+  saveDemoTickets(workshop, rows)
   return rows
 }
 

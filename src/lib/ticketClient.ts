@@ -27,11 +27,13 @@ export type ClientNameSource = {
   movil?: string | null
   marca?: string | null
   modelo?: string | null
+  asunto?: string | null
 }
 
 export type TicketClientInput = {
   caller?: string | null
   descripcion?: string | null
+  tipopeticion?: string | null
   gestionobservaciones?: string | null
   /** Nombre cruzado por teléfono con una cita (sin enlazar IDCita). */
   clienteNombre?: string | null
@@ -89,6 +91,41 @@ export function ticketClientLabel(p: TicketClientInput): string {
 
 export function ticketClientPhone(p: TicketClientInput): string {
   return clean(p.caller || p.cita?.movil || p.cita?.telefono)
+}
+
+const CHANNEL_ONLY =
+  /^(voz laura|whatsapp|llamada|tel[eé]fono|sms|chat|seguimiento|consulta general)$/i
+
+/** Quita el volcado de centralita y deja el motivo. */
+function tidyClientNeed(raw: string): string {
+  let text = clean(raw)
+  if (!text) return ''
+  text = text.replace(/\s*[-–:·]?\s*Tel\.?\s*:\s*.+$/i, '').trim()
+  const laura = text.match(
+    /:\s*(?:llamada(?:\s+sin\s+finalizar)?|whatsapp|chat|voz laura)\s*[-–:]\s*(.+)$/i,
+  )
+  if (laura?.[1]) text = clean(laura[1])
+  text = text.replace(
+    /^(?:llamada(?:\s+sin\s+finalizar)?|whatsapp|chat|voz laura)\s*[-–:]\s*/i,
+    '',
+  )
+  text = text
+    .replace(/\bMECANICA\b/gi, 'Mecánica')
+    .replace(/\bRECAMBIO\b/gi, 'Recambio')
+    .replace(/\bPOSVENTA\b/gi, 'Posventa')
+  return clean(text)
+}
+
+/** Lo que pide el cliente, a golpe de vista. */
+export function ticketNeedLabel(p: TicketClientInput): string {
+  const name = ticketClientName(p).toLowerCase()
+  const fromText = [tidyClientNeed(p.descripcion || ''), tidyClientNeed(p.cita?.asunto || '')]
+  for (const text of fromText) {
+    if (text && text.toLowerCase() !== name) return text
+  }
+  const tipo = clean(p.tipopeticion)
+  if (tipo && tipo.toLowerCase() !== name && !CHANNEL_ONLY.test(tipo)) return tipo
+  return 'Sin detalle'
 }
 
 export function ticketVehicleLabel(p: TicketClientInput): string {

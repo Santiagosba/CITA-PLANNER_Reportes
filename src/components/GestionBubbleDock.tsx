@@ -12,7 +12,7 @@ import {
 import { GripVertical, ListTodo, Phone, PhoneCall, Wrench, X } from 'lucide-react'
 import type { PeticionPendiente } from '../lib/peticionesPendientes'
 import { formatFecha } from '../lib/peticionesPendientes'
-import { ticketClientLabel, ticketClientPhone } from '../lib/ticketClient'
+import { ticketClientLabel, ticketClientPhone, ticketNeedLabel } from '../lib/ticketClient'
 import { useSoftphone } from '../lib/softphone'
 import { APP_META, apps, useActiveAppId, useApps, useTaskbarPinned, type AppId } from '../lib/apps'
 import { AppIcon } from './AppWindows'
@@ -126,9 +126,9 @@ function initials(name: string): string {
 function sessionLabel(p: PeticionPendiente): { name: string; phone: string; detail: string } {
   const name = ticketClientLabel(p)
   const phone = ticketClientPhone(p) || 'Sin teléfono'
-  const channel = p.tipopeticion || 'Llamada'
+  const need = ticketNeedLabel(p)
   const when = formatFecha(p.fechainicio)
-  const detail = [channel, when].filter(Boolean).join(' · ')
+  const detail = [need, when].filter(Boolean).join(' · ')
   return { name, phone, detail }
 }
 

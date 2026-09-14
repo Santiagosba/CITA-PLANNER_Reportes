@@ -4,11 +4,14 @@ import { type DateRangePreset, type ResolvedDateRange } from '../lib/dateRangePr
 import { CHANNEL_OPTIONS } from '../lib/tallerStations'
 import type { PeticionesStats } from '../lib/peticionesPendientes'
 import type { CitaLinkFilter } from '../lib/citaLinkFilter'
+import type { AdvisorTeam } from '../lib/advisorWorkspace'
 import type { OwnerScope } from '../lib/ownerScope'
+import type { TeamFilterId } from '../lib/teamScope'
 import Button from './ui/Button'
 import CitaLinkFilterControl from './CitaLinkFilter'
 import EstadoDoneFilter from './EstadoDoneFilter'
 import OwnerScopeFilter from './OwnerScopeFilter'
+import TeamFilter from './TeamFilter'
 import type { EstadoFilter } from '../lib/doneFilter'
 
 export type { EstadoFilter }
@@ -35,6 +38,9 @@ type Props = {
   estado: EstadoFilter
   ownerScope: OwnerScope
   onOwnerScopeChange: (scope: OwnerScope) => void
+  teams: AdvisorTeam[]
+  teamFilter: TeamFilterId
+  onTeamFilterChange: (filter: TeamFilterId) => void
   citaLink: CitaLinkFilter
   onCitaLinkChange: (filter: CitaLinkFilter) => void
   search: string
@@ -66,6 +72,9 @@ export default function PendingCitasToolbar({
   estado,
   ownerScope,
   onOwnerScopeChange,
+  teams,
+  teamFilter,
+  onTeamFilterChange,
   citaLink,
   onCitaLinkChange,
   search,
@@ -98,7 +107,8 @@ export default function PendingCitasToolbar({
 
       <div className="elevator-filters glass glass-lite">
         <EstadoDoneFilter value={estado} onChange={onEstadoChange} />
-        <OwnerScopeFilter value={ownerScope} onChange={onOwnerScopeChange} />
+        <TeamFilter teams={teams} value={teamFilter} onChange={onTeamFilterChange} />
+        <OwnerScopeFilter value={ownerScope} onChange={onOwnerScopeChange} label="Dueño" />
         <CitaLinkFilterControl value={citaLink} onChange={onCitaLinkChange} />
         <label className="filter-field queue-filter-search">
           <span className="filter-field-label">Buscar</span>

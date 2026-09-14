@@ -7,6 +7,8 @@ import {
   normalizeEmail,
   personByEmail,
   personById,
+  teamMemberEmails,
+  teamsForEmail,
   type AdvisorWorkspace,
   type AssignedTask,
 } from './advisorWorkspace'
@@ -31,16 +33,10 @@ export function buildOwnerScopeContext(
   email: string,
 ): OwnerScopeContext {
   const myEmail = normalizeEmail(email)
-  const me = personByEmail(workspace, myEmail)
   const teamEmails = new Set<string>()
-  if (me) {
-    for (const team of workspace.teams) {
-      if (!team.memberIds.includes(me.id)) continue
-      for (const memberId of team.memberIds) {
-        const person = personById(workspace, memberId)
-        const memberEmail = normalizeEmail(person?.email ?? '')
-        if (memberEmail && memberEmail !== myEmail) teamEmails.add(memberEmail)
-      }
+  for (const team of teamsForEmail(workspace, myEmail)) {
+    for (const memberEmail of teamMemberEmails(workspace, team)) {
+      if (memberEmail && memberEmail !== myEmail) teamEmails.add(memberEmail)
     }
   }
   return { myEmail, teamEmails }

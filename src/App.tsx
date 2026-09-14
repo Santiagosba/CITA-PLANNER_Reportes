@@ -616,9 +616,9 @@ export default function App() {
     }
   }, [])
 
-  const handleLocalPreview = useCallback((role: CrmAppRole) => {
+  const handleLocalPreview = useCallback((role: CrmAppRole, advisorId?: string) => {
     setLoginNotice(null)
-    setLocalPreview(writeLocalPreview(role))
+    setLocalPreview((current) => writeLocalPreview(role, advisorId ?? current?.advisorId))
   }, [])
 
   const handleDemoLogin = useCallback(async (asesor: DemoAsesor) => {
@@ -628,7 +628,7 @@ export default function App() {
     // Con éxito, `onAuthStateChange` fija la sesión real (JWT) como en cualquier login.
   }, [])
 
-  const previewUser = localPreview ? buildLocalPreviewUser(localPreview.role) : null
+  const previewUser = localPreview ? buildLocalPreviewUser(localPreview.role, localPreview.advisorId) : null
   const effectiveUser = previewUser ?? (session as { user?: unknown } | null)?.user
   const previewOnly = Boolean(localPreview && !(session as { user?: unknown } | null)?.user)
   const effectiveWorkshop = selectedWorkshop ?? (localPreview ? LOCAL_PREVIEW_WORKSHOP : null)
@@ -681,7 +681,7 @@ export default function App() {
   return (
     <div className={rootClass}>
       <DashboardShell
-        key={`${effectiveWorkshop.id}-${localPreview?.role ?? 'real'}`}
+        key={`${effectiveWorkshop.id}-${localPreview?.role ?? 'real'}-${localPreview?.advisorId ?? ''}`}
         workshop={effectiveWorkshop}
         sessionUser={effectiveUser}
         licenseLogoUrl={mergedSidebarLogo}
@@ -693,6 +693,7 @@ export default function App() {
         isDarkMode={isDarkMode}
         onToggleTheme={() => setIsDarkMode((prev) => !prev)}
         onLocalPreviewRole={LOCAL_PREVIEW_ENABLED ? handleLocalPreview : undefined}
+        previewAdvisorId={localPreview?.advisorId}
       />
     </div>
   )

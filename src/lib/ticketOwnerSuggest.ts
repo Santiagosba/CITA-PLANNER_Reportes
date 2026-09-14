@@ -1,12 +1,5 @@
-import {
-  boardsForTeam,
-  normalizeEmail,
-  personByEmail,
-  typesForTeam,
-  type AdvisorPerson,
-  type AdvisorTeam,
-  type AdvisorWorkspace,
-} from './advisorWorkspace'
+import { isPersonOnTeam, normalizeEmail, personByEmail, type AdvisorPerson, type AdvisorTeam, type AdvisorWorkspace } from './advisorWorkspace'
+import { teamForTicketType } from './teamScope'
 import { phoneMatchKey } from './ticketClient'
 import type { PeticionPendiente } from './peticionesPendientes'
 
@@ -17,42 +10,12 @@ export type SuggestedTicketOwner = {
   reason: OwnerSuggestReason
 }
 
-function fold(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim()
-}
-
-function teamForTicketType(
-  workspace: AdvisorWorkspace,
-  tipopeticion: string | null | undefined,
-): AdvisorTeam | undefined {
-  const label = fold(tipopeticion || '')
-  if (!workspace.teams.length) return undefined
-  if (!label) return workspace.teams.length === 1 ? workspace.teams[0] : undefined
-
-  const hits = workspace.teams.filter((team) => {
-    const names = [
-      ...typesForTeam(workspace, team).map((item) => fold(item.name)),
-      ...boardsForTeam(workspace, team).map((item) => fold(item.name)),
-      fold(team.name),
-    ].filter(Boolean)
-    return names.some((name) => label.includes(name) || name.includes(label))
-  })
-  if (hits.length === 1) return hits[0]
-  if (workspace.teams.length === 1) return workspace.teams[0]
-  return hits[0]
-}
-
 function membersOf(
   workspace: AdvisorWorkspace,
   team: AdvisorTeam | undefined,
 ): AdvisorPerson[] {
   if (!team) return workspace.people
-  const ids = new Set(team.memberIds)
-  const members = workspace.people.filter((person) => ids.has(person.id))
+  const members = workspace.people.filter((person) => isPersonOnTeam(workspace, team, person.id, person.email))
   return members.length ? members : workspace.people
 }
 

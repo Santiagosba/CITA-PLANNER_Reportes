@@ -37,7 +37,14 @@ import {
   matchesManualCitaLink,
   type CitaLinkFilter,
 } from '../lib/citaLinkFilter'
-import { buildOwnerScopeContext, matchesOwnerScope, matchesTeamOwnedTickets, type OwnerScope } from '../lib/ownerScope'
+import { buildOwnerScopeContext, matchesOwnerScope, type OwnerScope } from '../lib/ownerScope'
+import TeamFilter from '../components/TeamFilter'
+import {
+  matchesTeamFilter,
+  TEAM_FILTER_ALL,
+  visibleTeamsForUser,
+  type TeamFilterId,
+} from '../lib/teamScope'
 import CitaLinkFilterControl from '../components/CitaLinkFilter'
 import OwnerScopeFilter from '../components/OwnerScopeFilter'
 import TicketOwnerPicker from '../components/TicketOwnerPicker'
@@ -460,8 +467,8 @@ const BoardTicket = memo(function BoardTicket({
         <div className="ticket-client is-md">
           <p className="ticket-client-name">{entry.title}</p>
           <p className="ticket-client-phone">{entry.phone || 'Sin teléfono'}</p>
+          <p className="ticket-client-need">{entry.note || 'Sin detalle'}</p>
         </div>
-        {entry.note ? <p className="kanban-card-desc">{entry.note}</p> : null}
         <footer>
           <time>{formatFecha(entry.createdAt)}</time>
           <span>Urgencia {scoreManualUrgency({ title: entry.title, note: entry.note, createdAt: entry.createdAt }).score}</span>
@@ -491,9 +498,8 @@ const BoardTicket = memo(function BoardTicket({
         <span className={`badge ${tone}`}>{column.label}</span>
       </div>
       <TicketClientBlock peticion={item} size="md" />
-      <span className="kanban-card-meta">{item.tipopeticion || 'Sin tipo'}</span>
+      {item.tipopeticion ? <span className="kanban-card-meta">{item.tipopeticion}</span> : null}
       {vehicle ? <span className="kanban-card-meta">{vehicle}</span> : null}
-      {item.descripcion ? <p className="kanban-card-desc">{item.descripcion}</p> : null}
       <TicketOwnerPicker
         workshop={workshop}
         workspace={workspace}
@@ -524,22 +530,25 @@ export default function BoardsManagerView({
   const workshopKey = workshop.containerIdTaller || workshop.id
   const { workspace } = useAdvisorWorkspace(workshopKey, currentUser, true)
   const [ownerScope, setOwnerScope] = useState<OwnerScope>('todas')
+  const [teamFilter, setTeamFilter] = useState<TeamFilterId>(TEAM_FILTER_ALL)
   const [citaLink, setCitaLink] = useState<CitaLinkFilter>('todas')
   const ownerCtx = useMemo(
     () => buildOwnerScopeContext(workspace, currentUser.email),
     [workspace, currentUser.email],
   )
+  const visibleTeams = useMemo(
+    () => visibleTeamsForUser(workspace, currentUser.email, appRole),
+    [workspace, currentUser.email, appRole],
+  )
   const scopedItems = useMemo(
     () =>
       items.filter((item) => {
         if (!isLiveBoardTicket(item, today)) return false
-        const ownerOk =
-          appRole === 'asesor'
-            ? matchesTeamOwnedTickets(item.gestionemail, ownerCtx)
-            : matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx)
-        return ownerOk && matchesCitaLink(item, citaLink)
+        const teamOk = matchesTeamFilter(workspace, item, teamFilter, appRole, currentUser.email)
+        const ownerOk = matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx)
+        return teamOk && ownerOk && matchesCitaLink(item, citaLink)
       }),
-    [items, today, appRole, ownerScope, ownerCtx, citaLink],
+    [items, today, workspace, teamFilter, appRole, currentUser.email, ownerScope, ownerCtx, citaLink],
   )
 
   useEffect(() => {
@@ -1081,13 +1090,16 @@ export default function BoardsManagerView({
           <h2 className="ops-card-title">{active.label}</h2>
           <p className="section-subtitle">
             {appRole === 'asesor'
-              ? 'Solo tickets de tu equipo · desde hoy hacia adelante'
+              ? 'Tus equipos, tickets sueltos y los que puedes pasar · desde hoy'
               : `${active.description} · desde hoy hacia adelante`}
           </p>
           <div className="elevator-filters" style={{ marginTop: 'var(--space-3)' }}>
+            <TeamFilter teams={visibleTeams} value={teamFilter} onChange={setTeamFilter} />
             {appRole === 'admin' ? (
               <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} />
-            ) : null}
+            ) : (
+              <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Dueño" />
+            )}
             <CitaLinkFilterControl value={citaLink} onChange={setCitaLink} />
           </div>
         </div>
