@@ -12,6 +12,10 @@ async function loadCatalog(): Promise<MotivoCanceladaRow[]> {
         cached = rows
         return rows
       })
+      .catch(() => {
+        cached = cached ?? []
+        return cached
+      })
       .finally(() => {
         inflight = null
       })

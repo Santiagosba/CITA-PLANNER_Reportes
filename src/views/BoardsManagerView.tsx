@@ -1,7 +1,5 @@
 import {
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   ChevronUp,
   GripVertical,
   Plus,
@@ -27,12 +25,7 @@ import {
   manualOperationOf,
   operationKeyOf,
 } from '../lib/boardOperations'
-import {
-  CALENDAR_SCALE_OPTIONS,
-  calendarPeriod,
-  shiftCalendarAnchor,
-  type CalendarScale,
-} from '../lib/calendarScale'
+import { boardLiveFetchRange, isLiveBoardTicket } from '../lib/boardLiveRange'
 import { formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
 import { defaultBoardPriority, scoreManualUrgency, scoreTicketUrgency } from '../lib/ticketUrgency'
 import TicketClientBlock from '../components/TicketClientBlock'
@@ -432,6 +425,7 @@ const BoardTicket = memo(function BoardTicket({
   workspace,
   currentUser,
   appRole,
+  tickets,
 }: {
   card: BoardCard
   column: PriorityColumn
@@ -441,6 +435,7 @@ const BoardTicket = memo(function BoardTicket({
   workspace: AdvisorWorkspace
   currentUser: { name: string; email: string }
   appRole: CrmAppRole
+  tickets: PeticionPendiente[]
 }) {
   const id = cardId(card)
   const tone = badgeTone(column.tone)
@@ -505,6 +500,7 @@ const BoardTicket = memo(function BoardTicket({
         currentUser={currentUser}
         appRole={appRole}
         peticion={item}
+        tickets={tickets}
         compact
       />
       <footer>
@@ -515,10 +511,6 @@ const BoardTicket = memo(function BoardTicket({
   )
 })
 
-function todayAnchor() {
-  return new Date(`${localTodayIso()}T12:00:00`)
-}
-
 export default function BoardsManagerView({
   workshop,
   currentUser,
@@ -526,10 +518,8 @@ export default function BoardsManagerView({
   onOpenLead,
   refreshToken = 0,
 }: Props) {
-  const [scale, setScale] = useState<CalendarScale>('mes')
-  const [anchor, setAnchor] = useState(todayAnchor)
-  const period = useMemo(() => calendarPeriod(scale, anchor), [scale, anchor])
-  const range = useMemo(() => ({ from: period.from, to: period.to }), [period.from, period.to])
+  const today = localTodayIso()
+  const range = useMemo(() => boardLiveFetchRange(today), [today])
   const { items, loading, error, sourceNotice, refresh } = useOperationalData(workshop, range)
   const workshopKey = workshop.containerIdTaller || workshop.id
   const { workspace } = useAdvisorWorkspace(workshopKey, currentUser, true)
@@ -542,13 +532,14 @@ export default function BoardsManagerView({
   const scopedItems = useMemo(
     () =>
       items.filter((item) => {
+        if (!isLiveBoardTicket(item, today)) return false
         const ownerOk =
           appRole === 'asesor'
             ? matchesTeamOwnedTickets(item.gestionemail, ownerCtx)
             : matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx)
         return ownerOk && matchesCitaLink(item, citaLink)
       }),
-    [items, appRole, ownerScope, ownerCtx, citaLink],
+    [items, today, appRole, ownerScope, ownerCtx, citaLink],
   )
 
   useEffect(() => {
@@ -1027,8 +1018,8 @@ export default function BoardsManagerView({
           {citaLink !== 'todas'
             ? citaLinkEmptyCopy(citaLink)
             : appRole === 'asesor'
-              ? 'Tu equipo no tiene consultas en este periodo.'
-              : 'No hay consultas en este periodo.'}
+              ? 'Tu equipo no tiene consultas de hoy en adelante.'
+              : 'No hay consultas de hoy en adelante.'}
         </p>
       ) : null}
 
@@ -1090,53 +1081,12 @@ export default function BoardsManagerView({
           <h2 className="ops-card-title">{active.label}</h2>
           <p className="section-subtitle">
             {appRole === 'asesor'
-              ? `Solo tickets de tu equipo · ${period.label}`
-              : `${active.description} · ${period.label}`}
+              ? 'Solo tickets de tu equipo · desde hoy hacia adelante'
+              : `${active.description} · desde hoy hacia adelante`}
           </p>
           <div className="elevator-filters" style={{ marginTop: 'var(--space-3)' }}>
             {appRole === 'admin' ? (
-              <>
-                <div className="filter-field">
-                  <span className="filter-field-label">Periodo</span>
-                  <div className="estado-filter" role="group" aria-label="Periodo del tablero">
-                    {CALENDAR_SCALE_OPTIONS.map((option) => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        className={`preset-chip ${scale === option.id ? 'is-active' : ''}`}
-                        onClick={() => {
-                          setScale(option.id)
-                          setAnchor(todayAnchor())
-                        }}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="elevator-day-nav">
-                  <button
-                    type="button"
-                    className="ghost-button calendar-nav"
-                    onClick={() => setAnchor((current) => shiftCalendarAnchor(scale, current, -1))}
-                    aria-label="Periodo anterior"
-                  >
-                    <ChevronLeft size={17} />
-                  </button>
-                  <button type="button" className="ghost-button" onClick={() => setAnchor(todayAnchor())}>
-                    Hoy
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost-button calendar-nav"
-                    onClick={() => setAnchor((current) => shiftCalendarAnchor(scale, current, 1))}
-                    aria-label="Periodo siguiente"
-                  >
-                    <ChevronRight size={17} />
-                  </button>
-                </div>
-                <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} />
-              </>
+              <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} />
             ) : null}
             <CitaLinkFilterControl value={citaLink} onChange={setCitaLink} />
           </div>
@@ -1240,6 +1190,7 @@ export default function BoardsManagerView({
                       workspace={workspace}
                       currentUser={currentUser}
                       appRole={appRole}
+                      tickets={items}
                     />
                   ))
                 )}

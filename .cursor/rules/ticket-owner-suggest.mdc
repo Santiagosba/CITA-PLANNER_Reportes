@@ -1,0 +1,14 @@
+---
+description: El dueño del ticket es el asesor que le tocaría, no un hueco vacío
+alwaysApply: true
+---
+
+# Dueño del ticket = quien le tocaría
+
+Si un ticket no tiene `gestionemail`, **Dueño del ticket** no se queda en «Sin dueño». Hay que proponer (y en la ficha asignar) al **asesor que le tocaría**:
+
+1. El que ya atendió ese **mismo teléfono**
+2. Si no, alguien del **equipo** de ese tipo de consulta
+3. Si hay varios, el que **menos tickets abiertos** tenga
+
+Textos en español llano: «Le tocaría Ana». No inventar otra regla de reparto.

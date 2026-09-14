@@ -605,6 +605,7 @@ export default function PendingCitasView({
                             currentUser={currentUser}
                             appRole={appRole}
                             peticion={p}
+                            tickets={items}
                             compact
                           />
                         }
@@ -687,6 +688,7 @@ export default function PendingCitasView({
                             currentUser={currentUser}
                             appRole={appRole}
                             peticion={p}
+                            tickets={items}
                             compact
                           />
                         </td>

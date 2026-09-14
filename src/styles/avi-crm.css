@@ -8046,6 +8046,19 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   font-size: 16px;
 }
 
+.ticket-owner-hint {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.ticket-owner-card.is-suggested,
+.ticket-owner-picker.is-suggested .field-select,
+.ticket-owner-readonly.is-suggested {
+  color: var(--color-brand);
+}
+
 .lead-calls-toolbar {
   display: flex;
   align-items: center;

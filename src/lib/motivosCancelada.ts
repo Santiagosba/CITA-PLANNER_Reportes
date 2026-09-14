@@ -1,27 +1,21 @@
-import { supabaseAviOld } from './supabase'
-import { fetchAllSupabasePages } from './supabaseFetchAll'
-import { isSqlServerPeticionesSource, sqlFetchMotivosCancelada } from './sqlServerApi'
+import { sqlFetchMotivosCancelada } from './sqlServerApi'
 
 export type MotivoCanceladaRow = {
   idmotivocancelada: number
   motivocancelada: string
 }
 
-async function fetchMotivosCanceladaSupabase(): Promise<MotivoCanceladaRow[]> {
-  return fetchAllSupabasePages<MotivoCanceladaRow>(() =>
-    supabaseAviOld.from('motivoscancelada').select('idmotivocancelada,motivocancelada').order('motivocancelada'),
-  )
-}
-
+/**
+ * El catálogo vive en SQL Server (`/api/motivos-cancelada`).
+ * `aviold.motivoscancelada` no se lee desde el navegador: la anon key
+ * responde 401 (permission denied).
+ */
 export async function fetchMotivosCancelada(): Promise<MotivoCanceladaRow[]> {
-  if (isSqlServerPeticionesSource()) {
-    try {
-      return await sqlFetchMotivosCancelada()
-    } catch {
-      return fetchMotivosCanceladaSupabase()
-    }
+  try {
+    return await sqlFetchMotivosCancelada()
+  } catch {
+    return []
   }
-  return fetchMotivosCanceladaSupabase()
 }
 
 export function motivosCanceladaMap(rows: MotivoCanceladaRow[]): Map<number, string> {

@@ -79,7 +79,7 @@ export default function DashboardGeneralView({
 }: Props) {
   const workshopId = workshop.containerIdTaller || workshop.id
   const { workspace } = useAdvisorWorkspace(workshopId, currentUser, true)
-  const [scale, setScale] = useState<CalendarScale>('dia')
+  const [scale, setScale] = useState<CalendarScale>('mes')
   const [ownerScope, setOwnerScope] = useState<OwnerScope>(appRole === 'asesor' ? 'grupo' : 'todas')
   const [citaLink, setCitaLink] = useState<CitaLinkFilter>('todas')
   const today = localTodayIso()
@@ -201,6 +201,7 @@ export default function DashboardGeneralView({
     currentUser,
     appRole,
     onOpenLead,
+    tickets: liveItems,
   }
 
   const scaleLabel = CALENDAR_SCALE_OPTIONS.find((option) => option.id === scale)?.label ?? 'Periodo'
@@ -499,6 +500,7 @@ type DashTicketRowProps = {
   currentUser: { name: string; email: string }
   appRole: CrmAppRole
   onOpenLead?: (peticion: PeticionPendiente) => void
+  tickets: PeticionPendiente[]
 }
 
 type DashTicketColumnProps = Omit<DashTicketRowProps, 'item'> & {
@@ -564,7 +566,7 @@ function MetricCard({ icon: Icon, label, value, helper, tone, onClick }: MetricP
   )
 }
 
-function DashTicketRow({ item, workshop, workspace, currentUser, appRole, onOpenLead }: DashTicketRowProps) {
+function DashTicketRow({ item, workshop, workspace, currentUser, appRole, onOpenLead, tickets }: DashTicketRowProps) {
   const sla = !item.gestionado && (isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha))
   return (
     <li
@@ -597,6 +599,7 @@ function DashTicketRow({ item, workshop, workspace, currentUser, appRole, onOpen
           currentUser={currentUser}
           appRole={appRole}
           peticion={item}
+          tickets={tickets}
           compact
         />
         <span className={`badge ${item.gestionado ? 'tone-positive' : sla ? 'tone-negative' : 'tone-warning'}`}>
