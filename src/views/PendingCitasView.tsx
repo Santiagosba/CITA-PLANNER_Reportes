@@ -8,7 +8,7 @@ import PeticionRow from '../components/PeticionRow'
 import type { ActionStatus } from '../components/ui/ActionButton'
 import Card from '../components/ui/Card'
 import { HexLoaderScreen } from '../components/ui/HexLoader'
-import VehiclePlate from '../components/ui/VehiclePlate'
+import TicketPlate from '../components/TicketPlate'
 import CalendarTallerView from './CalendarTallerView'
 import type { CalendarScale } from '../lib/calendarScale'
 import type { CitaTaller } from '../lib/citasTaller'
@@ -653,7 +653,6 @@ export default function PendingCitasView({
                 </thead>
                 <tbody>
                   {visible.map((p, index) => {
-                    const c = p.cita
                     const hecha = Boolean(p.gestionado)
                     return (
                       <tr
@@ -674,7 +673,7 @@ export default function PendingCitasView({
                         <td>
                           <TicketClientBlock peticion={p} size="sm" />
                         </td>
-                        <td>{c?.matricula ? <VehiclePlate value={c.matricula} compact /> : '—'}</td>
+                        <td><TicketPlate peticion={p} /></td>
                         <td>
                           {p.tipopeticion ?? '—'}
                           {isDemoTicketId(p.idpeticion) ? (

@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { ChevronLeft, ChevronRight, Clock3, RefreshCw } from 'lucide-react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
 import { HexLoaderScreen } from '../components/ui/HexLoader'
-import VehiclePlate from '../components/ui/VehiclePlate'
+import TicketPlate from '../components/TicketPlate'
 import { toDateInputValue } from '../lib/dateRangePresets'
 import {
   WEEKDAY_LABELS,
@@ -100,7 +100,8 @@ function CitaChip({
       }}
     >
       {time ? <time>{time}</time> : null}
-      {cita.matricula ? <VehiclePlate value={cita.matricula} compact /> : <strong>{vehicleLabel(cita)}</strong>}
+      <TicketPlate value={cita.matricula} />
+      {cita.matricula ? null : <strong>{vehicleLabel(cita)}</strong>}
       {compact ? null : (
         <>
           {cita.matricula ? <strong>{vehicleLabel(cita)}</strong> : null}
@@ -299,7 +300,7 @@ export default function CalendarTallerView({
                                   {citaTime(cita) && !sameTime ? <time>{citaTime(cita)}</time> : null}
                                   <strong>{vehicleLabel(cita)}</strong>
                                   <span className="calendar-slot-customer">{customerLabel(cita)}</span>
-                                  {cita.matricula ? <VehiclePlate value={cita.matricula} compact /> : null}
+                                  <TicketPlate value={cita.matricula} />
                                 </button>
                               )
                             })

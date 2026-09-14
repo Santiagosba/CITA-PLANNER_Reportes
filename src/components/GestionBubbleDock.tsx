@@ -46,6 +46,7 @@ import {
   type Edge,
 } from '../lib/osWindowDrag'
 import WindowControls from './os/WindowControls'
+import TicketPlate from './TicketPlate'
 
 const POS_KEY = 'avi-call-agenda-pos'
 const SIZE_KEY = 'avi-call-agenda-size'
@@ -123,13 +124,11 @@ function initials(name: string): string {
 }
 
 function sessionLabel(p: PeticionPendiente): { name: string; phone: string; detail: string } {
-  const c = p.cita
   const name = ticketClientLabel(p)
   const phone = ticketClientPhone(p) || 'Sin teléfono'
-  const plate = c?.matricula
   const channel = p.tipopeticion || 'Llamada'
   const when = formatFecha(p.fechainicio)
-  const detail = [channel, plate, when].filter(Boolean).join(' · ')
+  const detail = [channel, when].filter(Boolean).join(' · ')
   return { name, phone, detail }
 }
 
@@ -745,6 +744,7 @@ export default function GestionBubbleDock({
                   </span>
                   <span className="call-agenda-meta">
                     <strong>{name}</strong>
+                    <TicketPlate peticion={session.peticion} />
                     <span className="call-agenda-phone">
                       <Phone size={11} />
                       {phone}

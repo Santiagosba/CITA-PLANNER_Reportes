@@ -17,7 +17,6 @@ const PERIOD_CHIPS: { id: DateRangePreset; label: string }[] = [
   { id: 'trimestre', label: '3 meses' },
   { id: 'anio', label: 'Año' },
   { id: 'personalizada', label: 'Entre' },
-  { id: 'todas', label: 'Todas' },
 ]
 
 type Props = {

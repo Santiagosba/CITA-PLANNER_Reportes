@@ -120,7 +120,7 @@ export function useAdvisorWorkspace(
         commit((latest) => addPerson(latest, name, email, teamId)),
       addTaskType: (name: string) => commit((latest) => addCatalogItem(latest, 'taskTypes', name)),
       addBoard: (name: string) => commit((latest) => addCatalogItem(latest, 'boards', name)),
-      assignTask: (input: Omit<AssignedTask, 'id' | 'createdAt' | 'status'> & { status?: AssignedTaskStatus }) =>
+      assignTask: (input: Omit<AssignedTask, 'id' | 'createdAt' | 'completedAt' | 'status'> & { status?: AssignedTaskStatus }) =>
         commit((latest) => addAssignedTask(latest, input)),
       setTaskStatus: (taskId: string, status: AssignedTaskStatus) =>
         commit((latest) => setAssignedTaskStatus(latest, taskId, status)),

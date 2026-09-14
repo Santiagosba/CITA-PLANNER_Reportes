@@ -70,6 +70,15 @@ export function matchesOwnerScope(
   return kind === scope
 }
 
+/** Tableros en vista asesor: solo tickets del equipo (tuyos o de un compañero del grupo). */
+export function matchesTeamOwnedTickets(
+  email: string | null | undefined,
+  ctx: OwnerScopeContext,
+): boolean {
+  const kind = classifyOwnerEmail(email, ctx)
+  return kind === 'mias' || kind === 'grupo'
+}
+
 export function taskOwnerEmail(workspace: AdvisorWorkspace, task: AssignedTask): string | null {
   if (!task.assigneeId) return null
   return personById(workspace, task.assigneeId)?.email ?? null

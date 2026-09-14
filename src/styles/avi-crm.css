@@ -2470,6 +2470,11 @@ html.dark .hex-loader-aura,
   flex-wrap: wrap;
 }
 
+.prow-headline > .vehicle-plate,
+.prow-headline > .ops-feed-placeholder {
+  flex: 0 0 auto;
+}
+
 .prow-name {
   color: var(--fog-strong);
   font-size: var(--font-lg);
@@ -8129,6 +8134,8 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
     0 16px 36px rgba(15, 23, 42, 0.14);
   overflow: hidden;
   transform-origin: bottom right;
+  container-type: inline-size;
+  container-name: taskbar;
 }
 
 .dashboard-shell:not(.is-light) .call-agenda-panel {
@@ -8223,15 +8230,19 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  display: flex;
-  flex-direction: column;
+  overflow-x: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
   gap: 6px;
 }
 
 .call-agenda-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
   gap: 4px;
+  min-width: 0;
   border-radius: 14px;
   border: 1px solid rgba(15, 17, 21, 0.08);
   background: rgba(246, 248, 251, 0.95);
@@ -8254,11 +8265,12 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
 }
 
 .call-agenda-item-main {
-  flex: 1;
+  flex: 1 1 140px;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 8px 10px;
   padding: 10px;
   border: 0;
   background: transparent;
@@ -8271,6 +8283,7 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  flex: 0 0 auto;
   gap: 2px;
   padding: 6px 6px 6px 0;
 }
@@ -8301,10 +8314,17 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
 
 .call-agenda-meta {
   min-width: 0;
-  flex: 1;
+  flex: 1 1 120px;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.call-agenda-meta > .vehicle-plate,
+.call-agenda-meta > .ops-feed-placeholder {
+  flex: 0 0 auto;
+  max-width: 100%;
 }
 
 .call-agenda-meta strong {
@@ -8313,25 +8333,34 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   font-weight: 750;
   line-height: 1.25;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .call-agenda-phone {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
+  max-width: 100%;
   color: var(--fog);
   font-size: 12px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-wrap: anywhere;
 }
 
 .call-agenda-detail {
   color: var(--muted);
   font-size: 11px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .call-agenda-state {
@@ -8347,6 +8376,54 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
 .call-agenda-state.is-live {
   background: rgba(29, 138, 78, 0.12);
   color: #1d8a4e;
+}
+
+@container taskbar (min-width: 520px) {
+  .call-agenda-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container taskbar (min-width: 780px) {
+  .call-agenda-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container taskbar (max-width: 359px) {
+  .call-agenda-item-main {
+    flex: 1 1 100%;
+  }
+
+  .call-agenda-item-actions {
+    flex-direction: row;
+    width: 100%;
+    justify-content: flex-end;
+    padding: 0 8px 8px;
+  }
+
+  .call-agenda-state {
+    margin-left: auto;
+  }
+}
+
+@container taskbar (max-width: 420px) {
+  .call-agenda-panel-head {
+    flex-wrap: wrap;
+  }
+
+  .call-agenda-controls {
+    padding: 4px 8px 8px;
+  }
+
+  .taskbar-tabs {
+    width: 100%;
+  }
+
+  .taskbar-tab {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
 }
 
 /* Ventanas SO de gesti?n ? motion org?nica */
@@ -11654,9 +11731,10 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
 
 .taskbar-tools {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr));
   gap: 8px;
   padding: 10px 8px 8px;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
@@ -12774,6 +12852,100 @@ body > .os-desk-layer.dashboard-shell {
   font-variant-numeric: tabular-nums;
 }
 
+.laura-chart-hit {
+  fill: transparent;
+  stroke: none;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.laura-chart-hit.is-hot {
+  fill: rgba(255, 255, 255, 0.22);
+}
+
+.laura-radar-dot.is-hot {
+  r: 7;
+  stroke-width: 3;
+}
+
+.laura-upie-hits {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  transform: translateZ(22px);
+  pointer-events: none;
+  overflow: visible;
+}
+
+.laura-upie-hits path {
+  pointer-events: auto;
+}
+
+.laura-chart-tip {
+  position: fixed;
+  z-index: 240;
+  min-width: 188px;
+  max-width: 240px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  pointer-events: none;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+}
+
+.laura-chart-tip p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+
+.laura-chart-tip p i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+.laura-chart-tip strong {
+  color: var(--fog-strong);
+  font-size: 14px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.laura-chart-tip dl {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.laura-chart-tip dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.laura-chart-tip dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.laura-chart-tip dd {
+  margin: 0;
+  color: var(--fog-strong);
+  font-size: 12px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.dashboard-shell:not(.is-light) .laura-chart-tip strong,
+.dashboard-shell:not(.is-light) .laura-chart-tip dd {
+  color: #f8fafc;
+}
+
 .laura-circle-grid {
   list-style: none;
   margin: 18px 0 0;
@@ -13107,6 +13279,14 @@ body > .os-desk-layer.dashboard-shell {
   flex-direction: column;
   justify-content: flex-end;
   align-items: center;
+  cursor: pointer;
+}
+
+.laura-pareto-col.is-hot .laura-pareto-bar {
+  filter: brightness(1.12);
+  box-shadow:
+    5px 0 0 rgba(8, 63, 138, 0.28),
+    0 0 0 2px rgba(11, 99, 214, 0.35);
 }
 
 .laura-pareto-value {
@@ -13164,6 +13344,7 @@ body > .os-desk-layer.dashboard-shell {
   background: #f59e0b;
   border: 2px solid #fff;
   box-shadow: 0 2px 5px rgba(245, 158, 11, 0.4);
+  pointer-events: none;
   animation: laura-dot-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   animation-delay: calc(var(--i, 0) * 70ms + 0.7s);
 }
@@ -14425,6 +14606,13 @@ body > .os-desk-layer.dashboard-shell {
   animation: taskbar-section-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.call-agenda-list.taskbar-section-content,
+.taskbar-tools.taskbar-section-content,
+.taskbar-empty.taskbar-section-content {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .taskbar-title-value {
   animation: taskbar-title-refresh 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -14828,11 +15016,6 @@ body > .os-desk-layer.dashboard-shell {
 
 .call-agenda-meta > strong {
   font-size: var(--font-md);
-}
-
-.call-agenda-phone {
-  opacity: 0.78;
-  font-size: 12px;
 }
 
 .owner-scope-filter {

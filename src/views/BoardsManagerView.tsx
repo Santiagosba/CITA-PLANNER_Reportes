@@ -1,5 +1,7 @@
 import {
   Car,
+  ChevronLeft,
+  ChevronRight,
   GripVertical,
   Package,
   Plus,
@@ -21,18 +23,23 @@ import {
 } from 'react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
 import { HexLoaderScreen } from '../components/ui/HexLoader'
-import VehiclePlate from '../components/ui/VehiclePlate'
-import { resolveDateRange } from '../lib/dateRangePresets'
+import TicketPlate from '../components/TicketPlate'
+import { boardsForTeam, localTodayIso, personByEmail, teamForPerson, type AdvisorWorkspace } from '../lib/advisorWorkspace'
+import {
+  CALENDAR_SCALE_OPTIONS,
+  calendarPeriod,
+  shiftCalendarAnchor,
+  type CalendarScale,
+} from '../lib/calendarScale'
 import { formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
 import { defaultBoardPriority, scoreManualUrgency, scoreTicketUrgency } from '../lib/ticketUrgency'
 import TicketClientBlock from '../components/TicketClientBlock'
 import { useOperationalData } from '../hooks/useOperationalData'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
-import { buildOwnerScopeContext, matchesOwnerScope, type OwnerScope } from '../lib/ownerScope'
+import { buildOwnerScopeContext, matchesOwnerScope, matchesTeamOwnedTickets, type OwnerScope } from '../lib/ownerScope'
 import OwnerScopeFilter from '../components/OwnerScopeFilter'
 import TicketOwnerPicker from '../components/TicketOwnerPicker'
 import type { CrmAppRole } from '../lib/crmRoles'
-import { boardsForTeam, personByEmail, teamForPerson, type AdvisorWorkspace } from '../lib/advisorWorkspace'
 import type { Workshop } from '../types'
 
 type DepartmentId = 'mechanics' | 'bodywork' | 'insurance' | 'parts' | 'sales'
@@ -508,13 +515,7 @@ const BoardTicket = memo(function BoardTicket({
         <span className="kanban-drag-handle" aria-hidden>
           <GripVertical size={16} />
         </span>
-        {cita?.matricula ? (
-          <VehiclePlate value={cita.matricula} compact />
-        ) : (
-          <span className="ops-feed-placeholder">
-            {cita ? 'SIN MATRÍCULA' : 'SIN CITA'}
-          </span>
-        )}
+        <TicketPlate peticion={item} />
         <span className={`badge ${tone}`}>{column.label}</span>
       </div>
       <TicketClientBlock peticion={item} size="md" />
@@ -537,6 +538,10 @@ const BoardTicket = memo(function BoardTicket({
   )
 })
 
+function todayAnchor() {
+  return new Date(`${localTodayIso()}T12:00:00`)
+}
+
 export default function BoardsManagerView({
   workshop,
   currentUser,
@@ -544,14 +549,14 @@ export default function BoardsManagerView({
   onOpenLead,
   refreshToken = 0,
 }: Props) {
-  const range = resolveDateRange('mes', '', '')
+  const [scale, setScale] = useState<CalendarScale>('mes')
+  const [anchor, setAnchor] = useState(todayAnchor)
+  const period = useMemo(() => calendarPeriod(scale, anchor), [scale, anchor])
+  const range = useMemo(() => ({ from: period.from, to: period.to }), [period.from, period.to])
   const { items, loading, error, sourceNotice, refresh } = useOperationalData(workshop, range)
   const workshopKey = workshop.containerIdTaller || workshop.id
   const { workspace } = useAdvisorWorkspace(workshopKey, currentUser, true)
-  const [ownerScope, setOwnerScope] = useState<OwnerScope>(appRole === 'asesor' ? 'grupo' : 'todas')
-  useEffect(() => {
-    setOwnerScope(appRole === 'asesor' ? 'grupo' : 'todas')
-  }, [appRole])
+  const [ownerScope, setOwnerScope] = useState<OwnerScope>('todas')
   const ownerCtx = useMemo(
     () => buildOwnerScopeContext(workspace, currentUser.email),
     [workspace, currentUser.email],
@@ -565,8 +570,13 @@ export default function BoardsManagerView({
     return DEPARTMENTS.filter((department) => allowed.has(department.id))
   }, [appRole, workspace, currentUser.email])
   const scopedItems = useMemo(
-    () => items.filter((item) => matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx)),
-    [items, ownerScope, ownerCtx],
+    () =>
+      items.filter((item) =>
+        appRole === 'asesor'
+          ? matchesTeamOwnedTickets(item.gestionemail, ownerCtx)
+          : matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx),
+      ),
+    [items, appRole, ownerScope, ownerCtx],
   )
 
   useEffect(() => {
@@ -1012,8 +1022,55 @@ export default function BoardsManagerView({
         <div className="board-heading-copy">
           <p className="section-eyebrow">Tablero especializado</p>
           <h2 className="ops-card-title">{active.label}</h2>
-          <p className="section-subtitle">{active.description}</p>
-          <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} />
+          <p className="section-subtitle">
+            {appRole === 'asesor'
+              ? `Solo tickets de tu equipo · ${period.label}`
+              : `${active.description} · ${period.label}`}
+          </p>
+          {appRole === 'admin' ? (
+            <div className="elevator-filters" style={{ marginTop: 'var(--space-3)' }}>
+              <div className="filter-field">
+                <span className="filter-field-label">Periodo</span>
+                <div className="estado-filter" role="group" aria-label="Periodo del tablero">
+                  {CALENDAR_SCALE_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={`preset-chip ${scale === option.id ? 'is-active' : ''}`}
+                      onClick={() => {
+                        setScale(option.id)
+                        setAnchor(todayAnchor())
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="elevator-day-nav">
+                <button
+                  type="button"
+                  className="ghost-button calendar-nav"
+                  onClick={() => setAnchor((current) => shiftCalendarAnchor(scale, current, -1))}
+                  aria-label="Periodo anterior"
+                >
+                  <ChevronLeft size={17} />
+                </button>
+                <button type="button" className="ghost-button" onClick={() => setAnchor(todayAnchor())}>
+                  Hoy
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button calendar-nav"
+                  onClick={() => setAnchor((current) => shiftCalendarAnchor(scale, current, 1))}
+                  aria-label="Periodo siguiente"
+                >
+                  <ChevronRight size={17} />
+                </button>
+              </div>
+              <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} />
+            </div>
+          ) : null}
         </div>
         <button type="button" className="client-submit" onClick={openNewEntry}>
           <Plus size={16} />

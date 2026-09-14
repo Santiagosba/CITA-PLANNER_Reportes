@@ -36,6 +36,7 @@ export type AssignedTask = {
   assigneeId: string
   dueDate: string
   createdAt: string
+  completedAt: string | null
   createdByEmail: string
   status: AssignedTaskStatus
   peticionId: string | null
@@ -70,7 +71,89 @@ function newId(prefix: string): string {
   return `${prefix}-${rand}`
 }
 
-export function seedAdvisorWorkspace(): AdvisorWorkspace {
+export function isExampleAssignedTask(task: Pick<AssignedTask, 'id' | 'peticionId'>): boolean {
+  const id = String(task.id || '')
+  const peticionId = String(task.peticionId || '')
+  return id.startsWith('task-local-') || id.startsWith('demo-task-') || peticionId.startsWith('demo-ticket-')
+}
+
+function keepExampleTasksFor(workshopId: string): boolean {
+  return workshopId === 'local-preview'
+}
+
+function dropExampleTasks(workspace: AdvisorWorkspace): AdvisorWorkspace {
+  const tasks = workspace.tasks.filter((task) => !isExampleAssignedTask(task))
+  return tasks.length === workspace.tasks.length ? workspace : { ...workspace, tasks }
+}
+
+function exampleAssignedTasks(): AssignedTask[] {
+  const today = localTodayIso()
+  const createdAt = new Date().toISOString()
+  return [
+    {
+      id: 'task-local-1',
+      title: 'Llamar a Mariano: ruido al arrancar',
+      notes: 'Ejemplo local. Entra como Ana para verla en Tareas.',
+      taskTypeId: 'tt-llamada',
+      boardId: 'mechanics',
+      teamId: 'team-prueba',
+      assigneeId: 'demo-asesor-ana',
+      dueDate: today,
+      createdAt,
+      completedAt: null,
+      createdByEmail: 'santy@gmail.com',
+      status: 'pendiente',
+      peticionId: null,
+    },
+    {
+      id: 'task-local-2',
+      title: 'Confirmar cita de flota',
+      notes: 'Del grupo: asignada a Luis.',
+      taskTypeId: 'tt-cita',
+      boardId: 'parts',
+      teamId: 'team-prueba',
+      assigneeId: 'demo-asesor-luis',
+      dueDate: today,
+      createdAt,
+      completedAt: null,
+      createdByEmail: 'santy@gmail.com',
+      status: 'pendiente',
+      peticionId: null,
+    },
+    {
+      id: 'task-local-3',
+      title: 'Peritaje Mapfre de Carmen',
+      notes: 'De otra compañera, fuera del grupo de Ana.',
+      taskTypeId: 'tt-peritaje',
+      boardId: 'insurance',
+      teamId: 'team-prueba',
+      assigneeId: 'demo-asesor-carmen',
+      dueDate: today,
+      createdAt,
+      completedAt: null,
+      createdByEmail: 'santy@gmail.com',
+      status: 'pendiente',
+      peticionId: null,
+    },
+    {
+      id: 'task-local-4',
+      title: 'WhatsApp sin dueño',
+      notes: 'Nadie la ha cogido todavía.',
+      taskTypeId: 'tt-whatsapp',
+      boardId: null,
+      teamId: 'team-prueba',
+      assigneeId: '',
+      dueDate: today,
+      createdAt,
+      completedAt: null,
+      createdByEmail: 'santy@gmail.com',
+      status: 'pendiente',
+      peticionId: null,
+    },
+  ]
+}
+
+export function seedAdvisorWorkspace(opts?: { examples?: boolean }): AdvisorWorkspace {
   const people: AdvisorPerson[] = DEMO_ASESORES.map((asesor) => ({
     id: asesor.id,
     name: `${asesor.firstName} ${asesor.lastName}`.trim(),
@@ -104,64 +187,7 @@ export function seedAdvisorWorkspace(): AdvisorWorkspace {
     ],
     taskTypes,
     boards,
-    tasks: [
-      {
-        id: 'task-local-1',
-        title: 'Llamar a Mariano: ruido al arrancar',
-        notes: 'Ejemplo local. Entra como Ana para verla en Tareas de hoy.',
-        taskTypeId: 'tt-llamada',
-        boardId: 'mechanics',
-        teamId: 'team-prueba',
-        assigneeId: 'demo-asesor-ana',
-        dueDate: localTodayIso(),
-        createdAt: new Date().toISOString(),
-        createdByEmail: 'santy@gmail.com',
-        status: 'pendiente',
-        peticionId: null,
-      },
-      {
-        id: 'task-local-2',
-        title: 'Confirmar cita de flota',
-        notes: 'Del grupo: asignada a Luis.',
-        taskTypeId: 'tt-cita',
-        boardId: 'parts',
-        teamId: 'team-prueba',
-        assigneeId: 'demo-asesor-luis',
-        dueDate: localTodayIso(),
-        createdAt: new Date().toISOString(),
-        createdByEmail: 'santy@gmail.com',
-        status: 'pendiente',
-        peticionId: null,
-      },
-      {
-        id: 'task-local-3',
-        title: 'Peritaje Mapfre de Carmen',
-        notes: 'De otra compañera, fuera del grupo de Ana.',
-        taskTypeId: 'tt-peritaje',
-        boardId: 'insurance',
-        teamId: 'team-prueba',
-        assigneeId: 'demo-asesor-carmen',
-        dueDate: localTodayIso(),
-        createdAt: new Date().toISOString(),
-        createdByEmail: 'santy@gmail.com',
-        status: 'pendiente',
-        peticionId: null,
-      },
-      {
-        id: 'task-local-4',
-        title: 'WhatsApp sin dueño',
-        notes: 'Nadie la ha cogido todavía.',
-        taskTypeId: 'tt-whatsapp',
-        boardId: null,
-        teamId: 'team-prueba',
-        assigneeId: '',
-        dueDate: localTodayIso(),
-        createdAt: new Date().toISOString(),
-        createdByEmail: 'santy@gmail.com',
-        status: 'pendiente',
-        peticionId: null,
-      },
-    ],
+    tasks: opts?.examples ? exampleAssignedTasks() : [],
   }
 }
 
@@ -224,8 +250,12 @@ function refreshDemoTaskDates(workspace: AdvisorWorkspace): AdvisorWorkspace {
 }
 
 /** Completa huecos de demo sin reescribir equipos ni tareas que ya existan. */
-export function hydrateAdvisorWorkspace(workspace: AdvisorWorkspace): AdvisorWorkspace {
-  return refreshDemoTaskDates(ensureDefaultCatalog(ensureDemoPeople(workspace)))
+export function hydrateAdvisorWorkspace(
+  workspace: AdvisorWorkspace,
+  opts?: { keepExamples?: boolean },
+): AdvisorWorkspace {
+  const next = refreshDemoTaskDates(ensureDefaultCatalog(ensureDemoPeople(workspace)))
+  return opts?.keepExamples ? next : dropExampleTasks(next)
 }
 
 export function parseAdvisorWorkspace(value: unknown): AdvisorWorkspace | null {
@@ -233,16 +263,32 @@ export function parseAdvisorWorkspace(value: unknown): AdvisorWorkspace | null {
   return hydrateAdvisorWorkspace(value)
 }
 
+export function rawWorkspaceHasExampleTasks(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false
+  const tasks = (value as { tasks?: unknown }).tasks
+  if (!Array.isArray(tasks)) return false
+  return tasks.some((row) => {
+    if (!row || typeof row !== 'object') return false
+    const task = row as { id?: unknown; peticionId?: unknown }
+    return isExampleAssignedTask({
+      id: String(task.id ?? ''),
+      peticionId: task.peticionId == null ? null : String(task.peticionId),
+    })
+  })
+}
+
 export function loadAdvisorWorkspace(workshopId: string): AdvisorWorkspace {
-  if (!workshopId || typeof localStorage === 'undefined') return hydrateAdvisorWorkspace(seedAdvisorWorkspace())
+  const keepExamples = keepExampleTasksFor(workshopId)
+  const seed = () => seedAdvisorWorkspace({ examples: keepExamples })
+  if (!workshopId || typeof localStorage === 'undefined') return hydrateAdvisorWorkspace(seed(), { keepExamples })
   try {
     const raw = localStorage.getItem(advisorWorkspaceStorageKey(workshopId))
-    if (!raw) return hydrateAdvisorWorkspace(seedAdvisorWorkspace())
+    if (!raw) return hydrateAdvisorWorkspace(seed(), { keepExamples })
     const parsed = JSON.parse(raw) as unknown
-    if (!isWorkspace(parsed)) return hydrateAdvisorWorkspace(seedAdvisorWorkspace())
-    return hydrateAdvisorWorkspace(parsed)
+    if (!isWorkspace(parsed)) return hydrateAdvisorWorkspace(seed(), { keepExamples })
+    return hydrateAdvisorWorkspace(parsed, { keepExamples })
   } catch {
-    return hydrateAdvisorWorkspace(seedAdvisorWorkspace())
+    return hydrateAdvisorWorkspace(seed(), { keepExamples })
   }
 }
 
@@ -301,14 +347,54 @@ export function isTaskDueOnOrBefore(task: AssignedTask, dayIso: string): boolean
   return task.dueDate <= dayIso
 }
 
+function localDateFromIso(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return null
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+export function taskCompletedOn(task: AssignedTask): string | null {
+  if (task.status !== 'hecho') return null
+  return localDateFromIso(task.completedAt) ?? task.dueDate
+}
+
+export function isTaskOnTodayBoard(task: AssignedTask, dayIso: string): boolean {
+  if (isExampleAssignedTask(task)) return false
+  if (task.status === 'hecho') return taskCompletedOn(task) === dayIso
+  return isTaskDueOnOrBefore(task, dayIso)
+}
+
+export function tasksOnTodayBoard(
+  workspace: AdvisorWorkspace,
+  dayIso: string,
+  extra?: (task: AssignedTask) => boolean,
+): AssignedTask[] {
+  return workspace.tasks.filter((task) => {
+    if (!isTaskOnTodayBoard(task, dayIso)) return false
+    return extra ? extra(task) : true
+  })
+}
+
+/** Todas las tareas asignadas de verdad (sin ejemplos), para el historial. */
+export function assignedTasksHistory(
+  workspace: AdvisorWorkspace,
+  extra?: (task: AssignedTask) => boolean,
+): AssignedTask[] {
+  return workspace.tasks.filter((task) => {
+    if (isExampleAssignedTask(task)) return false
+    return extra ? extra(task) : true
+  })
+}
+
 export function tasksForAdvisorDay(workspace: AdvisorWorkspace, email: string, dayIso: string): AssignedTask[] {
   const person = personByEmail(workspace, email)
   if (!person) return []
-  return workspace.tasks.filter((task) => {
-    if (task.assigneeId !== person.id) return false
-    if (task.status === 'hecho') return task.dueDate === dayIso
-    return isTaskDueOnOrBefore(task, dayIso)
-  })
+  return tasksOnTodayBoard(workspace, dayIso, (task) => task.assigneeId === person.id)
 }
 
 export function createTeam(workspace: AdvisorWorkspace, name: string): AdvisorWorkspace {
@@ -395,12 +481,13 @@ export function addCatalogItem(
 
 export function addAssignedTask(
   workspace: AdvisorWorkspace,
-  input: Omit<AssignedTask, 'id' | 'createdAt' | 'status'> & { status?: AssignedTaskStatus },
+  input: Omit<AssignedTask, 'id' | 'createdAt' | 'completedAt' | 'status'> & { status?: AssignedTaskStatus },
 ): AdvisorWorkspace {
   const task: AssignedTask = {
     ...input,
     id: newId('task'),
     createdAt: new Date().toISOString(),
+    completedAt: input.status === 'hecho' ? new Date().toISOString() : null,
     status: input.status ?? 'pendiente',
   }
   return { ...workspace, tasks: [...workspace.tasks, task] }
@@ -413,7 +500,15 @@ export function setAssignedTaskStatus(
 ): AdvisorWorkspace {
   return {
     ...workspace,
-    tasks: workspace.tasks.map((task) => (task.id === taskId ? { ...task, status } : task)),
+    tasks: workspace.tasks.map((task) =>
+      task.id === taskId
+        ? {
+            ...task,
+            status,
+            completedAt: status === 'hecho' ? task.completedAt || new Date().toISOString() : null,
+          }
+        : task,
+    ),
   }
 }
 
@@ -451,6 +546,7 @@ export function computeAdvisorStats(
 ): AdvisorWorkStats[] {
   return workspace.people.map((person) => {
     const tasks = workspace.tasks.filter((task) => {
+      if (isExampleAssignedTask(task)) return false
       if (task.assigneeId !== person.id) return false
       if (opts.fromIso && task.dueDate < opts.fromIso) return false
       if (opts.toIso && task.dueDate > opts.toIso) return false

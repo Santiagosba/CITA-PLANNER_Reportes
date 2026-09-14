@@ -1,6 +1,6 @@
 import PaginatedItems from '../components/PaginatedItems'
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowRight, CalendarCheck2, ClipboardList, Percent, Radio, Wrench } from 'lucide-react'
+import { AlertTriangle, ArrowRight, ClipboardList, History, Percent, Radio, Wrench } from 'lucide-react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
 import {
   formatLauraPct,
@@ -16,7 +16,7 @@ import TicketClientBlock from '../components/TicketClientBlock'
 import TicketOwnerPicker from '../components/TicketOwnerPicker'
 import { HexLoaderScreen } from '../components/ui/HexLoader'
 import Card from '../components/ui/Card'
-import VehiclePlate from '../components/ui/VehiclePlate'
+import TicketPlate from '../components/TicketPlate'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
 import { useOperationalData } from '../hooks/useOperationalData'
 import {
@@ -35,18 +35,11 @@ import {
   volumeChartTitle,
   volumeForScale,
 } from '../lib/dashboardAnalytics'
-import { resolveDateRange } from '../lib/dateRangePresets'
-import {
-  isTaskDueOnOrBefore,
-  localTodayIso,
-  type AdvisorWorkspace,
-} from '../lib/advisorWorkspace'
-import {
-  compareTasksByOpenFirst,
-  compareTicketsByOpenFirst,
-} from '../lib/doneFilter'
-import { buildOwnerScopeContext, matchesOwnerScope, matchesTaskOwnerScope, ownerScopeEmptyCopy, type OwnerScope } from '../lib/ownerScope'
+import { localTodayIso, type AdvisorWorkspace } from '../lib/advisorWorkspace'
+import { compareTicketsByOpenFirst } from '../lib/doneFilter'
+import { buildOwnerScopeContext, matchesOwnerScope, ownerScopeEmptyCopy, type OwnerScope } from '../lib/ownerScope'
 import { isDemoTicketId } from '../lib/demoTickets'
+import { isLocalPreviewWorkshop } from '../lib/localPreview'
 import { computePeticionesStats, formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
 import { isSlaCritico } from '../lib/tallerStations'
 import type { Workshop } from '../types'
@@ -79,8 +72,12 @@ export default function DashboardGeneralView({
   const today = localTodayIso()
   const anchor = useMemo(() => new Date(`${today}T12:00:00`), [today])
   const period = useMemo(() => calendarPeriod(scale, anchor), [scale, anchor])
-  const lifetimeRange = useMemo(() => resolveDateRange('todas', '', ''), [])
-  const { items, loading, error, sourceNotice, refresh, refreshSilent } = useOperationalData(workshop, lifetimeRange)
+  const fetchRange = useMemo(() => ({ from: period.from, to: period.to }), [period.from, period.to])
+  const { items, loading, error, sourceNotice, refresh, refreshSilent } = useOperationalData(workshop, fetchRange)
+  const liveItems = useMemo(() => {
+    if (isLocalPreviewWorkshop(workshop)) return items
+    return items.filter((item) => !isDemoTicketId(item.idpeticion))
+  }, [items, workshop])
   const ownerCtx = useMemo(
     () => buildOwnerScopeContext(workspace, currentUser.email),
     [workspace, currentUser.email],
@@ -102,13 +99,13 @@ export default function DashboardGeneralView({
   }, [refreshSilent])
 
   const periodItems = useMemo(
-    () => filterReceivedInRange(items, period.from, period.to),
-    [items, period.from, period.to],
+    () => filterReceivedInRange(liveItems, period.from, period.to),
+    [liveItems, period.from, period.to],
   )
   const stats = useMemo(() => computePeticionesStats(periodItems), [periodItems])
   const closedNow = useMemo(
-    () => closedInRangeCount(items, period.from, period.to),
-    [items, period.from, period.to],
+    () => closedInRangeCount(liveItems, period.from, period.to),
+    [liveItems, period.from, period.to],
   )
   const slaCount = useMemo(
     () =>
@@ -124,7 +121,7 @@ export default function DashboardGeneralView({
     [periodItems],
   )
 
-  const volume = useMemo(() => volumeForScale(items, scale, anchor), [items, scale, anchor])
+  const volume = useMemo(() => volumeForScale(liveItems, scale, anchor), [liveItems, scale, anchor])
   const mixRows = useMemo(
     () => (scale === 'dia' ? channelMix(periodItems) : typeMix(periodItems)),
     [scale, periodItems],
@@ -147,25 +144,12 @@ export default function DashboardGeneralView({
     [teamRows],
   )
 
-  const todayTasksAll = useMemo(
-    () =>
-      workspace.tasks
-        .filter((task) => {
-          if (!matchesTaskOwnerScope(task, ownerScope, workspace, ownerCtx)) return false
-          if (task.status === 'hecho') return task.dueDate === today
-          return isTaskDueOnOrBefore(task, today)
-        })
-        .sort((a, b) => compareTasksByOpenFirst(a, b, today)),
-    [workspace, ownerScope, ownerCtx, today],
-  )
-  const pendingTasks = todayTasksAll.filter((task) => task.status === 'pendiente')
-  const overdueTasks = pendingTasks.filter((task) => task.dueDate < today)
   const historyTicketsAll = useMemo(
     () =>
-      items
+      liveItems
         .filter((item) => matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx))
         .sort(compareTicketsByOpenFirst),
-    [items, ownerScope, ownerCtx],
+    [liveItems, ownerScope, ownerCtx],
   )
   const historyPendingTickets = useMemo(
     () => historyTicketsAll.filter((item) => !item.gestionado),
@@ -208,7 +192,7 @@ export default function DashboardGeneralView({
             ))}
           </div>
         </div>
-        <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Tickets y tareas" />
+        <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Tickets" />
         <p className="dash-period-label">{period.label}</p>
       </div>
 
@@ -232,15 +216,11 @@ export default function DashboardGeneralView({
 
       <section className="dash-kpi-grid" aria-label="Indicadores del periodo">
         <MetricCard
-          icon={CalendarCheck2}
-          label="Tareas de hoy"
-          value={pendingTasks.length}
-          helper={
-            overdueTasks.length > 0
-              ? `${overdueTasks.length} atrasada(s)`
-              : `${todayTasksAll.length - pendingTasks.length} ya hechas`
-          }
-          tone={overdueTasks.length > 0 ? 'warning' : 'brand'}
+          icon={History}
+          label="Historial"
+          value={loading ? '—' : lifetimeStats.porHacer}
+          helper={`${lifetimeStats.hechas} hechas · ${period.label}`}
+          tone={lifetimeStats.porHacer > 0 ? 'warning' : 'brand'}
           onClick={onOpenTodayTasks ?? onOpenTriage}
         />
         <MetricCard
@@ -273,11 +253,11 @@ export default function DashboardGeneralView({
         <div className="ops-card-header">
           <div>
             <p className="section-eyebrow">Bandeja</p>
-            <h2 className="ops-card-title">Para hacer hoy</h2>
+            <h2 className="ops-card-title">Tickets</h2>
             <p className="section-subtitle">
               {appRole === 'asesor'
-                ? 'Bandeja operativa: a la izquierda, tickets pendientes de gestión —asignados a usted, al equipo o sin responsable—. A la derecha se consolidan los tickets ya resueltos.'
-                : 'Bandeja operativa del taller: a la izquierda, tickets pendientes de atención. A la derecha, tickets ya resueltos. El inventario se actualiza de forma automática al cambiar el estado.'}
+                ? `Bandeja de ${period.label}: pendientes a la izquierda, resueltos a la derecha.`
+                : `Bandeja de ${period.label}: a la izquierda, tickets pendientes. A la derecha, los ya resueltos.`}
             </p>
           </div>
           <div className="dash-history-live" aria-live="polite">
@@ -295,7 +275,7 @@ export default function DashboardGeneralView({
           <DashTicketColumn
             title="Por hacer"
             empty={
-              items.length === 0
+              liveItems.length === 0
                 ? 'Aún no hay tickets para hacer.'
                 : historyTicketsAll.length === 0
                   ? ownerScopeEmptyCopy(ownerScope)
@@ -374,12 +354,13 @@ export default function DashboardGeneralView({
                     stats.total === 0
                   ? []
                   : [
-                      { label: 'Hechas', value: formatLauraPct(stats.pctHechas), pct: stats.pctHechas, color: '#0a55b8' },
+                      { label: 'Hechas', value: formatLauraPct(stats.pctHechas), pct: stats.pctHechas, color: '#0a55b8', count: stats.hechas },
                       {
                         label: 'Por hacer',
                         value: formatLauraPct(Math.max(0, 100 - stats.pctHechas)),
                         pct: Math.max(0, 100 - stats.pctHechas),
                         color: '#f59e0b',
+                        count: stats.porHacer,
                       },
                     ]
               }
@@ -493,7 +474,6 @@ function MetricCard({ icon: Icon, label, value, helper, tone, onClick }: MetricP
 
 function DashTicketRow({ item, workshop, workspace, currentUser, appRole, onOpenLead }: DashTicketRowProps) {
   const sla = !item.gestionado && (isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha))
-  const cita = item.cita
   return (
     <li
       className={`ops-feed-row dash-ticket-row${item.gestionado ? ' is-done' : ''}`}
@@ -509,13 +489,7 @@ function DashTicketRow({ item, workshop, workspace, currentUser, appRole, onOpen
       }}
     >
       <div className="ops-feed-identity">
-        {cita?.matricula ? (
-          <VehiclePlate value={cita.matricula} compact />
-        ) : cita ? (
-          <span className="ops-feed-placeholder">SIN MATRÍCULA</span>
-        ) : (
-          <span className="ops-feed-placeholder is-muted">SIN CITA</span>
-        )}
+        <TicketPlate peticion={item} />
         <div>
           <TicketClientBlock peticion={item} size="sm" />
           <span>

@@ -9,6 +9,7 @@ import {
   hydrateAdvisorWorkspace,
   loadAdvisorWorkspace,
   parseAdvisorWorkspace,
+  rawWorkspaceHasExampleTasks,
   saveAdvisorWorkspace,
   type AdvisorWorkspace,
 } from './advisorWorkspace'
@@ -70,7 +71,9 @@ export function advisorWorkspacePersistState(workshopId: string): AdvisorWorkspa
 }
 
 async function fetchRemote(workshopId: string): Promise<
-  { kind: 'row'; workspace: AdvisorWorkspace } | { kind: 'empty' } | { kind: 'error'; message: string }
+  | { kind: 'row'; workspace: AdvisorWorkspace; scrubExamples: boolean }
+  | { kind: 'empty' }
+  | { kind: 'error'; message: string }
 > {
   try {
     const { data, error } = await supabaseOperations
@@ -80,9 +83,10 @@ async function fetchRemote(workshopId: string): Promise<
       .maybeSingle()
     if (error) return { kind: 'error', message: error.message }
     if (!data) return { kind: 'empty' }
-    const parsed = parseAdvisorWorkspace((data as { workspace?: unknown }).workspace)
+    const raw = (data as { workspace?: unknown }).workspace
+    const parsed = parseAdvisorWorkspace(raw)
     if (!parsed) return { kind: 'empty' }
-    return { kind: 'row', workspace: parsed }
+    return { kind: 'row', workspace: parsed, scrubExamples: rawWorkspaceHasExampleTasks(raw) }
   } catch (error) {
     return { kind: 'error', message: error instanceof Error ? error.message : 'No se pudo leer el taller.' }
   }
@@ -132,6 +136,11 @@ export async function hydrateAdvisorWorkspaceStore(workshopId: string): Promise<
       persistErrors.set(workshopId, null)
       writeMemory(workshopId, remote.workspace, true)
       saveAdvisorWorkspace(workshopId, remote.workspace)
+      if (remote.scrubExamples) {
+        bumpWrite(workshopId)
+        const uploadError = await upsertRemote(workshopId, remote.workspace)
+        persistErrors.set(workshopId, uploadError)
+      }
       return remote.workspace
     }
     if (remote.kind === 'empty') {

@@ -130,11 +130,19 @@ export function resolveDateRange(
   }
 }
 
+/** Si no hay fechas, usa el mes en curso. Evita bajar decenas de miles de filas al navegador. */
+export function boundedDateRange(range: { from?: string; to?: string }): { from: string; to: string } {
+  const from = range.from?.trim()
+  const to = range.to?.trim()
+  if (from && to) return { from, to }
+  const month = resolveDateRange('mes')
+  return { from: from || month.from || toDateInputValue(new Date()), to: to || month.to || toDateInputValue(new Date()) }
+}
+
 export const DATE_PRESET_OPTIONS: { id: DateRangePreset; label: string }[] = [
   { id: 'semana', label: 'Esta semana' },
   { id: 'mes', label: 'Este mes' },
   { id: 'trimestre', label: 'Este trimestre' },
   { id: 'anio', label: 'Este año' },
   { id: 'personalizada', label: 'Elegir fechas' },
-  { id: 'todas', label: 'Ver todo' },
 ]

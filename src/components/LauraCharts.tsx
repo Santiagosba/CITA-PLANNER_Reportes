@@ -1,4 +1,5 @@
-import { useId, useMemo, type CSSProperties, type ReactNode } from 'react'
+import { useId, useMemo, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { PhoneCall } from 'lucide-react'
 
 export const LAURA_CHART_COLORS = ['#0a55b8', '#2563eb', '#3b82f6', '#60a5fa', '#7dd3fc', '#f59e0b'] as const
@@ -8,6 +9,7 @@ export type LauraRadarAxis = {
   short: string
   value: number
   color: string
+  count?: number
 }
 
 export type LauraPieSlice = {
@@ -16,6 +18,7 @@ export type LauraPieSlice = {
   pct: number
   color: string
   icon?: boolean
+  count?: number
 }
 
 export type LauraParetoRow = {
@@ -40,8 +43,89 @@ export function polarPoint(cx: number, cy: number, radius: number, angleDeg: num
   return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) }
 }
 
+function donutSlicePath(
+  cx: number,
+  cy: number,
+  outer: number,
+  inner: number,
+  startPct: number,
+  endPct: number,
+): string {
+  const span = Math.max(0, Math.min(100, endPct) - Math.max(0, startPct))
+  if (span <= 0) return ''
+  if (span >= 99.95) {
+    return [
+      `M ${cx} ${cy - outer}`,
+      `A ${outer} ${outer} 0 1 1 ${cx} ${cy + outer}`,
+      `A ${outer} ${outer} 0 1 1 ${cx} ${cy - outer}`,
+      `M ${cx} ${cy - inner}`,
+      `A ${inner} ${inner} 0 1 0 ${cx} ${cy + inner}`,
+      `A ${inner} ${inner} 0 1 0 ${cx} ${cy - inner}`,
+    ].join(' ')
+  }
+  const a0 = startPct * 3.6
+  const a1 = endPct * 3.6
+  const p0 = polarPoint(cx, cy, outer, a0)
+  const p1 = polarPoint(cx, cy, outer, a1)
+  const q1 = polarPoint(cx, cy, inner, a1)
+  const q0 = polarPoint(cx, cy, inner, a0)
+  const large = span > 50 ? 1 : 0
+  return [
+    `M ${p0.x.toFixed(2)} ${p0.y.toFixed(2)}`,
+    `A ${outer} ${outer} 0 ${large} 1 ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}`,
+    `L ${q1.x.toFixed(2)} ${q1.y.toFixed(2)}`,
+    `A ${inner} ${inner} 0 ${large} 0 ${q0.x.toFixed(2)} ${q0.y.toFixed(2)}`,
+    'Z',
+  ].join(' ')
+}
+
 export function formatLauraPct(value: number): string {
   return `${value.toLocaleString('es-ES', { maximumFractionDigits: 1 })}%`
+}
+
+type ChartTipData = {
+  x: number
+  y: number
+  title: string
+  color?: string
+  lines: { label: string; value: string }[]
+}
+
+function formatCount(value: number): string {
+  return value.toLocaleString('es-ES')
+}
+
+function ChartTip({ tip }: { tip: ChartTipData | null }) {
+  if (!tip || typeof document === 'undefined') return null
+  const width = 228
+  const left = tip.x + 16 + width > window.innerWidth - 8 ? Math.max(8, tip.x - 16 - width) : tip.x + 16
+  const top = tip.y + 132 > window.innerHeight - 8 ? Math.max(8, tip.y - 124) : tip.y + 14
+  return createPortal(
+    <div className="laura-chart-tip glass glass-lite" style={{ left, top }} role="status">
+      <p>
+        {tip.color ? <i style={{ background: tip.color }} aria-hidden /> : null}
+        <strong>{tip.title}</strong>
+      </p>
+      <dl>
+        {tip.lines.map((line) => (
+          <div key={line.label}>
+            <dt>{line.label}</dt>
+            <dd>{line.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>,
+    document.body,
+  )
+}
+
+function useChartTip() {
+  const [tip, setTip] = useState<ChartTipData | null>(null)
+  const show = (event: ReactPointerEvent, next: Omit<ChartTipData, 'x' | 'y'>) => {
+    setTip({ ...next, x: event.clientX, y: event.clientY })
+  }
+  const hide = () => setTip(null)
+  return { tip, show, hide }
 }
 
 export function LauraRadar({
@@ -81,6 +165,15 @@ export function LauraRadar({
     ...axis,
     ...polarPoint(cx, cy, radius + 34, index * step),
   }))
+  const { tip, show, hide } = useChartTip()
+  const sectorPaths = axes.map((_, index) => {
+    const start = index * step - step / 2
+    const end = index * step + step / 2
+    const a = polarPoint(cx, cy, radius + 28, start)
+    const b = polarPoint(cx, cy, radius + 28, end)
+    const large = step > 180 ? 1 : 0
+    return `M${cx.toFixed(1)},${cy.toFixed(1)} L${a.x.toFixed(1)},${a.y.toFixed(1)} A${radius + 28},${radius + 28} 0 ${large} 1 ${b.x.toFixed(1)},${b.y.toFixed(1)} Z`
+  })
 
   if (axes.length === 0) {
     return (
@@ -123,13 +216,35 @@ export function LauraRadar({
             {valuePts.map((point, index) => (
               <circle
                 key={index}
-                className="laura-radar-dot"
+                className={`laura-radar-dot${tip?.title === axes[index]?.label ? ' is-hot' : ''}`}
                 cx={point.x}
                 cy={point.y}
                 r="5"
                 style={{ ['--i' as string]: String(index) }}
               />
             ))}
+            {sectorPaths.map((d, index) => {
+              const axis = axes[index]
+              if (!axis) return null
+              return (
+                <path
+                  key={`hit-${axis.label}`}
+                  className="laura-chart-hit"
+                  d={d}
+                  onPointerMove={(event) =>
+                    show(event, {
+                      title: axis.label,
+                      color: axis.color,
+                      lines: [
+                        { label: 'Peso', value: formatLauraPct(axis.value) },
+                        ...(axis.count != null ? [{ label: 'Consultas', value: formatCount(axis.count) }] : []),
+                      ],
+                    })
+                  }
+                  onPointerLeave={hide}
+                />
+              )
+            })}
             {ringValues.map((value) => {
               const point = polarPoint(cx, cy, radius * (value / max), 0)
               return (
@@ -161,6 +276,7 @@ export function LauraRadar({
           </li>
         ))}
       </ul>
+      <ChartTip tip={tip} />
     </div>
   )
 }
@@ -187,6 +303,15 @@ export function LauraUprightPie({
     return { ...slice, x: (point.x / box) * 100, y: (point.y / box) * 100 }
   })
   const lead = slices[0]
+  const { tip, show, hide } = useChartTip()
+  const [hotSlice, setHotSlice] = useState<string | null>(null)
+  let sliceStart = 0
+  const sliceHits = slices.map((slice) => {
+    const start = sliceStart
+    sliceStart += slice.pct
+    const d = donutSlicePath(100, 100, 96, 38, start, start + slice.pct)
+    return { ...slice, start, d }
+  })
 
   if (slices.length === 0) {
     return (
@@ -212,6 +337,30 @@ export function LauraUprightPie({
             <b>{centerValue ?? lead?.value}</b>
             <small>{centerLabel ?? 'Canal'}</small>
           </span>
+          <svg className="laura-upie-hits" viewBox="0 0 200 200" aria-hidden>
+            {sliceHits.map((item) => (
+              <path
+                key={item.label}
+                className={`laura-chart-hit${hotSlice === item.label ? ' is-hot' : ''}`}
+                d={item.d}
+                onPointerMove={(event) => {
+                  setHotSlice(item.label)
+                  show(event, {
+                    title: item.label,
+                    color: item.color,
+                    lines: [
+                      { label: 'Parte', value: item.value },
+                      ...(item.count != null ? [{ label: 'Consultas', value: formatCount(item.count) }] : []),
+                    ],
+                  })
+                }}
+                onPointerLeave={() => {
+                  setHotSlice(null)
+                  hide()
+                }}
+              />
+            ))}
+          </svg>
         </div>
         <div className="laura-upie-callouts">
           {callouts.map((item, index) => (
@@ -243,6 +392,7 @@ export function LauraUprightPie({
           </li>
         ))}
       </ul>
+      <ChartTip tip={tip} />
     </div>
   )
 }
@@ -283,6 +433,9 @@ export function LauraPareto({
   }, [rows, sortByValue])
   const maxVolume = Math.max(1, ...plotted.map((item) => item.value))
   const cols = plotted.length
+  const { tip, show, hide } = useChartTip()
+  const [hotKey, setHotKey] = useState<string | null>(null)
+  const total = plotted.reduce((sum, item) => sum + item.value, 0)
   const linePoints = plotted
     .map((item, index) => {
       const x = ((index + 0.5) / Math.max(1, cols)) * 100
@@ -340,7 +493,28 @@ export function LauraPareto({
               </div>
               <div className="laura-pareto-bars">
                 {plotted.map((item, index) => (
-                  <div key={item.key} className="laura-pareto-col" style={{ ['--i' as string]: String(index) }}>
+                  <div
+                    key={item.key}
+                    className={`laura-pareto-col${hotKey === item.key ? ' is-hot' : ''}`}
+                    style={{ ['--i' as string]: String(index) }}
+                    onPointerMove={(event) => {
+                      setHotKey(item.key)
+                      show(event, {
+                        title: item.label,
+                        color: '#0a55b8',
+                        lines: [
+                          { label: barLabel, value: formatCount(item.value) },
+                          { label: 'Peso', value: formatLauraPct(item.share) },
+                          { label: lineLabel, value: formatLauraPct(item.cumulative) },
+                          { label: 'Total del periodo', value: formatCount(total) },
+                        ],
+                      })
+                    }}
+                    onPointerLeave={() => {
+                      setHotKey(null)
+                      hide()
+                    }}
+                  >
                     {!dense ? <span className="laura-pareto-value">{item.value}</span> : null}
                     <span className="laura-pareto-bar" style={{ height: `${(item.value / maxVolume) * 100}%` }} />
                   </div>
@@ -386,6 +560,7 @@ export function LauraPareto({
               {lineLabel}
             </li>
           </ul>
+          <ChartTip tip={tip} />
         </>
       )}
     </>
@@ -401,6 +576,7 @@ export function mixToPieSlices(rows: { key: string; label: string; value: number
       label: row.label,
       value: formatLauraPct(pct),
       pct,
+      count: row.value,
       color: LAURA_CHART_COLORS[index % LAURA_CHART_COLORS.length],
       icon: /llamad|voz/i.test(row.label),
     }
@@ -414,6 +590,7 @@ export function mixToRadarAxes(rows: { key: string; label: string; value: number
     label: row.label,
     short: row.label.length > 14 ? `${row.label.slice(0, 12)}…` : row.label,
     value: Math.round((row.value / total) * 1000) / 10,
+    count: row.value,
     color: LAURA_CHART_COLORS[index % LAURA_CHART_COLORS.length],
   }))
 }

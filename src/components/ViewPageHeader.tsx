@@ -10,7 +10,7 @@ import { invalidateOperationalData, useOperationalData } from '../hooks/useOpera
 import type { DashboardShellRoute } from './Sidebar'
 import type { CrmAppRole } from '../lib/crmRoles'
 import type { Workshop } from '../types'
-import VehiclePlate from './ui/VehiclePlate'
+import TicketPlate from './TicketPlate'
 
 type TriageTab = 'kanban' | 'tabla' | 'calendario'
 
@@ -54,7 +54,7 @@ function pageCopy(
           }
         : {
             title: 'Dashboard',
-            subtitle: 'Tareas de hoy, volumen del taller y trabajo del equipo por periodo.',
+            subtitle: 'Consultas, volumen del taller y trabajo del equipo por periodo.',
           }
     case 'pending-citas':
       return {
@@ -88,8 +88,8 @@ function pageCopy(
       }
     case 'tareas-hoy':
       return {
-        title: 'Tareas de hoy',
-        subtitle: 'Lo que te toca cerrar hoy.',
+        title: 'Historial',
+        subtitle: 'Consultas del periodo que elijas: día, semana, mes o año.',
       }
     case 'boards':
       return {
@@ -132,11 +132,8 @@ export default function ViewPageHeader({
   onSynced,
 }: Props) {
   const range = resolveDateRange('mes', '', '')
-  const allRange = resolveDateRange('todas', '', '')
   const { items, loading, refresh } = useOperationalData(workshop, range)
   const [query, setQuery] = useState('')
-  const searchRange = query.trim() ? allRange : range
-  const { items: searchPool, loading: searchLoading } = useOperationalData(workshop, searchRange)
   const copy = pageCopy(route, triageTab, botName, appRole)
 
   const slaItems = useMemo(
@@ -156,7 +153,7 @@ export default function ViewPageHeader({
   const searchRef = useRef<HTMLDivElement>(null)
   const noticesRef = useRef<HTMLDivElement>(null)
 
-  const hits = useMemo(() => searchPeticionesAi(searchPool, query), [searchPool, query])
+  const hits = useMemo(() => searchPeticionesAi(items, query), [items, query])
   const notices = useMemo(() => headerNoticeItems(items), [items])
 
   useEffect(() => {
@@ -245,10 +242,10 @@ export default function ViewPageHeader({
                 <Sparkles size={14} aria-hidden />
                 Laura interpreta «{query.trim()}»
               </p>
-              {searchLoading && hits.length === 0 ? (
-                <p className="section-subtitle view-page-popover-empty">Buscando en todas las consultas…</p>
+              {loading && hits.length === 0 ? (
+                <p className="section-subtitle view-page-popover-empty">Buscando en las consultas de este mes…</p>
               ) : hits.length === 0 ? (
-                <p className="section-subtitle view-page-popover-empty">No hay coincidencias en este taller.</p>
+                <p className="section-subtitle view-page-popover-empty">No hay coincidencias en las consultas de este mes.</p>
               ) : (
                 <ul className="view-page-popover-list custom-scrollbar-light">
                   {hits.map((hit) => (
@@ -259,11 +256,8 @@ export default function ViewPageHeader({
                           <span className="badge tone-muted">{hit.reason}</span>
                         </span>
                         <span className="view-page-popover-row-meta">
-                          {hit.item.cita?.matricula ? (
-                            <VehiclePlate value={hit.item.cita.matricula} compact />
-                          ) : (
-                            <span>{hit.item.tipopeticion || 'Sin tipo'}</span>
-                          )}
+                          <TicketPlate peticion={hit.item} />
+                          <span>{hit.item.tipopeticion || 'Sin tipo'}</span>
                           <time>{formatFecha(hit.item.fechainicio)}</time>
                         </span>
                       </button>

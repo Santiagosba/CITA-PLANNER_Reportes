@@ -15,6 +15,7 @@ import { DEMO_TICKETS_NOTICE, isDemoTicketId, mergeLiveAndDemoTickets } from '..
 import { isLocalPreviewWorkshop } from '../lib/localPreview'
 import { PETICIONES_PATCHED_EVENT } from '../lib/ticketOps'
 import { withLoadDeadline } from '../lib/loadDeadline'
+import { boundedDateRange } from '../lib/dateRangePresets'
 import {
   COPY_FALLBACK_NOTICE,
   loadPeticionesCopy,
@@ -44,10 +45,18 @@ function workshopKey(workshop: Workshop): string {
 }
 
 function requestKey(workshop: Workshop, range: DateRange): string {
-  return `${workshopKey(workshop)}|${range.from || ''}|${range.to || ''}`
+  const bounded = boundedDateRange(range)
+  return `${workshopKey(workshop)}|${bounded.from}|${bounded.to}`
+}
+
+function rowInRange(item: PeticionPendiente, range: { from: string; to: string }): boolean {
+  const key = String(item.fechainicio || item.fechacreacion || '').slice(0, 10)
+  if (!key) return false
+  return key >= range.from && key <= range.to
 }
 
 async function fetchData(workshop: Workshop, range: DateRange): Promise<CacheEntry> {
+  range = boundedDateRange(range)
   if (isLocalPreviewWorkshop(workshop)) {
     return { timestamp: Date.now(), items: mergeLiveAndDemoTickets([], workshop, range), tipos: [] }
   }
@@ -137,8 +146,11 @@ export function useOperationalData(workshop: Workshop, range: DateRange) {
       } catch (e) {
         if (version !== requestVersion.current) return
         const reason = e instanceof Error ? e.message : 'No se pudieron cargar los datos actualizados.'
-        const copy = loadPeticionesCopy(workshopCopyId(workshop)) ?? []
-        const merged = mergeLiveAndDemoTickets(copy, workshop, range)
+        const bounded = boundedDateRange(range)
+        const copy = (loadPeticionesCopy(workshopCopyId(workshop)) ?? []).filter((row) =>
+          rowInRange(row, bounded),
+        )
+        const merged = mergeLiveAndDemoTickets(copy, workshop, bounded)
         if (merged.length) {
           setItems(merged)
           setError(null)

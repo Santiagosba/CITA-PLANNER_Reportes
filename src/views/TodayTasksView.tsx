@@ -1,29 +1,35 @@
-import { useEffect, useMemo, useState } from 'react'
-import { CalendarCheck2, CheckCircle2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, History } from 'lucide-react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
 import { HexLoaderScreen } from '../components/ui/HexLoader'
 import Card from '../components/ui/Card'
-import { resolveDateRange } from '../lib/dateRangePresets'
-import { type PeticionPendiente } from '../lib/peticionesPendientes'
-import {
-  catalogName,
-  isTaskDueOnOrBefore,
-  localTodayIso,
-  personById,
-} from '../lib/advisorWorkspace'
+import PaginatedItems from '../components/PaginatedItems'
+import TicketClientBlock from '../components/TicketClientBlock'
+import TicketOwnerPicker from '../components/TicketOwnerPicker'
+import TicketPlate from '../components/TicketPlate'
+import { computePeticionesStats, formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
-import { teammatesForReassign } from '../lib/ticketOps'
 import type { CrmAppRole } from '../lib/crmRoles'
+import { isDemoTicketId } from '../lib/demoTickets'
+import { isLocalPreviewWorkshop } from '../lib/localPreview'
 import { useOperationalData } from '../hooks/useOperationalData'
 import {
   buildOwnerScopeContext,
-  matchesTaskOwnerScope,
+  matchesOwnerScope,
   ownerScopeEmptyCopy,
   type OwnerScope,
 } from '../lib/ownerScope'
 import EstadoDoneFilter from '../components/EstadoDoneFilter'
 import OwnerScopeFilter from '../components/OwnerScopeFilter'
-import { compareTasksByOpenFirst, matchesEstadoDone, type EstadoFilter } from '../lib/doneFilter'
+import { compareTicketsByOpenFirst, matchesEstadoDone, type EstadoFilter } from '../lib/doneFilter'
+import { isSlaCritico } from '../lib/tallerStations'
+import { localTodayIso } from '../lib/advisorWorkspace'
+import {
+  CALENDAR_SCALE_OPTIONS,
+  calendarPeriod,
+  shiftCalendarAnchor,
+  type CalendarScale,
+} from '../lib/calendarScale'
 import type { Workshop } from '../types'
 
 type Props = {
@@ -33,169 +39,185 @@ type Props = {
   onOpenLead: (peticion: PeticionPendiente) => void
 }
 
+function todayAnchor() {
+  return new Date(`${localTodayIso()}T12:00:00`)
+}
+
 export default function TodayTasksView({ workshop, currentUser, appRole = 'asesor', onOpenLead }: Props) {
   const workshopId = workshop.containerIdTaller || workshop.id
-  const { workspace, persistError, setTaskStatus, setTaskAssignee } = useAdvisorWorkspace(workshopId, currentUser, true)
-  const today = localTodayIso()
-  const range = resolveDateRange('mes', '', '')
+  const { workspace } = useAdvisorWorkspace(workshopId, currentUser, true)
+  const [scale, setScale] = useState<CalendarScale>('mes')
+  const [anchor, setAnchor] = useState(todayAnchor)
+  const period = useMemo(() => calendarPeriod(scale, anchor), [scale, anchor])
+  const range = useMemo(() => ({ from: period.from, to: period.to }), [period.from, period.to])
   const { items, loading, error, sourceNotice } = useOperationalData(workshop, range)
-  const [ownerScope, setOwnerScope] = useState<OwnerScope>(appRole === 'asesor' ? 'grupo' : 'todas')
-  const [estado, setEstado] = useState<EstadoFilter>('faltan')
-  useEffect(() => {
-    setOwnerScope(appRole === 'asesor' ? 'grupo' : 'todas')
-  }, [appRole])
+  const [ownerScope, setOwnerScope] = useState<OwnerScope>('todas')
+  const [estado, setEstado] = useState<EstadoFilter>('todas')
   const ownerCtx = useMemo(
     () => buildOwnerScopeContext(workspace, currentUser.email),
     [workspace, currentUser.email],
   )
 
-  const tasksAll = useMemo(
-    () =>
-      workspace.tasks
-        .filter((task) => {
-          if (!matchesTaskOwnerScope(task, ownerScope, workspace, ownerCtx)) return false
-          if (task.status === 'hecho') return task.dueDate === today
-          return isTaskDueOnOrBefore(task, today)
-        })
-        .sort((a, b) => compareTasksByOpenFirst(a, b, today)),
-    [workspace, ownerScope, ownerCtx, today],
-  )
-  const tasks = useMemo(
-    () => tasksAll.filter((task) => matchesEstadoDone(task.status === 'hecho', estado)),
-    [tasksAll, estado],
-  )
-  const pending = tasksAll.filter((task) => task.status === 'pendiente')
-  const done = tasksAll.filter((task) => task.status === 'hecho')
+  const liveItems = useMemo(() => {
+    if (isLocalPreviewWorkshop(workshop)) return items
+    return items.filter((item) => !isDemoTicketId(item.idpeticion))
+  }, [items, workshop])
 
-  const openLinked = (peticionId: string | null) => {
-    if (!peticionId) return
-    const item = items.find((row) => row.idpeticion === peticionId)
-    if (item) onOpenLead(item)
+  const historyAll = useMemo(
+    () =>
+      liveItems
+        .filter((item) => matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx))
+        .sort(compareTicketsByOpenFirst),
+    [liveItems, ownerScope, ownerCtx],
+  )
+  const rows = useMemo(
+    () => historyAll.filter((item) => matchesEstadoDone(Boolean(item.gestionado), estado)),
+    [historyAll, estado],
+  )
+  const stats = useMemo(() => computePeticionesStats(historyAll), [historyAll])
+
+  const changeScale = (next: CalendarScale) => {
+    setScale(next)
+    setAnchor(todayAnchor())
   }
 
   return (
     <div className="dashboard-page role-desk">
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
       {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
-      {persistError ? (
-        <ApiStatusBanner
-          message="No se ha podido guardar en el taller. El cambio de la tarea queda en este navegador."
-          variant="warning"
-        />
-      ) : null}
 
-      <section className="ops-kpi-grid" aria-label="Tus números de hoy">
+      <div className="elevator-filters glass glass-lite">
+        <div className="filter-field">
+          <span className="filter-field-label">Periodo</span>
+          <div className="estado-filter" role="group" aria-label="Periodo del historial">
+            {CALENDAR_SCALE_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={`preset-chip ${scale === option.id ? 'is-active' : ''}`}
+                onClick={() => changeScale(option.id)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="elevator-day-nav">
+          <button
+            type="button"
+            className="ghost-button calendar-nav"
+            onClick={() => setAnchor((current) => shiftCalendarAnchor(scale, current, -1))}
+            aria-label="Periodo anterior"
+          >
+            <ChevronLeft size={17} />
+          </button>
+          <button type="button" className="ghost-button" onClick={() => setAnchor(todayAnchor())}>
+            Hoy
+          </button>
+          <button
+            type="button"
+            className="ghost-button calendar-nav"
+            onClick={() => setAnchor((current) => shiftCalendarAnchor(scale, current, 1))}
+            aria-label="Periodo siguiente"
+          >
+            <ChevronRight size={17} />
+          </button>
+        </div>
+        <p className="dash-period-label">{period.label}</p>
+        <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Tickets" />
+        <EstadoDoneFilter value={estado} onChange={setEstado} label="Hechas o no" />
+      </div>
+
+      <section className="ops-kpi-grid" aria-label="Historial de consultas">
         <article className="metric glass glass-lite">
-          <span className="ops-kpi-label">Pendientes</span>
-          <strong>{pending.length}</strong>
-          <span className="ops-kpi-helper">Para hoy o atrasadas</span>
+          <span className="ops-kpi-label">Por hacer</span>
+          <strong>{loading ? '—' : stats.porHacer}</strong>
+          <span className="ops-kpi-helper">En {period.label}</span>
         </article>
         <article className="metric glass glass-lite">
-          <span className="ops-kpi-label">Hechas hoy</span>
-          <strong>{done.length}</strong>
-          <span className="ops-kpi-helper">Ya cerradas</span>
+          <span className="ops-kpi-label">Hechas</span>
+          <strong>{loading ? '—' : stats.hechas}</strong>
+          <span className="ops-kpi-helper">Cerradas en el periodo</span>
         </article>
         <article className="metric glass glass-lite">
           <span className="ops-kpi-label">Total</span>
-          <strong>{tasks.length}</strong>
-          <span className="ops-kpi-helper">Según el dueño elegido</span>
+          <strong>{loading ? '—' : stats.total}</strong>
+          <span className="ops-kpi-helper">Consultas de este periodo</span>
         </article>
       </section>
 
       <Card>
         <div className="role-desk-heading">
           <div>
-            <p className="section-eyebrow">Bandeja</p>
-            <h2 className="ops-card-title">Tareas de hoy</h2>
+            <p className="section-eyebrow">Consultas</p>
+            <h2 className="ops-card-title">Historial</h2>
             <p className="section-subtitle">
-              Las tuyas y las del equipo. Si un compañero está de baja o el cliente lo atendió otro, pásasela.
+              {period.label}. Elige día, semana, mes o año. No cargamos todo el taller de golpe.
             </p>
           </div>
-          <CalendarCheck2 size={22} aria-hidden style={{ color: 'var(--color-brand)' }} />
+          <History size={22} aria-hidden style={{ color: 'var(--color-brand)' }} />
         </div>
 
-        <div className="elevator-filters glass glass-lite" style={{ marginBottom: 'var(--space-4)' }}>
-          <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Tareas" />
-          <EstadoDoneFilter value={estado} onChange={setEstado} label="Hechas o no" />
-        </div>
-
-        {loading && tasks.length === 0 ? (
-          <HexLoaderScreen size="md" label="Cargando tus tareas…" />
-        ) : tasks.length === 0 ? (
+        {loading && rows.length === 0 ? (
+          <HexLoaderScreen size="md" label="Cargando el historial…" />
+        ) : rows.length === 0 ? (
           <p className="section-subtitle">
-            {tasksAll.length > 0
+            {historyAll.length > 0
               ? estado === 'hechas'
-                ? 'Hoy no hay tareas hechas con este filtro.'
-                : 'Hoy no hay tareas por hacer. Mira «Hechos» o «Todas».'
+                ? 'No hay consultas hechas con este filtro.'
+                : 'No hay consultas por hacer. Mira «Hechos» o «Todas».'
               : ownerScope === 'mias'
-                ? 'Hoy no tienes tareas. Cuando el admin te asigne una, saldrá aquí.'
-                : ownerScopeEmptyCopy(ownerScope)}
+                ? 'Aún no hay consultas tuyas en este periodo.'
+                : liveItems.length === 0
+                  ? `No hay consultas en ${period.label}. Prueba otro periodo.`
+                  : ownerScopeEmptyCopy(ownerScope)}
           </p>
         ) : (
-          <ul className="role-list">
-            {tasks.map((task) => {
-              const overdue = task.status === 'pendiente' && task.dueDate < today
-              const owner = personById(workspace, task.assigneeId)
-              return (
-                <li key={task.id} className="role-task-row glass glass-lite">
-                  <div>
-                    <p className="list-row-title">{task.title}</p>
-                    <p className="list-row-meta">
-                      {catalogName(workspace.taskTypes, task.taskTypeId)}
-                      {task.boardId ? ` · ${catalogName(workspace.boards, task.boardId)}` : ''}
-                      {` · ${owner?.name || 'Sin dueño'}`}
-                      {overdue ? ' · Atrasada' : ` · ${task.dueDate}`}
-                    </p>
-                    {task.notes ? <p className="section-subtitle">{task.notes}</p> : null}
-                  </div>
-                  <div className="role-task-actions">
-                    <label className="ticket-owner-picker is-compact" onClick={(e) => e.stopPropagation()}>
-                      <span className="sr-only">Pasar tarea</span>
-                      <select
-                        className="field-select"
-                        value={task.assigneeId}
-                        aria-label="Pasar tarea a otro asesor"
-                        onChange={(e) => setTaskAssignee(task.id, e.target.value)}
-                      >
-                        <option value="">Sin dueño</option>
-                        {teammatesForReassign(workspace, currentUser.email, appRole).map((person) => (
-                          <option key={person.id} value={person.id}>
-                            {person.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <span className={`badge ${task.status === 'hecho' ? 'tone-positive' : overdue ? 'tone-negative' : 'tone-warning'}`}>
-                      {task.status === 'hecho' ? 'Hecha' : overdue ? 'Atrasada' : 'Pendiente'}
-                    </span>
-                    {task.peticionId ? (
-                      <button type="button" className="ghost-button" onClick={() => openLinked(task.peticionId)}>
-                        Abrir ficha
-                      </button>
-                    ) : null}
-                    {task.status === 'pendiente' ? (
-                      <button
-                        type="button"
-                        className="client-submit"
-                        onClick={() => setTaskStatus(task.id, 'hecho')}
-                      >
-                        <CheckCircle2 size={16} aria-hidden />
-                        Ya está hecha
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        onClick={() => setTaskStatus(task.id, 'pendiente')}
-                      >
-                        Reabrir
-                      </button>
-                    )}
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
+          <PaginatedItems
+            items={rows}
+            label="Historial"
+            resetKey={`${workshopId}-${period.from}-${period.to}-${ownerScope}-${estado}`}
+          >
+            {(pageRows) => (
+              <div className="scroll-panel">
+                <ul className="role-list">
+                  {pageRows.map((item) => {
+                    const sla = !item.gestionado && (isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha))
+                    return (
+                      <li key={item.idpeticion} className="role-task-row glass glass-lite">
+                        <button type="button" className="list-row-title" onClick={() => onOpenLead(item)}>
+                          <span className="ops-feed-identity">
+                            <TicketPlate peticion={item} />
+                            <TicketClientBlock peticion={item} size="md" />
+                          </span>
+                        </button>
+                        <p className="list-row-meta">
+                          {item.tipopeticion || 'Sin tipo'}
+                          {` · ${formatFecha(item.fechainicio)}`}
+                        </p>
+                        <div className="role-task-actions">
+                          <TicketOwnerPicker
+                            workshop={workshop}
+                            workspace={workspace}
+                            currentUser={currentUser}
+                            appRole={appRole}
+                            peticion={item}
+                            compact
+                          />
+                          <span className={`badge ${item.gestionado ? 'tone-positive' : sla ? 'tone-negative' : 'tone-warning'}`}>
+                            {item.gestionado ? 'Hecha' : sla ? 'SLA' : 'Por hacer'}
+                          </span>
+                          <button type="button" className="ghost-button" onClick={() => onOpenLead(item)}>
+                            Abrir ficha
+                          </button>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
+          </PaginatedItems>
         )}
       </Card>
     </div>

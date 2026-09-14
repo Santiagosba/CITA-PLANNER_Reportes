@@ -1,7 +1,7 @@
 import { ChevronDown, Phone } from 'lucide-react'
 import { memo, type ReactNode } from 'react'
 import ActionButton, { type ActionStatus } from './ui/ActionButton'
-import VehiclePlate from './ui/VehiclePlate'
+import TicketPlate from './TicketPlate'
 import { formatAgendaTime } from '../lib/agendaGrouping'
 import { isDemoTicketId } from '../lib/demoTickets'
 import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
@@ -50,12 +50,6 @@ function PeticionRow({
   const facts: { label: string; value: ReactNode }[] = []
   facts.push({ label: 'Tipo', value: p.tipopeticion ?? 'Sin tipo' })
   facts.push({ label: 'Consulta', value: formatFecha(p.fechainicio) })
-  if (c?.matricula) {
-    facts.push({
-      label: 'Matrícula',
-      value: <VehiclePlate value={c.matricula} compact />,
-    })
-  }
   if (vehiculo) facts.push({ label: 'Vehículo', value: vehiculo })
   if (c?.email) facts.push({ label: 'Email', value: c.email })
   if (c?.fecha) facts.push({ label: 'Cita', value: formatFecha(c.fecha) })
@@ -86,6 +80,7 @@ function PeticionRow({
           <span className={`prow-marker ${pendiente ? 'is-pending' : 'is-done'}`} aria-hidden />
           <span className="prow-info">
             <span className="prow-headline">
+              <TicketPlate peticion={p} />
               <span className="prow-name">
                 <TicketClientBlock peticion={p} size="md" />
               </span>
@@ -143,9 +138,7 @@ function PeticionRow({
             <Detail label="Tipo de consulta" value={p.tipopeticion} />
             <Detail label="Fecha de la consulta" value={formatFecha(p.fechainicio)} />
             <Detail label="Cita en calendario" value={formatFecha(p.cita?.fecha) || 'Todavía no'} />
-            {c?.matricula ? (
-              <Detail label="Matrícula" value={<VehiclePlate value={c.matricula} />} />
-            ) : null}
+            <Detail label="Matrícula" value={<TicketPlate peticion={p} compact={false} />} />
             {vehiculo ? <Detail label="Vehículo" value={vehiculo} /> : null}
             {c?.email ? <Detail label="Email" value={c.email} /> : null}
           </dl>

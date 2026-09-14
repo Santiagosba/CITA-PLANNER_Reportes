@@ -362,7 +362,6 @@ export function attachClientNamesFromCitas(
 ): PeticionPendiente[] {
   const byPhone = new Map<string, CitaResumen>()
   for (const cita of citas) {
-    if (!personFromCitaFields(cita)) continue
     for (const key of [phoneMatchKey(cita.movil), phoneMatchKey(cita.telefono)]) {
       if (!key) continue
       const prev = byPhone.get(key)
@@ -371,23 +370,26 @@ export function attachClientNamesFromCitas(
   }
 
   return peticiones.map((item) => {
-    if (ticketClientName(item)) return item
     const key = phoneMatchKey(item.caller)
     const hit = key ? byPhone.get(key) : undefined
-    if (!hit) return item
-    const nombre = personFromCitaFields(hit)
+    const nombre = ticketClientName(item) || (hit ? personFromCitaFields(hit) : '')
+    if (!hit) return nombre && !item.clienteNombre ? { ...item, clienteNombre: nombre } : item
+    const cita = item.cita
+      ? {
+          ...item.cita,
+          nombre: item.cita.nombre || hit.nombre,
+          apellidos: item.cita.apellidos || hit.apellidos,
+          razonSocial: item.cita.razonSocial || hit.razonSocial,
+          contacto: item.cita.contacto || hit.contacto,
+          matricula: item.cita.matricula || hit.matricula,
+          marca: item.cita.marca || hit.marca,
+          modelo: item.cita.modelo || hit.modelo,
+        }
+      : hit
     return {
       ...item,
-      clienteNombre: nombre,
-      cita: item.cita
-        ? {
-            ...item.cita,
-            nombre: item.cita.nombre || hit.nombre,
-            apellidos: item.cita.apellidos || hit.apellidos,
-            razonSocial: item.cita.razonSocial || hit.razonSocial,
-            contacto: item.cita.contacto || hit.contacto,
-          }
-        : item.cita,
+      clienteNombre: nombre || item.clienteNombre,
+      cita,
     }
   })
 }
@@ -453,10 +455,24 @@ export async function enrichPeticionClientNames(
 
 /** Merge names only: a late calendar response must not revert ticket edits. */
 export function mergePeticionClientNames(current: PeticionPendiente[], enriched: PeticionPendiente[]): PeticionPendiente[] {
-  const names = new Map(enriched.map((row) => [row.idpeticion, ticketClientName(row)]))
+  const extra = new Map(enriched.map((row) => [row.idpeticion, row]))
   return current.map((row) => {
-    const name = names.get(row.idpeticion)
-    return name && !ticketClientName(row) ? { ...row, clienteNombre: name } : row
+    const hit = extra.get(row.idpeticion)
+    if (!hit) return row
+    const name = ticketClientName(row) || ticketClientName(hit)
+    const cita = row.cita
+      ? {
+          ...row.cita,
+          matricula: row.cita.matricula || hit.cita?.matricula || null,
+          marca: row.cita.marca || hit.cita?.marca || null,
+          modelo: row.cita.modelo || hit.cita?.modelo || null,
+        }
+      : hit.cita
+    return {
+      ...row,
+      clienteNombre: row.clienteNombre || name || hit.clienteNombre,
+      cita,
+    }
   })
 }
 

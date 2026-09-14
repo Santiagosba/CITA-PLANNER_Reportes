@@ -1,8 +1,8 @@
 import {
   BadgeCheck,
   BarChart3,
-  CalendarCheck2,
   Coins,
+  History,
   ClipboardList,
   Columns3,
   LayoutDashboard,
@@ -29,7 +29,7 @@ const ADMIN_NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] 
   { id: 'pending-citas', label: 'Triage operativo', icon: ClipboardList },
   { id: 'equipos', label: 'Equipos', icon: Users },
   { id: 'asignar-tarea', label: 'Asignar tarea', icon: UserPlus },
-  { id: 'tareas-hoy', label: 'Tareas de hoy', icon: CalendarCheck2 },
+  { id: 'tareas-hoy', label: 'Historial', icon: History },
   { id: 'stats-equipo', label: 'Estadísticas', icon: BarChart3 },
   { id: 'gasto-ia', label: 'Gasto IA', icon: Coins },
   { id: 'boards', label: 'Gestor de tableros', icon: Columns3 },
@@ -40,7 +40,7 @@ const ADMIN_NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] 
 const ASESOR_NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] = [
   { id: 'dashboard-general', label: 'Dashboard general', icon: LayoutDashboard },
   { id: 'pending-citas', label: 'Triage operativo', icon: ClipboardList },
-  { id: 'tareas-hoy', label: 'Tareas de hoy', icon: CalendarCheck2 },
+  { id: 'tareas-hoy', label: 'Historial', icon: History },
   { id: 'equipos', label: 'Mi equipo', icon: Users },
   { id: 'boards', label: 'Gestor de tableros', icon: Columns3 },
   { id: 'laura', label: 'Asistente de IA Laura', icon: Sparkles },

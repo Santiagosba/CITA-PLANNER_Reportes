@@ -8,6 +8,7 @@ import { ticketClientLabel } from '../lib/ticketClient'
 import {
   boardsForTeam,
   catalogName,
+  isExampleAssignedTask,
   localTodayIso,
   personById,
   typesForTeam,
@@ -83,6 +84,7 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
   const recentTasks = useMemo(
     () =>
       workspace.tasks
+        .filter((task) => !isExampleAssignedTask(task))
         .slice()
         .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))),
     [workspace.tasks],
@@ -109,7 +111,7 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
     setTitle('')
     setNotes('')
     setPeticionId('')
-    setNotice(`Tarea asignada a ${assignee.name}. La verá en Tareas de hoy.`)
+    setNotice(`Tarea asignada a ${assignee.name}.`)
   }
 
   return (
@@ -284,7 +286,7 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                   {notice}{' '}
                   {onOpenTodayTasks ? (
                     <button type="button" className="ghost-button" onClick={onOpenTodayTasks}>
-                      Ir a Tareas de hoy
+                      Ir al historial
                     </button>
                   ) : null}
                 </p>
