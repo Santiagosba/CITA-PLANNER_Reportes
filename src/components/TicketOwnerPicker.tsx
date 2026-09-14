@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { UserRound } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { ChevronDown, UserRound } from 'lucide-react'
 import type { CrmAppRole } from '../lib/crmRoles'
-import { normalizeEmail, teamsForPerson, type AdvisorPerson, type AdvisorWorkspace } from '../lib/advisorWorkspace'
+import {
+  isPersonOnTeam,
+  normalizeEmail,
+  teamsForPerson,
+  type AdvisorPerson,
+  type AdvisorTeam,
+  type AdvisorWorkspace,
+} from '../lib/advisorWorkspace'
 import {
   canReassignTicket,
   claimTicket,
@@ -24,19 +32,167 @@ type Props = {
   layout?: 'inline' | 'card'
 }
 
+type OwnerGroup = {
+  team: AdvisorTeam | null
+  members: AdvisorPerson[]
+}
+
 const assignedOnOpen = new Set<string>()
 
-function groupedTeammates(workspace: AdvisorWorkspace, people: AdvisorPerson[]) {
+function groupedTeammates(workspace: AdvisorWorkspace, people: AdvisorPerson[]): OwnerGroup[] {
   const seen = new Set<string>()
   const groups = workspace.teams
     .map((team) => {
-      const members = people.filter((person) => team.memberIds.includes(person.id))
+      const members = people.filter((person) => isPersonOnTeam(workspace, team, person.id, person.email))
       members.forEach((person) => seen.add(person.id))
       return { team, members }
     })
     .filter((group) => group.members.length > 0)
   const loose = people.filter((person) => !seen.has(person.id))
-  return { groups, loose }
+  return loose.length > 0 ? [...groups, { team: null, members: loose }] : groups
+}
+
+function OwnerSelect({
+  value,
+  label,
+  currentName,
+  disabled,
+  variant,
+  suggested,
+  groups,
+  suggestedEmail,
+  onChange,
+}: {
+  value: string
+  label: string
+  currentName: string
+  disabled?: boolean
+  variant: 'field' | 'plain'
+  suggested?: boolean
+  groups: OwnerGroup[]
+  suggestedEmail: string
+  onChange: (next: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 240 })
+
+  useEffect(() => {
+    if (!open) return
+    const place = () => {
+      const trigger = triggerRef.current
+      if (!trigger) return
+      const rect = trigger.getBoundingClientRect()
+      const width = Math.max(rect.width, 240)
+      const maxH = Math.min(320, window.innerHeight - 24)
+      const below = window.innerHeight - rect.bottom - 12
+      const openUp = below < 160 && rect.top > below
+      const top = openUp ? Math.max(12, rect.top - maxH - 6) : rect.bottom + 6
+      const left = Math.min(Math.max(12, rect.left), window.innerWidth - width - 12)
+      setPos({ top, left, width })
+    }
+    place()
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', place, true)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', place, true)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const onPointer = (event: PointerEvent) => {
+      const node = event.target as Node
+      if (triggerRef.current?.contains(node) || menuRef.current?.contains(node)) return
+      setOpen(false)
+    }
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const pick = (next: string) => {
+    setOpen(false)
+    if (next !== value) onChange(next)
+  }
+
+  const menu = open
+    ? createPortal(
+        <div
+          ref={menuRef}
+          className="ticket-owner-menu glass glass-lite"
+          role="listbox"
+          aria-label={label}
+          style={{ top: pos.top, left: pos.left, width: pos.width }}
+          onClick={(event) => event.stopPropagation()}
+          onPointerDown={(event) => event.stopPropagation()}
+        >
+          <button
+            type="button"
+            role="option"
+            className={`ticket-owner-menu-item${value === '' ? ' is-active' : ''}`}
+            aria-selected={value === ''}
+            onClick={() => pick('')}
+          >
+            Sin dueño
+          </button>
+          {groups.map((group) => (
+            <div key={group.team?.id ?? 'loose'} className="ticket-owner-menu-group">
+              <p className="ticket-owner-menu-heading">{group.team?.name || 'Sin equipo'}</p>
+              {group.members.map((person) => {
+                const email = normalizeEmail(person.email)
+                const hint = suggestedEmail === email ? 'Le tocaría' : ''
+                return (
+                  <button
+                    key={`${group.team?.id ?? 'loose'}-${person.id}`}
+                    type="button"
+                    role="option"
+                    className={`ticket-owner-menu-item${value === email ? ' is-active' : ''}${hint ? ' is-suggested' : ''}`}
+                    aria-selected={value === email}
+                    onClick={() => pick(email)}
+                  >
+                    <span>{person.name}</span>
+                    {hint ? <small>{hint}</small> : null}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </div>,
+        document.body,
+      )
+    : null
+
+  return (
+    <div className={`ticket-owner-select is-${variant}${suggested ? ' is-suggested' : ''}`}>
+      <button
+        ref={triggerRef}
+        type="button"
+        className={`ticket-owner-select-trigger${open ? ' is-open' : ''}`}
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={label}
+        onClick={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          setOpen((current) => !current)
+        }}
+      >
+        <span>{currentName}</span>
+        <ChevronDown size={16} aria-hidden />
+      </button>
+      {menu}
+    </div>
+  )
 }
 
 export default function TicketOwnerPicker({
@@ -120,29 +276,18 @@ export default function TicketOwnerPicker({
     })
   }, [layout, allowed, value, suggestedAllowed, suggestedEmail, peticion.idpeticion])
 
-  const optionGroups = (
-    <>
-      <option value="">Sin dueño</option>
-      {grouped.groups.map(({ team, members }) => (
-        <optgroup key={team.id} label={team.name}>
-          {members.map((person) => (
-            <option key={`${team.id}-${person.id}`} value={normalizeEmail(person.email)}>
-              {person.name}
-              {showSuggest && suggestedEmail === normalizeEmail(person.email) ? ' · le tocaría' : ''}
-            </option>
-          ))}
-        </optgroup>
-      ))}
-      {grouped.loose.length > 0 ? (
-        <optgroup label="Sin equipo">
-          {grouped.loose.map((person) => (
-            <option key={person.id} value={normalizeEmail(person.email)}>
-              {person.name}
-            </option>
-          ))}
-        </optgroup>
-      ) : null}
-    </>
+  const select = (
+    <OwnerSelect
+      value={displayEmail}
+      label={showSuggest && suggested ? `Le tocaría ${suggested.person.name}` : label}
+      currentName={showSuggest && suggested ? `${suggested.person.name}` : currentName}
+      disabled={busy}
+      variant={layout === 'card' ? 'plain' : 'field'}
+      suggested={showSuggest}
+      groups={grouped}
+      suggestedEmail={suggestedEmail}
+      onChange={(next) => void onChange(next)}
+    />
   )
 
   const actions =
@@ -173,20 +318,10 @@ export default function TicketOwnerPicker({
         </span>
         <div className="ticket-owner-card-body">
           <span className="ticket-owner-card-label">{label}</span>
-          {allowed ? (
-            <select
-              className="ticket-owner-card-select"
-              value={displayEmail}
-              disabled={busy}
-              aria-label={label}
-              onChange={(e) => void onChange(e.target.value)}
-            >
-              {optionGroups}
-            </select>
-          ) : (
-            <strong className="ticket-owner-card-name">{currentName}</strong>
-          )}
-          {actions}
+          <div className="ticket-owner-card-row">
+            {allowed ? select : <strong className="ticket-owner-card-name">{currentName}</strong>}
+            {actions}
+          </div>
           {showSuggest && suggested ? (
             <span className="ticket-owner-hint">{ownerSuggestCopy(suggested.reason, suggested.person.name)}</span>
           ) : null}
@@ -218,23 +353,17 @@ export default function TicketOwnerPicker({
   }
 
   return (
-    <label
+    <div
       className={`ticket-owner-picker${compact ? ' is-compact' : ''}${showSuggest ? ' is-suggested' : ''}`}
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
     >
       {compact ? null : <span className="filter-field-label">{label}</span>}
-      <select
-        className="field-select"
-        value={displayEmail}
-        disabled={busy}
-        aria-label={showSuggest && suggested ? `Le tocaría ${suggested.person.name}` : 'Pasar ticket a otro asesor'}
-        onChange={(e) => void onChange(e.target.value)}
-      >
-        {optionGroups}
-      </select>
-      {actions}
+      <div className="ticket-owner-main">
+        {select}
+        {actions}
+      </div>
       {error ? <span className="ticket-owner-error">{error}</span> : null}
-    </label>
+    </div>
   )
 }
