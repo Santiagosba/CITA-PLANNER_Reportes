@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) => {
   // api-crm y la API SQL no comparten rutas, así que un único origen puede servir
   // la SPA y repartir /api entre las dos. Lo usa `npm run preview` detrás del túnel.
   const proxy: Record<string, ProxyOptions> = {
-    '^/api/(webrtc|call|calls)(/|$)': {
+    '^/api/(webrtc|call|calls|taller)(/|$)': {
       target: `http://localhost:${crmPort}`,
       changeOrigin: true,
     },

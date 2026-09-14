@@ -17,6 +17,10 @@
       "destination": "https://api-crm.avigo.es/api/calls/:path*"
     },
     {
+      "source": "/api/taller/:path*",
+      "destination": "https://api-crm.avigo.es/api/taller/:path*"
+    },
+    {
       "source": "/api/:path*",
       "destination": "http://avi-bot-avibotcitaplanner-khxi1c-391083-76-13-141-36.sslip.io/api/:path*"
     },

@@ -76,6 +76,11 @@ function pageCopy(
         title: 'Asignar tarea',
         subtitle: 'Elige asesor, tipo y día. La tarea aparece en su bandeja.',
       }
+    case 'contrasenas':
+      return {
+        title: 'Contraseñas',
+        subtitle: 'Cambia la tuya o la de un asesor del taller.',
+      }
     case 'stats-equipo':
       return {
         title: 'Estadísticas',

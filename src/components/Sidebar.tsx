@@ -9,6 +9,7 @@ export type DashboardShellRoute =
   | 'pending-citas'
   | 'equipos'
   | 'asignar-tarea'
+  | 'contrasenas'
   | 'stats-equipo'
   | 'gasto-ia'
   | 'tareas-hoy'

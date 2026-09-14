@@ -21,6 +21,7 @@ import LauraIntelligenceView from './LauraIntelligenceView'
 import BotIdentityView from './BotIdentityView'
 import TeamsManagerView from './TeamsManagerView'
 import AssignTaskView from './AssignTaskView'
+import PasswordsAdminView from './PasswordsAdminView'
 import EmployeeStatsView from './EmployeeStatsView'
 import AiUsageView from './AiUsageView'
 import TodayTasksView from './TodayTasksView'
@@ -813,6 +814,8 @@ export default function DashboardShell({
             setShellRoute('tareas-hoy')
           }}
         />
+      ) : shellRoute === 'contrasenas' ? (
+        <PasswordsAdminView workshop={workshop} currentUser={currentUser} />
       ) : shellRoute === 'stats-equipo' ? (
         <EmployeeStatsView workshop={workshop} currentUser={currentUser} />
       ) : shellRoute === 'gasto-ia' ? (

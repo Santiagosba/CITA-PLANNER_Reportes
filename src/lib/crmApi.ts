@@ -448,6 +448,15 @@ export function fetchCallCostStats(range?: { from?: string; to?: string }): Prom
   return crmFetch<CallCostStats>(`/api/calls/cost-stats${suffix}`, { endpointKey: 'GET /api/calls/cost-stats' })
 }
 
+/** Cambia o crea la contraseña de un asesor (`POST /api/taller/cuentas/password`). */
+export async function crmUpdateAccountPassword(email: string, password: string): Promise<void> {
+  await crmFetch<{ ok: boolean }>('/api/taller/cuentas/password', {
+    method: 'POST',
+    endpointKey: 'POST /api/taller/cuentas/password',
+    body: JSON.stringify({ email, password }),
+  })
+}
+
 /** Cuelga por Call Control si conocemos el `call_control_id` (`POST /api/call/hangup`). */
 export function hangupByCallControl(callControlId: string): Promise<{ success: boolean }> {
   return crmFetch<{ success: boolean }>('/api/call/hangup', {
