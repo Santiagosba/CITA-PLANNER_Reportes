@@ -20,7 +20,7 @@ const TIPS: Section[] = [
   {
     title: 'Triage y prioridades',
     items: [
-      'El tablero ordena las peticiones por urgencia. Arrastra una tarjeta para cambiarla de columna; el orden se guarda.',
+      'El tablero agrupa por operación (tipo de consulta) y ordena por urgencia. Arrastra una tarjeta para cambiarla de columna; el orden se guarda.',
       'Las peticiones con SLA crítico llevan borde rojo y aparecen en la campana de notificaciones. Empieza siempre por ellas.',
       'Cuando marcas «Gestionado» la ficha se cierra sola y desaparece de pendientes; si no quieres cerrarla, deja una nota y guarda.',
     ],

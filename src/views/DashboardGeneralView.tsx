@@ -1,10 +1,13 @@
 import PaginatedItems from '../components/PaginatedItems'
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowRight, ClipboardList, History, Percent, Radio, Wrench } from 'lucide-react'
+import { AlertTriangle, ArrowRight, ClipboardList, Columns3, History, Percent, Radio, Wrench } from 'lucide-react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
 import {
   formatLauraPct,
   LauraChartCardHeader,
+  LauraGroupedBars,
+  LauraHeatmap,
+  LauraMosaic,
   LauraPareto,
   LauraRadar,
   LauraUprightPie,
@@ -18,6 +21,9 @@ import { HexLoaderScreen } from '../components/ui/HexLoader'
 import Card from '../components/ui/Card'
 import TicketPlate from '../components/TicketPlate'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
+import { useCallCancelNotes } from '../hooks/useCallCancelNotes'
+import { useCitasTaller } from '../hooks/useCitasTaller'
+import { useMotivosCancelada } from '../hooks/useMotivosCancelada'
 import { useOperationalData } from '../hooks/useOperationalData'
 import {
   CALENDAR_SCALE_OPTIONS,
@@ -27,10 +33,13 @@ import {
 import type { CrmAppRole } from '../lib/crmRoles'
 import {
   advisorWorkload,
+  cancelMotiveHeatmap,
   channelMix,
   closedInRangeCount,
   filterReceivedInRange,
+  heatChartTitle,
   mixChartTitle,
+  motiveOutcomeMix,
   typeMix,
   volumeChartTitle,
   volumeForScale,
@@ -38,7 +47,7 @@ import {
 import { localTodayIso, type AdvisorWorkspace } from '../lib/advisorWorkspace'
 import { compareTicketsByOpenFirst } from '../lib/doneFilter'
 import { buildOwnerScopeContext, matchesOwnerScope, ownerScopeEmptyCopy, type OwnerScope } from '../lib/ownerScope'
-import { isDemoTicketId } from '../lib/demoTickets'
+import { isDemoCitaId, isDemoTicketId } from '../lib/demoTickets'
 import { isLocalPreviewWorkshop } from '../lib/localPreview'
 import { computePeticionesStats, formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
 import { isSlaCritico } from '../lib/tallerStations'
@@ -51,6 +60,7 @@ type Props = {
   onOpenTriage: () => void
   onOpenCalendar: () => void
   onOpenTodayTasks?: () => void
+  onOpenBoards?: () => void
   onOpenLead?: (peticion: PeticionPendiente) => void
   refreshToken?: number
 }
@@ -62,6 +72,7 @@ export default function DashboardGeneralView({
   onOpenTriage,
   onOpenCalendar,
   onOpenTodayTasks,
+  onOpenBoards,
   onOpenLead,
   refreshToken = 0,
 }: Props) {
@@ -73,7 +84,14 @@ export default function DashboardGeneralView({
   const anchor = useMemo(() => new Date(`${today}T12:00:00`), [today])
   const period = useMemo(() => calendarPeriod(scale, anchor), [scale, anchor])
   const fetchRange = useMemo(() => ({ from: period.from, to: period.to }), [period.from, period.to])
-  const { items, loading, error, sourceNotice, refresh, refreshSilent } = useOperationalData(workshop, fetchRange)
+  const { items, tipos, loading, error, sourceNotice, refresh, refreshSilent } = useOperationalData(workshop, fetchRange)
+  const { citas, loading: citasLoading, error: citasError } = useCitasTaller(workshop, fetchRange)
+  const { byId: cancelMotivosById, loading: cancelMotivosLoading } = useMotivosCancelada()
+  const { notesByPhone } = useCallCancelNotes(workshop, fetchRange)
+  const tiposById = useMemo(
+    () => new Map(tipos.map((tipo) => [tipo.idtipopeticion, tipo.tipopeticion])),
+    [tipos],
+  )
   const liveItems = useMemo(() => {
     if (isLocalPreviewWorkshop(workshop)) return items
     return items.filter((item) => !isDemoTicketId(item.idpeticion))
@@ -123,11 +141,16 @@ export default function DashboardGeneralView({
 
   const volume = useMemo(() => volumeForScale(liveItems, scale, anchor), [liveItems, scale, anchor])
   const mixRows = useMemo(
-    () => (scale === 'dia' ? channelMix(periodItems) : typeMix(periodItems)),
-    [scale, periodItems],
+    () => (scale === 'dia' ? channelMix(periodItems) : typeMix(periodItems, tiposById)),
+    [scale, periodItems, tiposById],
   )
-  const teamRows = useMemo(
-    () => (appRole === 'admin' ? advisorWorkload(periodItems, workspace.people) : []),
+  const teamMosaicRows = useMemo(
+    () =>
+      appRole === 'admin'
+        ? advisorWorkload(periodItems, workspace.people)
+            .filter((row) => row.recibidas > 0)
+            .map((row) => ({ key: row.key, label: row.label, value: row.recibidas }))
+        : [],
     [appRole, periodItems, workspace.people],
   )
   const pieSlices = useMemo(() => mixToPieSlices(mixRows), [mixRows])
@@ -136,12 +159,22 @@ export default function DashboardGeneralView({
     () => volume.map((point) => ({ key: point.key, label: point.label, value: point.recibidas })),
     [volume],
   )
-  const teamParetoRows = useMemo(
+  const liveCitas = useMemo(() => {
+    if (isLocalPreviewWorkshop(workshop)) return citas
+    return citas.filter((cita) => !isDemoCitaId(cita.idcita))
+  }, [citas, workshop])
+  const motiveRows = useMemo(
+    () => motiveOutcomeMix(liveCitas, periodItems, tiposById),
+    [liveCitas, periodItems, tiposById],
+  )
+  const motiveChartRows = useMemo(
+    () => motiveRows.map((row) => ({ key: row.key, label: row.label, a: row.realizadas, b: row.canceladas })),
+    [motiveRows],
+  )
+  const cancelHeat = useMemo(
     () =>
-      teamRows
-        .filter((row) => row.recibidas > 0)
-        .map((row) => ({ key: row.key, label: row.label, value: row.recibidas })),
-    [teamRows],
+      cancelMotiveHeatmap(liveCitas, periodItems, cancelMotivosById, tiposById, scale, anchor, notesByPhone),
+    [liveCitas, periodItems, cancelMotivosById, tiposById, scale, anchor, notesByPhone],
   )
 
   const historyTicketsAll = useMemo(
@@ -174,6 +207,7 @@ export default function DashboardGeneralView({
   return (
     <div className="dashboard-page operational-dashboard dash-ops">
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
+      {citasError ? <ApiStatusBanner message={citasError} variant="error" /> : null}
       {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
 
       <div className="elevator-filters glass glass-lite">
@@ -248,6 +282,23 @@ export default function DashboardGeneralView({
           onClick={onOpenTriage}
         />
       </section>
+
+      {onOpenBoards ? (
+        <aside className="dash-boards-jump glass glass-lite">
+          <div className="dash-boards-jump-icon" aria-hidden>
+            <Columns3 size={22} />
+          </div>
+          <div className="dash-boards-jump-copy">
+            <p className="section-eyebrow">Herramienta principal</p>
+            <strong>Gestor de tableros</strong>
+            <p>Aquí se trabajan las consultas del taller, por operación y prioridad.</p>
+          </div>
+          <button type="button" className="client-submit dash-boards-jump-action" onClick={onOpenBoards}>
+            Abrir tableros
+            <ArrowRight size={16} />
+          </button>
+        </aside>
+      ) : null}
 
       <Card className="dash-today dash-history" padding="none">
         <div className="ops-card-header">
@@ -369,19 +420,53 @@ export default function DashboardGeneralView({
         </Card>
       </section>
 
+      <Card className="laura-panel" padding="md">
+        <LauraChartCardHeader
+          eyebrow="Motivos de consulta"
+          title="Barras agrupadas · Realizadas y canceladas por motivo"
+        />
+        {loading || citasLoading ? (
+          <HexLoaderScreen size="md" label="Cargando el desglose…" />
+        ) : (
+          <LauraGroupedBars
+            caption={`Tipo de consulta · realizadas frente a canceladas · ${period.label}.`}
+            rows={motiveChartRows}
+            empty="En este periodo no hay consultas con motivo. Prueba otro día, semana o mes."
+          />
+        )}
+      </Card>
+
+      <Card className="laura-panel" padding="md">
+        <LauraChartCardHeader eyebrow="Canceladas" title={`Heat · Motivos ${heatChartTitle(scale)}`}>
+          <span className="badge tone-neutral">{scaleLabel}</span>
+        </LauraChartCardHeader>
+        {loading || citasLoading || cancelMotivosLoading ? (
+          <HexLoaderScreen size="md" label="Cargando los motivos de cancelación…" />
+        ) : (
+          <LauraHeatmap
+            caption={`${period.label}. Cada fila es lo que se dijo o se anotó en la llamada al cancelar.`}
+            rows={cancelHeat.rows}
+            cols={cancelHeat.cols}
+            values={cancelHeat.values}
+            valueLabel="Canceladas"
+            empty="En este periodo no hay citas canceladas."
+          />
+        )}
+      </Card>
+
       {appRole === 'admin' ? (
         <Card className="laura-panel" padding="md">
+          <LauraChartCardHeader eyebrow="Equipo" title="Mosaico · Trabajo por asesor">
+            <span className="badge tone-neutral">{scaleLabel}</span>
+          </LauraChartCardHeader>
           {loading ? (
             <HexLoaderScreen size="md" label="Cargando el trabajo del equipo…" />
           ) : (
-            <LauraPareto
-              eyebrow="Equipo"
-              title="Pareto · Trabajo por asesor"
-              legend={[scaleLabel]}
-              rows={teamParetoRows}
-              sortByValue
-              barLabel="Consultas"
-              lineLabel="Acumulado"
+            <LauraMosaic
+              caption={`${period.label}. Cada pieza es una persona.`}
+              rows={teamMosaicRows}
+              valueLabel="Consultas"
+              helper="Cuanto más grande es la pieza, más consultas ha llevado esa persona."
               empty="Añade asesores en Equipos o espera a que gestionen consultas."
             />
           )}

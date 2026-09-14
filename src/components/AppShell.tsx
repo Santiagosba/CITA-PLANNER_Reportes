@@ -26,23 +26,23 @@ import type { CrmAppRole } from '../lib/crmRoles'
 
 const ADMIN_NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] = [
   { id: 'dashboard-general', label: 'Dashboard general', icon: LayoutDashboard },
+  { id: 'boards', label: 'Gestor de tableros', icon: Columns3 },
   { id: 'pending-citas', label: 'Triage operativo', icon: ClipboardList },
   { id: 'equipos', label: 'Equipos', icon: Users },
   { id: 'asignar-tarea', label: 'Asignar tarea', icon: UserPlus },
   { id: 'tareas-hoy', label: 'Historial', icon: History },
   { id: 'stats-equipo', label: 'Estadísticas', icon: BarChart3 },
   { id: 'gasto-ia', label: 'Gasto IA', icon: Coins },
-  { id: 'boards', label: 'Gestor de tableros', icon: Columns3 },
   { id: 'laura', label: 'Asistente de IA Laura', icon: Sparkles },
   { id: 'bot-identity', label: 'Identidad del bot', icon: BadgeCheck },
 ]
 
 const ASESOR_NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] = [
   { id: 'dashboard-general', label: 'Dashboard general', icon: LayoutDashboard },
+  { id: 'boards', label: 'Gestor de tableros', icon: Columns3 },
   { id: 'pending-citas', label: 'Triage operativo', icon: ClipboardList },
   { id: 'tareas-hoy', label: 'Historial', icon: History },
   { id: 'equipos', label: 'Mi equipo', icon: Users },
-  { id: 'boards', label: 'Gestor de tableros', icon: Columns3 },
   { id: 'laura', label: 'Asistente de IA Laura', icon: Sparkles },
 ]
 

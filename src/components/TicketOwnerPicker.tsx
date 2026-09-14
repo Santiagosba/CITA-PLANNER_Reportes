@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { UserRound } from 'lucide-react'
 import type { CrmAppRole } from '../lib/crmRoles'
 import { normalizeEmail, type AdvisorWorkspace } from '../lib/advisorWorkspace'
 import { canReassignTicket, reassignTicketOwner, teammatesForReassign } from '../lib/ticketOps'
@@ -12,6 +13,7 @@ type Props = {
   appRole: CrmAppRole
   peticion: PeticionPendiente
   compact?: boolean
+  layout?: 'inline' | 'card'
 }
 
 export default function TicketOwnerPicker({
@@ -21,6 +23,7 @@ export default function TicketOwnerPicker({
   appRole,
   peticion,
   compact = false,
+  layout = 'inline',
 }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -30,10 +33,6 @@ export default function TicketOwnerPicker({
   const currentName =
     people.find((person) => normalizeEmail(person.email) === value)?.name ||
     (value ? value : 'Sin dueño')
-
-  if (!allowed) {
-    return <span className="ticket-owner-readonly">{currentName}</span>
-  }
 
   const onChange = async (next: string) => {
     setBusy(true)
@@ -45,6 +44,46 @@ export default function TicketOwnerPicker({
     } finally {
       setBusy(false)
     }
+  }
+
+  if (layout === 'card') {
+    return (
+      <div
+        className={`ticket-owner-card${allowed ? '' : ' is-readonly'}`}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <span className="ticket-owner-card-icon" aria-hidden>
+          <UserRound size={18} />
+        </span>
+        <div className="ticket-owner-card-body">
+          <span className="ticket-owner-card-label">Dueño del ticket</span>
+          {allowed ? (
+            <select
+              className="ticket-owner-card-select"
+              value={value}
+              disabled={busy}
+              aria-label="Dueño del ticket"
+              onChange={(e) => void onChange(e.target.value)}
+            >
+              <option value="">Sin dueño</option>
+              {people.map((person) => (
+                <option key={person.id} value={normalizeEmail(person.email)}>
+                  {person.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <strong className="ticket-owner-card-name">{currentName}</strong>
+          )}
+          {error ? <span className="ticket-owner-error">{error}</span> : null}
+        </div>
+      </div>
+    )
+  }
+
+  if (!allowed) {
+    return <span className="ticket-owner-readonly">{currentName}</span>
   }
 
   return (

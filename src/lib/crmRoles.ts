@@ -45,13 +45,13 @@ export function crmAppRoleLabel(role: CrmAppRole): string {
 
 export const ADMIN_SHELL_ROUTES: DashboardShellRoute[] = [
   'dashboard-general',
+  'boards',
   'pending-citas',
   'equipos',
   'asignar-tarea',
   'tareas-hoy',
   'stats-equipo',
   'gasto-ia',
-  'boards',
   'laura',
   'bot-identity',
   'reportes',
@@ -60,10 +60,10 @@ export const ADMIN_SHELL_ROUTES: DashboardShellRoute[] = [
 
 export const ASESOR_SHELL_ROUTES: DashboardShellRoute[] = [
   'dashboard-general',
+  'boards',
   'pending-citas',
   'equipos',
   'tareas-hoy',
-  'boards',
   'laura',
   'configuration',
 ]

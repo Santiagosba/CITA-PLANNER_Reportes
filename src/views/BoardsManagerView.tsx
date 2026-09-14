@@ -1,16 +1,12 @@
 import {
-  Car,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   GripVertical,
-  Package,
   Plus,
-  ShieldCheck,
-  ShoppingBag,
-  Wrench,
   X,
 } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
 import {
   memo,
   useCallback,
@@ -24,7 +20,13 @@ import {
 import ApiStatusBanner from '../components/ApiStatusBanner'
 import { HexLoaderScreen } from '../components/ui/HexLoader'
 import TicketPlate from '../components/TicketPlate'
-import { boardsForTeam, localTodayIso, personByEmail, teamForPerson, type AdvisorWorkspace } from '../lib/advisorWorkspace'
+import { localTodayIso, type AdvisorWorkspace } from '../lib/advisorWorkspace'
+import {
+  buildOperation,
+  fallbackOperation,
+  manualOperationOf,
+  operationKeyOf,
+} from '../lib/boardOperations'
 import {
   CALENDAR_SCALE_OPTIONS,
   calendarPeriod,
@@ -42,17 +44,8 @@ import TicketOwnerPicker from '../components/TicketOwnerPicker'
 import type { CrmAppRole } from '../lib/crmRoles'
 import type { Workshop } from '../types'
 
-type DepartmentId = 'mechanics' | 'bodywork' | 'insurance' | 'parts' | 'sales'
 type PriorityId = 'urgente' | 'alta' | 'media' | 'baja' | 'hecho'
 type OrderMap = Record<string, string[]>
-
-type Department = {
-  id: DepartmentId
-  label: string
-  description: string
-  icon: LucideIcon
-  keywords: string[]
-}
 
 type PriorityColumn = {
   id: PriorityId
@@ -63,7 +56,9 @@ type PriorityColumn = {
 
 type ManualEntry = {
   id: string
-  departmentId: DepartmentId
+  operationKey: string
+  operationLabel: string
+  departmentId?: string
   priority: PriorityId
   title: string
   phone: string
@@ -88,44 +83,6 @@ type DragLive = {
 }
 
 type HoverSlot = { col: PriorityId; index: number }
-
-const DEPARTMENTS: Department[] = [
-  {
-    id: 'mechanics',
-    label: 'Mecánica & Diagnosis',
-    description: 'Mantenimientos oficiales, diagnosis electrónica, motores y alta tensión EV',
-    icon: Wrench,
-    keywords: ['mec', 'revisi', 'diagn', 'aver', 'motor', 'manten', 'aceite', 'itv', 'ev', 'híbrid', 'hibrid'],
-  },
-  {
-    id: 'bodywork',
-    label: 'Carrocería & Pintura',
-    description: 'Reparación de chapa, bancadas rápidas, sustitución de lunas y pintura en cabina',
-    icon: Car,
-    keywords: ['chapa', 'pint', 'carrocer', 'golpe', 'cristal', 'luna', 'lunas', 'bancada'],
-  },
-  {
-    id: 'insurance',
-    label: 'Peritaje de Seguros',
-    description: 'Apertura de siniestros, fotoperitaciones y acuerdos Mapfre, Mutua, Allianz',
-    icon: ShieldCheck,
-    keywords: ['seguro', 'perit', 'siniestro', 'mapfre', 'mutua', 'allianz', 'foto'],
-  },
-  {
-    id: 'parts',
-    label: 'Recambios & Flotas',
-    description: 'Pedidos de piezas originales OEM, consumibles y mantenimiento de flotas',
-    icon: Package,
-    keywords: ['recambio', 'pieza', 'neum', 'flota', 'oem', 'consumible', 'pedido'],
-  },
-  {
-    id: 'sales',
-    label: 'Ventas VN / VO',
-    description: 'Tasación de vehículo usado, renovación comercial y pruebas dinámicas',
-    icon: ShoppingBag,
-    keywords: ['venta', 'vehículo', 'vehiculo', 'ocasión', 'ocasion', 'tasac', 'vn', 'vo', 'usado'],
-  },
-]
 
 const COLUMNS: PriorityColumn[] = [
   { id: 'urgente', label: 'Urgente', hint: 'Atender ya', tone: 'danger' },
@@ -157,8 +114,29 @@ function orderKey(workshopId: string) {
   return `avi_board_order_${workshopId}`
 }
 
-function colOrderKey(dept: DepartmentId, col: PriorityId) {
-  return `${dept}:${col}`
+function colOrderKey(operationId: string, col: PriorityId) {
+  return `${operationId}:${col}`
+}
+
+function readManualEntries(workshopId: string): ManualEntry[] {
+  const raw = loadJson<Array<Partial<ManualEntry> & { id?: string }>>(manualKey(workshopId), [])
+  return raw.flatMap((row) => {
+    if (!row?.id) return []
+    const op = manualOperationOf(row)
+    return [
+      {
+        id: String(row.id),
+        operationKey: op.id,
+        operationLabel: op.label,
+        departmentId: row.departmentId,
+        priority: (row.priority as PriorityId | undefined) ?? 'media',
+        title: String(row.title || ''),
+        phone: String(row.phone || ''),
+        note: String(row.note || ''),
+        createdAt: String(row.createdAt || new Date().toISOString()),
+      },
+    ]
+  })
 }
 
 function loadJson<T>(key: string, fallback: T): T {
@@ -177,14 +155,6 @@ function saveJson(key: string, value: unknown) {
   } catch {
     /* ignore */
   }
-}
-
-function detectDepartment(item: PeticionPendiente): DepartmentId {
-  const text = `${item.tipopeticion || ''} ${item.descripcion || ''}`.toLowerCase()
-  const hit = DEPARTMENTS.find((department) =>
-    department.keywords.some((keyword) => text.includes(keyword)),
-  )
-  return hit?.id ?? 'mechanics'
 }
 
 function defaultPriority(item: PeticionPendiente): PriorityId {
@@ -561,14 +531,6 @@ export default function BoardsManagerView({
     () => buildOwnerScopeContext(workspace, currentUser.email),
     [workspace, currentUser.email],
   )
-  const visibleDepartments = useMemo(() => {
-    if (appRole === 'admin') return DEPARTMENTS
-    const me = personByEmail(workspace, currentUser.email)
-    const team = me ? teamForPerson(workspace, me.id) : undefined
-    if (!team) return DEPARTMENTS
-    const allowed = new Set(boardsForTeam(workspace, team).map((item) => item.id))
-    return DEPARTMENTS.filter((department) => allowed.has(department.id))
-  }, [appRole, workspace, currentUser.email])
   const scopedItems = useMemo(
     () =>
       items.filter((item) =>
@@ -582,21 +544,18 @@ export default function BoardsManagerView({
   useEffect(() => {
     if (refreshToken > 0) void refresh()
   }, [refreshToken, refresh])
-  const [activeDepartment, setActiveDepartment] = useState<DepartmentId>('mechanics')
-  useEffect(() => {
-    if (visibleDepartments.some((department) => department.id === activeDepartment)) return
-    const first = visibleDepartments[0]
-    if (first) setActiveDepartment(first.id)
-  }, [visibleDepartments, activeDepartment])
+  const [activeOperation, setActiveOperation] = useState('')
   const [priorities, setPriorities] = useState<PriorityMap>(() => loadJson(priorityKey(workshop.id), {}))
   const [manualEntries, setManualEntries] = useState<ManualEntry[]>(() =>
-    loadJson(manualKey(workshop.id), []),
+    readManualEntries(workshop.id),
   )
   const [orders, setOrders] = useState<OrderMap>(() => loadJson(orderKey(workshop.id), {}))
   const [showNewEntry, setShowNewEntry] = useState(false)
   const [draftTitle, setDraftTitle] = useState('')
   const [draftPhone, setDraftPhone] = useState('')
   const [draftNote, setDraftNote] = useState('')
+  const tabsRef = useRef<HTMLElement>(null)
+  const [tabsOverflow, setTabsOverflow] = useState({ up: false, down: false })
 
   const ghostLayerRef = useRef<HTMLElement | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
@@ -628,50 +587,76 @@ export default function BoardsManagerView({
     baja: [],
     hecho: [],
   })
-  const deptRef = useRef(activeDepartment)
+  const opRef = useRef(activeOperation)
   const workshopIdRef = useRef(workshop.id)
 
   useEffect(() => {
     setPriorities(loadJson(priorityKey(workshop.id), {}))
-    setManualEntries(loadJson(manualKey(workshop.id), []))
+    setManualEntries(readManualEntries(workshop.id))
     setOrders(loadJson(orderKey(workshop.id), {}))
     workshopIdRef.current = workshop.id
   }, [workshop.id])
 
   const grouped = useMemo(() => {
-    const map: Record<DepartmentId, PeticionPendiente[]> = {
-      mechanics: [],
-      bodywork: [],
-      insurance: [],
-      parts: [],
-      sales: [],
+    const map = new Map<string, PeticionPendiente[]>()
+    for (const item of scopedItems) {
+      const key = operationKeyOf(item)
+      const list = map.get(key)
+      if (list) list.push(item)
+      else map.set(key, [item])
     }
-    for (const item of scopedItems) map[detectDepartment(item)].push(item)
     return map
   }, [scopedItems])
 
+  const visibleOperations = useMemo(() => {
+    const counts = new Map<string, { label: string; count: number }>()
+    for (const item of scopedItems) {
+      const id = operationKeyOf(item)
+      const prev = counts.get(id)
+      if (prev) prev.count += 1
+      else counts.set(id, { label: item.tipopeticion?.trim() || 'Sin tipo', count: 1 })
+    }
+    for (const entry of manualEntries) {
+      if (appRole === 'admin' && !matchesOwnerScope(null, ownerScope, ownerCtx)) continue
+      const op = manualOperationOf(entry)
+      const prev = counts.get(op.id)
+      if (prev) prev.count += 1
+      else counts.set(op.id, { label: op.label, count: 1 })
+    }
+    const next = [...counts.entries()]
+      .map(([id, row]) => buildOperation(id, row.label, row.count))
+      .sort((a, b) => {
+        const delta = (counts.get(b.id)?.count ?? 0) - (counts.get(a.id)?.count ?? 0)
+        if (delta !== 0) return delta
+        return a.label.localeCompare(b.label, 'es')
+      })
+    return next.length > 0 ? next : [fallbackOperation()]
+  }, [scopedItems, manualEntries, appRole, ownerScope, ownerCtx])
+
+  useEffect(() => {
+    if (visibleOperations.some((operation) => operation.id === activeOperation)) return
+    const first = visibleOperations[0]
+    if (first) setActiveOperation(first.id)
+  }, [visibleOperations, activeOperation])
+
   const active =
-    visibleDepartments.find((department) => department.id === activeDepartment) ?? visibleDepartments[0] ?? DEPARTMENTS[0]
+    visibleOperations.find((operation) => operation.id === activeOperation) ??
+    visibleOperations[0] ??
+    fallbackOperation()
   const ActiveIcon = active.icon
 
-  const departmentCounts = useMemo(() => {
-    const counts: Record<DepartmentId, number> = {
-      mechanics: 0,
-      bodywork: 0,
-      insurance: 0,
-      parts: 0,
-      sales: 0,
-    }
-    for (const department of DEPARTMENTS) {
-      counts[department.id] =
-        grouped[department.id].length +
-        manualEntries.filter(
-          (entry) =>
-            entry.departmentId === department.id && matchesOwnerScope(null, ownerScope, ownerCtx),
-        ).length
+  const operationCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const operation of visibleOperations) {
+      const tickets = grouped.get(operation.id)?.length ?? 0
+      const manuals = manualEntries.filter((entry) => {
+        if (manualOperationOf(entry).id !== operation.id) return false
+        return appRole === 'asesor' || matchesOwnerScope(null, ownerScope, ownerCtx)
+      }).length
+      counts[operation.id] = tickets + manuals
     }
     return counts
-  }, [grouped, manualEntries, ownerScope, ownerCtx])
+  }, [visibleOperations, grouped, manualEntries, appRole, ownerScope, ownerCtx])
 
   const columns = useMemo(() => {
     const buckets: Record<PriorityId, BoardCard[]> = {
@@ -682,34 +667,73 @@ export default function BoardsManagerView({
       hecho: [],
     }
 
-    for (const item of grouped[activeDepartment]) {
+    for (const item of grouped.get(active.id) ?? []) {
       const priority = priorities[item.idpeticion] ?? defaultPriority(item)
       buckets[priority].push({ kind: 'peticion', item })
     }
 
     for (const entry of manualEntries) {
-      if (entry.departmentId !== activeDepartment) continue
-      if (!matchesOwnerScope(null, ownerScope, ownerCtx)) continue
+      if (manualOperationOf(entry).id !== active.id) continue
+      if (appRole === 'admin' && !matchesOwnerScope(null, ownerScope, ownerCtx)) continue
       buckets[entry.priority].push({ kind: 'manual', entry })
     }
 
     for (const col of COLUMNS) {
-      buckets[col.id] = applyOrder(buckets[col.id], orders[colOrderKey(activeDepartment, col.id)])
+      buckets[col.id] = applyOrder(buckets[col.id], orders[colOrderKey(active.id, col.id)])
     }
 
     return buckets
-  }, [grouped, activeDepartment, priorities, manualEntries, orders, ownerScope, ownerCtx])
+  }, [grouped, active.id, priorities, manualEntries, orders, ownerScope, ownerCtx, appRole])
 
   useEffect(() => {
     columnsRef.current = columns
   }, [columns])
 
   useEffect(() => {
-    deptRef.current = activeDepartment
-  }, [activeDepartment])
+    opRef.current = active.id
+  }, [active.id])
+
+  const updateTabsOverflow = useCallback(() => {
+    const el = tabsRef.current
+    if (!el) {
+      setTabsOverflow({ up: false, down: false })
+      return
+    }
+    setTabsOverflow({
+      up: el.scrollTop > 4,
+      down: el.scrollTop + el.clientHeight < el.scrollHeight - 4,
+    })
+  }, [])
+
+  useEffect(() => {
+    const el = tabsRef.current
+    if (!el) return
+    updateTabsOverflow()
+    el.addEventListener('scroll', updateTabsOverflow, { passive: true })
+    const observer = new ResizeObserver(updateTabsOverflow)
+    observer.observe(el)
+    return () => {
+      el.removeEventListener('scroll', updateTabsOverflow)
+      observer.disconnect()
+    }
+  }, [updateTabsOverflow, visibleOperations.length])
+
+  useEffect(() => {
+    const activeTab = tabsRef.current?.querySelector<HTMLElement>('.department-tab.is-active')
+    activeTab?.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' })
+    window.setTimeout(updateTabsOverflow, 280)
+  }, [active.id, updateTabsOverflow])
+
+  const scrollOperationTabs = (dir: -1 | 1) => {
+    const el = tabsRef.current
+    if (!el) return
+    const card = el.querySelector<HTMLElement>('.department-tab')
+    const step = (card?.offsetHeight ?? 148) + 10
+    el.scrollBy({ top: dir * step, behavior: 'smooth' })
+  }
 
   const placeCard = useCallback((id: string, to: PriorityId, index: number) => {
-    const dept = deptRef.current
+    const dept = opRef.current
     const workshopId = workshopIdRef.current
 
     if (id.startsWith('manual-')) {
@@ -958,7 +982,8 @@ export default function BoardsManagerView({
     if (!title) return
     const entry: ManualEntry = {
       id: `manual-${crypto.randomUUID()}`,
-      departmentId: activeDepartment,
+      operationKey: active.id,
+      operationLabel: active.label,
       priority: 'media',
       title,
       phone: draftPhone.trim(),
@@ -971,7 +996,7 @@ export default function BoardsManagerView({
       return next
     })
     setOrders((prev) => {
-      const key = colOrderKey(activeDepartment, 'media')
+      const key = colOrderKey(active.id, 'media')
       const next = { ...prev, [key]: insertId(prev[key] ?? columns.media.map(cardId), entry.id, 0) }
       saveJson(orderKey(workshop.id), next)
       return next
@@ -984,43 +1009,69 @@ export default function BoardsManagerView({
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
       {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
 
-      {visibleDepartments.length === 0 ? (
-        <p className="section-subtitle">Tu equipo no tiene tableros. El admin los asigna en Equipos.</p>
+      {!loading && scopedItems.length === 0 && manualEntries.length === 0 ? (
+        <p className="section-subtitle">
+          {appRole === 'asesor'
+            ? 'Tu equipo no tiene consultas en este periodo.'
+            : 'No hay consultas en este periodo.'}
+        </p>
       ) : null}
 
-      <nav className="department-tabs custom-scrollbar-light" aria-label="Departamentos">
-        {visibleDepartments.map((department) => {
-          const Icon = department.icon
-          const selected = department.id === activeDepartment
-          const count = departmentCounts[department.id]
-          return (
-            <button
-              key={department.id}
-              type="button"
-              className={`department-tab glass glass-lite ${selected ? 'is-active' : ''}`}
-              onClick={() => {
-                setActiveDepartment(department.id)
-                setShowNewEntry(false)
-              }}
-              aria-current={selected ? 'page' : undefined}
-            >
-              <span className="department-tab-count">
-                {loading ? '—' : count} {count === 1 ? 'caso' : 'casos'}
-              </span>
-              <span className="department-tab-icon"><Icon size={18} /></span>
-              <span className="department-tab-copy">
-                <strong>{department.label}</strong>
-                <small>{department.description}</small>
-              </span>
-            </button>
-          )
-        })}
-      </nav>
+      <div className="operation-tabs-rail">
+        <nav ref={tabsRef} className="department-tabs custom-scrollbar-light" aria-label="Operaciones">
+          {visibleOperations.map((operation) => {
+            const Icon = operation.icon
+            const selected = operation.id === active.id
+            const count = operationCounts[operation.id] ?? 0
+            return (
+              <button
+                key={operation.id}
+                type="button"
+                className={`department-tab glass glass-lite ${selected ? 'is-active' : ''}`}
+                onClick={() => {
+                  setActiveOperation(operation.id)
+                  setShowNewEntry(false)
+                }}
+                aria-current={selected ? 'page' : undefined}
+              >
+                <span className="department-tab-count">
+                  {loading ? '—' : count} {count === 1 ? 'caso' : 'casos'}
+                </span>
+                <span className="department-tab-icon"><Icon size={18} /></span>
+                <span className="department-tab-copy">
+                  <strong>{operation.label}</strong>
+                  <small>{operation.description}</small>
+                </span>
+              </button>
+            )
+          })}
+        </nav>
+        <div className="operation-tabs-arrows">
+          <button
+            type="button"
+            className="ghost-button calendar-nav"
+            onClick={() => scrollOperationTabs(-1)}
+            disabled={!tabsOverflow.up}
+            aria-label="Ver operaciones de arriba"
+          >
+            <ChevronUp size={17} />
+          </button>
+          <button
+            type="button"
+            className="ghost-button calendar-nav"
+            onClick={() => scrollOperationTabs(1)}
+            disabled={!tabsOverflow.down}
+            aria-label="Ver operaciones de abajo"
+          >
+            <ChevronDown size={17} />
+          </button>
+        </div>
+      </div>
 
       <section className="board-heading glass glass-lite">
         <div className="department-tab-icon"><ActiveIcon size={20} /></div>
         <div className="board-heading-copy">
-          <p className="section-eyebrow">Tablero especializado</p>
+          <p className="section-eyebrow">Tablero por operación</p>
           <h2 className="ops-card-title">{active.label}</h2>
           <p className="section-subtitle">
             {appRole === 'asesor'
@@ -1074,7 +1125,7 @@ export default function BoardsManagerView({
         </div>
         <button type="button" className="client-submit" onClick={openNewEntry}>
           <Plus size={16} />
-          Nueva entrada para este departamento
+          Nueva entrada para esta operación
         </button>
       </section>
 
@@ -1115,7 +1166,7 @@ export default function BoardsManagerView({
               rows={3}
               value={draftNote}
               onChange={(e) => setDraftNote(e.target.value)}
-              placeholder="Detalle para el departamento…"
+              placeholder="Detalle para esta operación…"
             />
           </label>
           <div className="board-new-entry-actions">

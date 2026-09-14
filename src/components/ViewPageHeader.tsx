@@ -94,7 +94,10 @@ function pageCopy(
     case 'boards':
       return {
         title: 'Gestor de tableros',
-        subtitle: 'Elige departamento y mueve las tarjetas según la prioridad del asesor.',
+        subtitle:
+          appRole === 'asesor'
+            ? 'Tu herramienta de trabajo: consultas por operación y prioridad.'
+            : 'Herramienta principal del taller: consultas por operación y prioridad.',
       }
     case 'laura':
       return {

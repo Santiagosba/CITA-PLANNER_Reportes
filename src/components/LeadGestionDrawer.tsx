@@ -1,9 +1,8 @@
-import { memo, useEffect, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import {
+  Car,
   FileText,
-  MessageSquare,
   PhoneCall,
-  Printer,
   Server,
   Sparkles,
   TriangleAlert,
@@ -11,16 +10,18 @@ import {
 } from 'lucide-react'
 import ActionButton, { type ActionStatus } from './ui/ActionButton'
 import VehiclePlate from './ui/VehiclePlate'
+import ChannelTag from './ChannelTag'
 import { LeadCallHistory, LeadCallTranscript } from './LeadCallHistory'
+import UrgencyThermometer from './UrgencyThermometer'
+import WhatsAppMark from './WhatsAppMark'
 import { useCustomerCalls } from '../hooks/useCustomerCalls'
 import type { CustomerCallItem } from '../lib/crmApi'
-import { peticionToHistoryItem } from '../lib/interactionLabels'
+import { inferPeticionTipo, peticionToHistoryItem } from '../lib/interactionLabels'
 import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
 import { ticketClientLabel, ticketClientPhone, ticketVehicleLabel } from '../lib/ticketClient'
 import { scoreTicketUrgency } from '../lib/ticketUrgency'
 import TicketClientBlock from './TicketClientBlock'
 import TicketOwnerPicker from './TicketOwnerPicker'
-import { isSlaCritico } from '../lib/tallerStations'
 import type { CrmAppRole } from '../lib/crmRoles'
 import type { AdvisorWorkspace } from '../lib/advisorWorkspace'
 import type { Workshop } from '../types'
@@ -122,14 +123,17 @@ function LeadGestionDrawer({
   const cliente = ticketClientLabel(p)
   const phone = ticketClientPhone(p)
   const vehicle = ticketVehicleLabel(p)
-  const titulo = cliente
+  const titulo = vehicle || 'Coche sin ficha'
   const telRaw = phone.replace(/\s/g, '')
   const telHref = telRaw ? `tel:${telRaw}` : null
   const waHref = telRaw ? `https://wa.me/${telRaw.replace(/^\+/, '')}` : null
   const pendiente = isPeticionPendiente(p)
-  const sla = isSlaCritico(p.fechainicio) || isSlaCritico(c?.fecha)
   const urgencyScore = scoreTicketUrgency(p)
-  const urgency = urgencyScore.score
+  const channel = inferPeticionTipo(p.tipopeticion)
+  const callCount = useMemo(
+    () => calls.items.filter((item) => item.tipo === 'llamada').length,
+    [calls.items],
+  )
 
   return (
     <div
@@ -160,7 +164,9 @@ function LeadGestionDrawer({
 
           <div className="lead-modal-title-row">
             {c?.matricula ? <VehiclePlate value={c.matricula} className="lead-modal-plate" /> : (
-              <span className="ops-feed-placeholder">SIN MATRÍCULA</span>
+              <span className="lead-modal-car-fallback" aria-hidden>
+                <Car size={18} />
+              </span>
             )}
             <div className="lead-modal-title-text">
               <div className="lead-modal-heading">
@@ -168,16 +174,20 @@ function LeadGestionDrawer({
                 {c?.fecha ? <span className="badge tone-muted">{formatFecha(c.fecha)}</span> : null}
               </div>
               <p className="lead-modal-sub">
-                {vehicle ? `${vehicle} · ` : ''}
                 {p.tipopeticion || 'Sin tipo'} · Consulta {formatFecha(p.fechainicio)}
               </p>
             </div>
           </div>
 
           <div className="lead-modal-header-actions">
-            <button type="button" className="ghost-button lead-icon-btn" title="Imprimir ficha" onClick={() => window.print()}>
-              <Printer size={16} />
-            </button>
+            <span
+              className="lead-call-count"
+              title="Llamadas de este cliente hasta hoy"
+            >
+              <PhoneCall size={16} aria-hidden />
+              <strong>{calls.loading ? '…' : callCount}</strong>
+              <span>{callCount === 1 ? 'llamada' : 'llamadas'}</span>
+            </span>
           </div>
         </header>
 
@@ -187,6 +197,7 @@ function LeadGestionDrawer({
               <User size={18} />
             </span>
             <TicketClientBlock peticion={p} size="lg" />
+            {channel === 'whatsapp' ? <ChannelTag tipo="whatsapp" /> : null}
           </div>
           <div className="lead-modal-contact">
             {telHref ? (
@@ -202,8 +213,8 @@ function LeadGestionDrawer({
               </a>
             ) : null}
             {waHref ? (
-              <a href={waHref} target="_blank" rel="noreferrer" className="ghost-button lead-contact-btn is-wa">
-                <MessageSquare size={14} />
+              <a href={waHref} target="_blank" rel="noreferrer" className="lead-contact-btn is-wa">
+                <WhatsAppMark size={16} />
                 WhatsApp
               </a>
             ) : null}
@@ -214,11 +225,13 @@ function LeadGestionDrawer({
                 currentUser={currentUser}
                 appRole={appRole}
                 peticion={p}
-                compact
+                layout="card"
               />
             ) : null}
           </div>
         </div>
+
+        <UrgencyThermometer score={urgencyScore.score} reason={urgencyScore.reasons[0]} />
 
         <LeadCallHistory
           phone={telRaw}
@@ -279,33 +292,19 @@ function LeadGestionDrawer({
                 </p>
               </section>
 
-              <div className="lead-info-grid">
-                <section className="lead-info-card">
-                  <div className="lead-info-row">
-                    <span>Termómetro de urgencia</span>
-                    <strong className="font-mono">{urgency}%</strong>
-                  </div>
-                  <div className="progress-bar" role="progressbar" aria-valuenow={urgency} aria-valuemin={0} aria-valuemax={100}>
-                    <div className="progress-bar-fill" style={{ width: `${urgency}%` }} />
-                  </div>
-                  <small>
-                    {urgencyScore.reasons[0] || (sla ? 'Prioridad máxima (alerta SLA)' : pendiente ? 'Pendiente de validación' : 'Ya tiene cita')}
-                  </small>
-                </section>
-                <section className="lead-info-card lead-sentiment-card">
-                  <div className="lead-sentiment-head">
-                    <span className="lead-info-muted">Sentimiento del cliente</span>
-                    <strong className="lead-sentiment">
-                      <span className="lead-sentiment-dot" />
-                      Neutral
-                    </strong>
-                  </div>
-                  <small className="lead-sentiment-detail">
-                    <Sparkles size={13} aria-hidden />
-                    Analizado por entonación y palabras clave
-                  </small>
-                </section>
-              </div>
+              <section className="lead-info-card lead-sentiment-card">
+                <div className="lead-sentiment-head">
+                  <span className="lead-info-muted">Sentimiento del cliente</span>
+                  <strong className="lead-sentiment">
+                    <span className="lead-sentiment-dot" />
+                    Neutral
+                  </strong>
+                </div>
+                <small className="lead-sentiment-detail">
+                  <Sparkles size={13} aria-hidden />
+                  Analizado por entonación y palabras clave
+                </small>
+              </section>
 
               <section className="lead-info-card">
                 <h3 className="lead-info-title">

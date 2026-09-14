@@ -1,11 +1,15 @@
-import { useMemo, useState } from 'react'
-import { FileText, Mail, MessageSquare, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, Play, RefreshCw } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ChevronDown, FileText, Mail, Mic, Pause, Phone, PhoneIncoming, PhoneMissed, Play, RefreshCw } from 'lucide-react'
+import ChannelTag from './ChannelTag'
+import WhatsAppMark from './WhatsAppMark'
 import { CrmApiError, fetchRecordingUrl, type CustomerCallItem } from '../lib/crmApi'
 import { formatFecha } from '../lib/peticionesPendientes'
 import { hasStoredTranscript, splitStoredNotes } from '../lib/callFormat'
-import { channelLabel, channelTone, closeLabels } from '../lib/interactionLabels'
+import { closeLabels } from '../lib/interactionLabels'
 import { phoneTail, useSoftphone, type TranscriptLine } from '../lib/softphone'
 import type { useCustomerCalls } from '../hooks/useCustomerCalls'
+
+const HISTORY_OPEN_KEY = 'avi_lead_history_open_v1'
 
 type CallsState = ReturnType<typeof useCustomerCalls>
 
@@ -28,8 +32,28 @@ type HistoryProps = {
   onSelect: (item: CustomerCallItem) => void
 }
 
+function readHistoryOpen(): boolean {
+  try {
+    const raw = localStorage.getItem(HISTORY_OPEN_KEY)
+    if (raw === '0') return false
+    if (raw === '1') return true
+  } catch {
+    /* private mode */
+  }
+  return true
+}
+
+function writeHistoryOpen(open: boolean) {
+  try {
+    localStorage.setItem(HISTORY_OPEN_KEY, open ? '1' : '0')
+  } catch {
+    /* private mode */
+  }
+}
+
 function channelIcon(item: CustomerCallItem) {
-  if (item.tipo === 'whatsapp' || item.tipo === 'sms') return <MessageSquare size={14} />
+  if (item.tipo === 'whatsapp') return <WhatsAppMark size={14} />
+  if (item.tipo === 'sms') return <Mail size={14} />
   if (item.tipo === 'email') return <Mail size={14} />
   const missed = item.nocontesta || !item.completada
   if (missed && item.tipo === 'llamada') return <PhoneMissed size={14} />
@@ -40,10 +64,15 @@ function channelIcon(item: CustomerCallItem) {
 /** Lista de llamadas con este teléfono: grabación (play) y acceso a la transcripción. */
 export function LeadCallHistory({ phone, calls, selectedId, extraItems = [], onSelect }: HistoryProps) {
   const { call } = useSoftphone()
+  const [open, setOpen] = useState(readHistoryOpen)
   const [playingId, setPlayingId] = useState<string | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [audioError, setAudioError] = useState<string | null>(null)
   const [loadingId, setLoadingId] = useState<string | null>(null)
+
+  useEffect(() => {
+    writeHistoryOpen(open)
+  }, [open])
 
   const live = call && phoneTail(call.number) === phoneTail(phone) ? call : null
   const items = useMemo(() => {
@@ -98,7 +127,7 @@ export function LeadCallHistory({ phone, calls, selectedId, extraItems = [], onS
   }
 
   return (
-    <div className="lead-voice-card lead-calls-card">
+    <div className={`lead-voice-card lead-calls-card${open ? '' : ' is-collapsed'}`}>
       <div className="lead-voice-meta">
         <div className="lead-voice-label">
           <span className={`lead-voice-dot ${live?.recording ? 'is-live' : ''}`} />
@@ -107,30 +136,41 @@ export function LeadCallHistory({ phone, calls, selectedId, extraItems = [], onS
               ? live.recording
                 ? 'Grabando la llamada en curso'
                 : 'Llamada en curso'
-              : `Historial del cliente · ${items.length}`}
+              : `Historial · ${items.length}`}
           </span>
         </div>
-        <button
-          type="button"
-          className="ghost-button lead-icon-btn"
-          title="Actualizar historial"
-          onClick={() => void calls.refresh()}
-          disabled={calls.loading}
-        >
-          <RefreshCw size={14} className={calls.loading ? 'animate-spin' : ''} aria-hidden />
-        </button>
+        <div className="lead-calls-toolbar">
+          <button
+            type="button"
+            className="ghost-button lead-icon-btn"
+            title="Actualizar historial"
+            onClick={() => void calls.refresh()}
+            disabled={calls.loading}
+          >
+            <RefreshCw size={14} className={calls.loading ? 'animate-spin' : ''} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className="ghost-button lead-history-toggle"
+            aria-expanded={open}
+            onClick={() => setOpen((prev) => !prev)}
+          >
+            <ChevronDown size={16} className={open ? 'is-open' : ''} aria-hidden />
+            {open ? 'Recoger' : 'Desplegar'}
+          </button>
+        </div>
       </div>
 
-      {calls.error ? <p className="lead-voice-hint lead-calls-error">{calls.error}</p> : null}
+      {open && calls.error ? <p className="lead-voice-hint lead-calls-error">{calls.error}</p> : null}
 
-      {!calls.loading && !calls.error && items.length === 0 ? (
+      {open && !calls.loading && !calls.error && items.length === 0 ? (
         <p className="lead-voice-hint">
           <Phone size={12} />
           Aún no hay llamadas ni mensajes con este cliente.
         </p>
       ) : null}
 
-      {items.length > 0 ? (
+      {open && items.length > 0 ? (
         <ul className="lead-calls-list">
           {items.map((item) => {
             const missed = item.tipo === 'llamada' && (item.nocontesta || !item.completada)
@@ -147,7 +187,7 @@ export function LeadCallHistory({ phone, calls, selectedId, extraItems = [], onS
                     {item.tipo === 'llamada' ? <span className="font-mono">{fmtSecs(item.duracionSeg)}</span> : null}
                   </span>
                   <span className="lead-calls-tags">
-                    <span className={`badge ${channelTone(item.tipo)}`}>{channelLabel(item.tipo)}</span>
+                    <ChannelTag tipo={item.tipo} />
                     {item.entrante ? <span className="badge tone-muted">Entrante</span> : null}
                     {closes.map((tag) => (
                       <span key={tag.text} className={`badge ${tag.tone}`}>
@@ -189,8 +229,8 @@ export function LeadCallHistory({ phone, calls, selectedId, extraItems = [], onS
         </ul>
       ) : null}
 
-      {audioError ? <p className="lead-voice-hint lead-calls-error">{audioError}</p> : null}
-      {audioUrl ? (
+      {open && audioError ? <p className="lead-voice-hint lead-calls-error">{audioError}</p> : null}
+      {open && audioUrl ? (
         <audio
           className="lead-calls-audio"
           src={audioUrl}

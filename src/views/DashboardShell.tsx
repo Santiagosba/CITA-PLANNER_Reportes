@@ -791,6 +791,10 @@ export default function DashboardShell({
             hideDeskWindows()
             setShellRoute('tareas-hoy')
           }}
+          onOpenBoards={() => {
+            hideDeskWindows()
+            setShellRoute('boards')
+          }}
           onOpenLead={openLead}
           refreshToken={gestionBump}
         />

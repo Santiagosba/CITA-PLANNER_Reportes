@@ -196,6 +196,12 @@ export async function sqlFetchTiposPeticion(): Promise<TipoPeticionRow[]> {
   return parseJson<TipoPeticionRow[]>(await apiFetch(url('/api/tipos-peticion')))
 }
 
+export async function sqlFetchMotivosCancelada(): Promise<
+  { idmotivocancelada: number; motivocancelada: string }[]
+> {
+  return parseJson(await apiFetch(url('/api/motivos-cancelada')))
+}
+
 export async function sqlFetchPendingPeticiones(
   idTallerIds: string[],
   filters: PeticionesFilters = {},

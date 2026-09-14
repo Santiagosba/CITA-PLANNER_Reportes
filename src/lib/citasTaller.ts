@@ -24,6 +24,7 @@ export type CitaTaller = {
   matricula: string | null
   kilometros: number | null
   idEstadoCita: number | null
+  idMotivoCancelada: number | null
   idCentro: string | null
   idOperario: string | null
   direccion: string | null
@@ -50,6 +51,7 @@ const CITA_TALLER_SELECT = [
   'matricula',
   'kilometros',
   'idestadocita',
+  'idmotivocancelada',
   'idcentro',
   'idoperario',
   'direccion',
@@ -72,18 +74,36 @@ export async function fetchCitasTaller(
     return sqlFetchCitas(ids, range)
   }
 
-  const rows = (await fetchAllSupabasePages(() => {
-    let query = supabaseAviOld
-      .from('citas')
-      .select(CITA_TALLER_SELECT)
-      .in('idtaller', ids)
-    if (range.from) query = query.gte('fecha', `${range.from}T00:00:00`)
-    if (range.to) query = query.lte('fecha', `${range.to}T23:59:59`)
-    return query.order('fecha', { ascending: true })
-  })) as unknown as Record<string, unknown>[]
+  const rows = await fetchCitaRows(ids, range, CITA_TALLER_SELECT)
+  return rows.map(mapCitaTallerRow)
+}
 
-  return rows.map((row) => ({
-    idcita: String(row.idcita),
+const CITA_TALLER_SELECT_FALLBACK = CITA_TALLER_SELECT.replace(',idmotivocancelada', '')
+
+async function fetchCitaRows(
+  ids: string[],
+  range: { from?: string; to?: string },
+  columns: string,
+): Promise<Record<string, unknown>[]> {
+  try {
+    return (await fetchAllSupabasePages(() => {
+      let query = supabaseAviOld.from('citas').select(columns).in('idtaller', ids)
+      if (range.from) query = query.gte('fecha', `${range.from}T00:00:00`)
+      if (range.to) query = query.lte('fecha', `${range.to}T23:59:59`)
+      return query.order('fecha', { ascending: true })
+    })) as unknown as Record<string, unknown>[]
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (columns.includes('idmotivocancelada') && /idmotivocancelada/i.test(message)) {
+      return fetchCitaRows(ids, range, CITA_TALLER_SELECT_FALLBACK)
+    }
+    throw error
+  }
+}
+
+function mapCitaTallerRow(row: Record<string, unknown>): CitaTaller {
+  return {
+    idcita: String(row.idcita || '').toLowerCase(),
     idtaller: String(row.idtaller),
     fecha: (row.fecha as string | null) ?? null,
     asunto: emptyToNull(row.asunto),
@@ -100,13 +120,14 @@ export async function fetchCitasTaller(
     matricula: emptyToNull(row.matricula),
     kilometros: row.kilometros == null ? null : Number(row.kilometros),
     idEstadoCita: row.idestadocita == null ? null : Number(row.idestadocita),
+    idMotivoCancelada: row.idmotivocancelada == null ? null : Number(row.idmotivocancelada),
     idCentro: emptyToNull(row.idcentro),
     idOperario: emptyToNull(row.idoperario),
     direccion: emptyToNull(row.direccion),
     poblacion: emptyToNull(row.poblacion),
     provincia: emptyToNull(row.provincia),
     contacto: emptyToNull(row.contacto),
-  }))
+  }
 }
 
 function emptyToNull(v: unknown): string | null {

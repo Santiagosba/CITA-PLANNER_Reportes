@@ -567,6 +567,108 @@ export function LauraPareto({
   )
 }
 
+export type LauraGroupBarRow = {
+  key: string
+  label: string
+  a: number
+  b: number
+}
+
+export function LauraGroupedBars({
+  caption,
+  rows,
+  aLabel = 'Realizadas',
+  bLabel = 'Canceladas',
+  aColor = '#0a55b8',
+  bColor = '#ef5b67',
+  empty = 'Aún no hay citas realizadas ni canceladas en este periodo.',
+}: {
+  caption: string
+  rows: LauraGroupBarRow[]
+  aLabel?: string
+  bLabel?: string
+  aColor?: string
+  bColor?: string
+  empty?: string
+}) {
+  const max = Math.max(1, ...rows.flatMap((row) => [row.a, row.b]))
+  const { tip, show, hide } = useChartTip()
+  const [hotKey, setHotKey] = useState<string | null>(null)
+  const totalA = rows.reduce((sum, row) => sum + row.a, 0)
+  const totalB = rows.reduce((sum, row) => sum + row.b, 0)
+
+  if (rows.length === 0 || (totalA === 0 && totalB === 0)) {
+    return (
+      <div className="laura-chart-block is-wide">
+        <p className="section-subtitle">{caption}</p>
+        <p className="section-subtitle">{empty}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="laura-chart-block is-wide">
+      <p className="section-subtitle">{caption}</p>
+      <ul className="laura-group-bars" role="img" aria-label={`${aLabel} y ${bLabel} por motivo.`}>
+        {rows.map((row, index) => {
+          const total = row.a + row.b
+          return (
+            <li
+              key={row.key}
+              className={hotKey === row.key ? 'is-hot' : undefined}
+              style={{ ['--i' as string]: String(index) } as CSSProperties}
+              onPointerMove={(event) => {
+                setHotKey(row.key)
+                show(event, {
+                  title: row.label,
+                  lines: [
+                    { label: aLabel, value: formatCount(row.a) },
+                    { label: bLabel, value: formatCount(row.b) },
+                    { label: 'Total', value: formatCount(total) },
+                    {
+                      label: 'Canceladas',
+                      value: total > 0 ? formatLauraPct((row.b / total) * 100) : '0%',
+                    },
+                  ],
+                })
+              }}
+              onPointerLeave={() => {
+                setHotKey(null)
+                hide()
+              }}
+            >
+              <strong>{row.label}</strong>
+              <div className="laura-group-tracks">
+                <span className="laura-group-track" aria-hidden>
+                  <i style={{ width: `${(row.a / max) * 100}%`, background: aColor }} />
+                </span>
+                <span className="laura-group-track" aria-hidden>
+                  <i style={{ width: `${(row.b / max) * 100}%`, background: bColor }} />
+                </span>
+              </div>
+              <span className="laura-group-counts">
+                <em style={{ color: aColor }}>{row.a}</em>
+                <em style={{ color: bColor }}>{row.b}</em>
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+      <ul className="laura-chart-keys">
+        <li>
+          <i style={{ background: aColor }} aria-hidden />
+          {aLabel} · {formatCount(totalA)}
+        </li>
+        <li>
+          <i style={{ background: bColor }} aria-hidden />
+          {bLabel} · {formatCount(totalB)}
+        </li>
+      </ul>
+      <ChartTip tip={tip} />
+    </div>
+  )
+}
+
 export function mixToPieSlices(rows: { key: string; label: string; value: number }[]): LauraPieSlice[] {
   const total = rows.reduce((sum, row) => sum + row.value, 0)
   if (total <= 0) return []
@@ -593,6 +695,212 @@ export function mixToRadarAxes(rows: { key: string; label: string; value: number
     count: row.value,
     color: LAURA_CHART_COLORS[index % LAURA_CHART_COLORS.length],
   }))
+}
+
+const MOSAIC_WORK_COLORS = ['#0a55b8', '#1473e6', '#2563eb', '#3b82f6', '#1d4ed8', '#60a5fa'] as const
+const THERMAL_STOPS: [number, number, number][] = [
+  [12, 8, 22],
+  [59, 15, 112],
+  [140, 20, 133],
+  [204, 62, 79],
+  [245, 125, 21],
+  [246, 215, 67],
+  [252, 253, 191],
+]
+
+function mosaicColor(index: number): string {
+  return MOSAIC_WORK_COLORS[index % MOSAIC_WORK_COLORS.length]
+}
+
+function thermalFill(value: number, max: number): string {
+  if (value <= 0 || max <= 0) return 'rgb(10, 8, 16)'
+  const t = Math.min(1, Math.sqrt(value / max))
+  const x = t * (THERMAL_STOPS.length - 1)
+  const i = Math.min(THERMAL_STOPS.length - 2, Math.floor(x))
+  const f = x - i
+  const a = THERMAL_STOPS[i]
+  const b = THERMAL_STOPS[i + 1]
+  const mix = (from: number, to: number) => Math.round(from + (to - from) * f)
+  return `rgb(${mix(a[0], b[0])}, ${mix(a[1], b[1])}, ${mix(a[2], b[2])})`
+}
+
+function thermalInk(value: number, max: number): string {
+  if (value <= 0 || max <= 0) return 'transparent'
+  return value / max > 0.62 ? '#1a1208' : '#fff6e8'
+}
+
+export function LauraMosaic({
+  caption,
+  rows,
+  valueLabel = 'Consultas',
+  helper = 'Cuanto más grande es la pieza, más trabajo tiene esa persona.',
+  empty = 'Aún no hay datos en este periodo.',
+}: {
+  caption: string
+  rows: LauraParetoRow[]
+  valueLabel?: string
+  helper?: string
+  empty?: string
+}) {
+  const total = rows.reduce((sum, row) => sum + row.value, 0)
+  const { tip, show, hide } = useChartTip()
+  const [hotKey, setHotKey] = useState<string | null>(null)
+  const tiles = [...rows].filter((row) => row.value > 0).sort((a, b) => b.value - a.value)
+
+  if (tiles.length === 0 || total <= 0) {
+    return (
+      <div className="laura-chart-block is-wide">
+        <p className="section-subtitle">{caption}</p>
+        <p className="section-subtitle">{empty}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="laura-chart-block is-wide">
+      <p className="section-subtitle">{caption}</p>
+      <ul className="laura-mosaic" role="img" aria-label="Mosaico de trabajo por persona.">
+        {tiles.map((row, index) => {
+          const pct = (row.value / total) * 100
+          const color = mosaicColor(index)
+          return (
+            <li
+              key={row.key}
+              className={hotKey === row.key ? 'is-hot' : undefined}
+              style={
+                {
+                  ['--w' as string]: String(Math.max(row.value, 1)),
+                  ['--tile' as string]: color,
+                  ['--i' as string]: String(index),
+                } as CSSProperties
+              }
+              onPointerMove={(event) => {
+                setHotKey(row.key)
+                show(event, {
+                  title: row.label,
+                  color,
+                  lines: [
+                    { label: valueLabel, value: formatCount(row.value) },
+                    { label: 'Peso', value: formatLauraPct(pct) },
+                    { label: 'Total', value: formatCount(total) },
+                  ],
+                })
+              }}
+              onPointerLeave={() => {
+                setHotKey(null)
+                hide()
+              }}
+            >
+              <strong>{row.label}</strong>
+              <span>
+                {formatCount(row.value)} · {formatLauraPct(pct)}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+      <p className="section-subtitle">{helper}</p>
+      <ChartTip tip={tip} />
+    </div>
+  )
+}
+
+export function LauraHeatmap({
+  caption,
+  rows,
+  cols,
+  values,
+  valueLabel = 'Canceladas',
+  empty = 'Aún no hay datos en este periodo.',
+}: {
+  caption: string
+  rows: { key: string; label: string }[]
+  cols: { key: string; label: string }[]
+  values: number[][]
+  valueLabel?: string
+  empty?: string
+}) {
+  const { tip, show, hide } = useChartTip()
+  const [hotKey, setHotKey] = useState<string | null>(null)
+  const max = Math.max(0, ...values.flat())
+  const dense = cols.length > 12
+
+  if (rows.length === 0 || cols.length === 0 || max <= 0) {
+    return (
+      <div className="laura-chart-block is-wide">
+        <p className="section-subtitle">{caption}</p>
+        <p className="section-subtitle">{empty}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="laura-chart-block is-wide">
+      <p className="section-subtitle">{caption}</p>
+      <div className={`laura-heat is-thermal${dense ? ' is-dense' : ''}`}>
+        <div className="laura-heat-stage">
+          <div
+            className="laura-heat-grid"
+            role="img"
+            aria-label="Visor de calor de motivos de cancelación."
+            style={{ ['--cols' as string]: String(cols.length) } as CSSProperties}
+          >
+            <span className="laura-heat-corner" aria-hidden />
+            {cols.map((col) => (
+              <span key={col.key} className="laura-heat-colhead">
+                {col.label}
+              </span>
+            ))}
+            {rows.map((row, rowIndex) => (
+              <div key={row.key} className="laura-heat-row" style={{ ['--i' as string]: String(rowIndex) } as CSSProperties}>
+                <strong>{row.label}</strong>
+                {cols.map((col, colIndex) => {
+                  const value = values[rowIndex]?.[colIndex] ?? 0
+                  const key = `${row.key}-${col.key}`
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`laura-heat-cell${hotKey === key ? ' is-hot' : ''}${value <= 0 ? ' is-empty' : ''}`}
+                      style={{
+                        background: thermalFill(value, max),
+                        color: thermalInk(value, max),
+                      }}
+                      aria-label={`${row.label}, ${col.label}: ${value} ${valueLabel.toLowerCase()}.`}
+                      onPointerMove={(event) => {
+                        setHotKey(key)
+                        show(event, {
+                          title: row.label,
+                          color: value > 0 ? '#f57d15' : undefined,
+                          lines: [
+                            { label: 'Tramo', value: col.label },
+                            { label: valueLabel, value: formatCount(value) },
+                          ],
+                        })
+                      }}
+                      onPointerLeave={() => {
+                        setHotKey(null)
+                        hide()
+                      }}
+                    >
+                      {dense ? '' : value > 0 ? value : ''}
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+          <div className="laura-heat-bar" aria-hidden>
+            <span>Caliente</span>
+            <i />
+            <span>Frío</span>
+          </div>
+        </div>
+      </div>
+      <p className="section-subtitle">Negro es cero. Amarillo y blanco son los motivos que más cancelan.</p>
+      <ChartTip tip={tip} />
+    </div>
+  )
 }
 
 export function LauraChartCardHeader({

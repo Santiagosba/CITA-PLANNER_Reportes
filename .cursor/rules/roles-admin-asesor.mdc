@@ -27,7 +27,7 @@ Gestor de tableros, equipo y métricas van aquí. No es solo el escritorio opera
 
 Puede:
 
-- Ver **Dashboard general**, **Triage**, **Gestor de tableros** y **Asistente IA**
+- Ver **Dashboard general**, **Gestor de tableros** (su herramienta principal), **Triage** y **Asistente IA**
 - Ver **su equipo o compañeros** (solo lectura: no crea equipos ni asigna tipos/tableros)
 - Ver **Tareas de hoy** y filtrar tickets/tareas: **mías**, **del grupo**, **de otros compañeros**, **sin dueño**
 - Ver los **tickets del equipo** y **pasarlos a un compañero** (baja, o el cliente lo atendió otro). No los de otros equipos
@@ -36,7 +36,7 @@ Puede:
 
 ## Al implementar
 
-- Nav y rutas según rol: admin ≠ asesor
+- Nav y rutas según rol: admin ≠ asesor. En ambos, **Gestor de tableros** va segundo, justo debajo de **Dashboard general**. Es la herramienta de trabajo del asesor.
 - Una tarea asignada por el admin aparece en Tareas de hoy del asesor
 - Tableros y tipos de tarea se filtran por el equipo del usuario
 - Stats de empleados y costes Telnyx: solo admin, sobre **todas** las filas del periodo (sin `TOP`/`LIMIT`)
