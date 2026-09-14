@@ -38,7 +38,14 @@ import { defaultBoardPriority, scoreManualUrgency, scoreTicketUrgency } from '..
 import TicketClientBlock from '../components/TicketClientBlock'
 import { useOperationalData } from '../hooks/useOperationalData'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
+import {
+  citaLinkEmptyCopy,
+  matchesCitaLink,
+  matchesManualCitaLink,
+  type CitaLinkFilter,
+} from '../lib/citaLinkFilter'
 import { buildOwnerScopeContext, matchesOwnerScope, matchesTeamOwnedTickets, type OwnerScope } from '../lib/ownerScope'
+import CitaLinkFilterControl from '../components/CitaLinkFilter'
 import OwnerScopeFilter from '../components/OwnerScopeFilter'
 import TicketOwnerPicker from '../components/TicketOwnerPicker'
 import type { CrmAppRole } from '../lib/crmRoles'
@@ -527,18 +534,21 @@ export default function BoardsManagerView({
   const workshopKey = workshop.containerIdTaller || workshop.id
   const { workspace } = useAdvisorWorkspace(workshopKey, currentUser, true)
   const [ownerScope, setOwnerScope] = useState<OwnerScope>('todas')
+  const [citaLink, setCitaLink] = useState<CitaLinkFilter>('todas')
   const ownerCtx = useMemo(
     () => buildOwnerScopeContext(workspace, currentUser.email),
     [workspace, currentUser.email],
   )
   const scopedItems = useMemo(
     () =>
-      items.filter((item) =>
-        appRole === 'asesor'
-          ? matchesTeamOwnedTickets(item.gestionemail, ownerCtx)
-          : matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx),
-      ),
-    [items, appRole, ownerScope, ownerCtx],
+      items.filter((item) => {
+        const ownerOk =
+          appRole === 'asesor'
+            ? matchesTeamOwnedTickets(item.gestionemail, ownerCtx)
+            : matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx)
+        return ownerOk && matchesCitaLink(item, citaLink)
+      }),
+    [items, appRole, ownerScope, ownerCtx, citaLink],
   )
 
   useEffect(() => {
@@ -617,6 +627,7 @@ export default function BoardsManagerView({
       else counts.set(id, { label: item.tipopeticion?.trim() || 'Sin tipo', count: 1 })
     }
     for (const entry of manualEntries) {
+      if (!matchesManualCitaLink(citaLink)) continue
       if (appRole === 'admin' && !matchesOwnerScope(null, ownerScope, ownerCtx)) continue
       const op = manualOperationOf(entry)
       const prev = counts.get(op.id)
@@ -631,7 +642,7 @@ export default function BoardsManagerView({
         return a.label.localeCompare(b.label, 'es')
       })
     return next.length > 0 ? next : [fallbackOperation()]
-  }, [scopedItems, manualEntries, appRole, ownerScope, ownerCtx])
+  }, [scopedItems, manualEntries, appRole, ownerScope, ownerCtx, citaLink])
 
   useEffect(() => {
     if (visibleOperations.some((operation) => operation.id === activeOperation)) return
@@ -651,12 +662,13 @@ export default function BoardsManagerView({
       const tickets = grouped.get(operation.id)?.length ?? 0
       const manuals = manualEntries.filter((entry) => {
         if (manualOperationOf(entry).id !== operation.id) return false
+        if (!matchesManualCitaLink(citaLink)) return false
         return appRole === 'asesor' || matchesOwnerScope(null, ownerScope, ownerCtx)
       }).length
       counts[operation.id] = tickets + manuals
     }
     return counts
-  }, [visibleOperations, grouped, manualEntries, appRole, ownerScope, ownerCtx])
+  }, [visibleOperations, grouped, manualEntries, appRole, ownerScope, ownerCtx, citaLink])
 
   const columns = useMemo(() => {
     const buckets: Record<PriorityId, BoardCard[]> = {
@@ -674,6 +686,7 @@ export default function BoardsManagerView({
 
     for (const entry of manualEntries) {
       if (manualOperationOf(entry).id !== active.id) continue
+      if (!matchesManualCitaLink(citaLink)) continue
       if (appRole === 'admin' && !matchesOwnerScope(null, ownerScope, ownerCtx)) continue
       buckets[entry.priority].push({ kind: 'manual', entry })
     }
@@ -683,7 +696,7 @@ export default function BoardsManagerView({
     }
 
     return buckets
-  }, [grouped, active.id, priorities, manualEntries, orders, ownerScope, ownerCtx, appRole])
+  }, [grouped, active.id, priorities, manualEntries, orders, ownerScope, ownerCtx, appRole, citaLink])
 
   useEffect(() => {
     columnsRef.current = columns
@@ -1009,11 +1022,13 @@ export default function BoardsManagerView({
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
       {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
 
-      {!loading && scopedItems.length === 0 && manualEntries.length === 0 ? (
+      {!loading && scopedItems.length === 0 && (citaLink === 'con_cita' || manualEntries.length === 0) ? (
         <p className="section-subtitle">
-          {appRole === 'asesor'
-            ? 'Tu equipo no tiene consultas en este periodo.'
-            : 'No hay consultas en este periodo.'}
+          {citaLink !== 'todas'
+            ? citaLinkEmptyCopy(citaLink)
+            : appRole === 'asesor'
+              ? 'Tu equipo no tiene consultas en este periodo.'
+              : 'No hay consultas en este periodo.'}
         </p>
       ) : null}
 
@@ -1078,50 +1093,53 @@ export default function BoardsManagerView({
               ? `Solo tickets de tu equipo · ${period.label}`
               : `${active.description} · ${period.label}`}
           </p>
-          {appRole === 'admin' ? (
-            <div className="elevator-filters" style={{ marginTop: 'var(--space-3)' }}>
-              <div className="filter-field">
-                <span className="filter-field-label">Periodo</span>
-                <div className="estado-filter" role="group" aria-label="Periodo del tablero">
-                  {CALENDAR_SCALE_OPTIONS.map((option) => (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className={`preset-chip ${scale === option.id ? 'is-active' : ''}`}
-                      onClick={() => {
-                        setScale(option.id)
-                        setAnchor(todayAnchor())
-                      }}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+          <div className="elevator-filters" style={{ marginTop: 'var(--space-3)' }}>
+            {appRole === 'admin' ? (
+              <>
+                <div className="filter-field">
+                  <span className="filter-field-label">Periodo</span>
+                  <div className="estado-filter" role="group" aria-label="Periodo del tablero">
+                    {CALENDAR_SCALE_OPTIONS.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className={`preset-chip ${scale === option.id ? 'is-active' : ''}`}
+                        onClick={() => {
+                          setScale(option.id)
+                          setAnchor(todayAnchor())
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <div className="elevator-day-nav">
-                <button
-                  type="button"
-                  className="ghost-button calendar-nav"
-                  onClick={() => setAnchor((current) => shiftCalendarAnchor(scale, current, -1))}
-                  aria-label="Periodo anterior"
-                >
-                  <ChevronLeft size={17} />
-                </button>
-                <button type="button" className="ghost-button" onClick={() => setAnchor(todayAnchor())}>
-                  Hoy
-                </button>
-                <button
-                  type="button"
-                  className="ghost-button calendar-nav"
-                  onClick={() => setAnchor((current) => shiftCalendarAnchor(scale, current, 1))}
-                  aria-label="Periodo siguiente"
-                >
-                  <ChevronRight size={17} />
-                </button>
-              </div>
-              <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} />
-            </div>
-          ) : null}
+                <div className="elevator-day-nav">
+                  <button
+                    type="button"
+                    className="ghost-button calendar-nav"
+                    onClick={() => setAnchor((current) => shiftCalendarAnchor(scale, current, -1))}
+                    aria-label="Periodo anterior"
+                  >
+                    <ChevronLeft size={17} />
+                  </button>
+                  <button type="button" className="ghost-button" onClick={() => setAnchor(todayAnchor())}>
+                    Hoy
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost-button calendar-nav"
+                    onClick={() => setAnchor((current) => shiftCalendarAnchor(scale, current, 1))}
+                    aria-label="Periodo siguiente"
+                  >
+                    <ChevronRight size={17} />
+                  </button>
+                </div>
+                <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} />
+              </>
+            ) : null}
+            <CitaLinkFilterControl value={citaLink} onChange={setCitaLink} />
+          </div>
         </div>
         <button type="button" className="client-submit" onClick={openNewEntry}>
           <Plus size={16} />

@@ -811,6 +811,7 @@ export default function GestionBubbleDock({
         <span
           key={edge}
           className={`os-resize-handle edge-${edge}`}
+          aria-hidden="true"
           onPointerDown={startResize(edge)}
           onDoubleClick={(e) => {
             e.stopPropagation()

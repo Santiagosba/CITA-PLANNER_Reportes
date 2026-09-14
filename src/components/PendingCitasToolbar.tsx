@@ -3,8 +3,10 @@ import { CALENDAR_SCALE_OPTIONS, type CalendarScale } from '../lib/calendarScale
 import { type DateRangePreset, type ResolvedDateRange } from '../lib/dateRangePresets'
 import { CHANNEL_OPTIONS } from '../lib/tallerStations'
 import type { PeticionesStats } from '../lib/peticionesPendientes'
+import type { CitaLinkFilter } from '../lib/citaLinkFilter'
 import type { OwnerScope } from '../lib/ownerScope'
 import Button from './ui/Button'
+import CitaLinkFilterControl from './CitaLinkFilter'
 import EstadoDoneFilter from './EstadoDoneFilter'
 import OwnerScopeFilter from './OwnerScopeFilter'
 import type { EstadoFilter } from '../lib/doneFilter'
@@ -33,6 +35,8 @@ type Props = {
   estado: EstadoFilter
   ownerScope: OwnerScope
   onOwnerScopeChange: (scope: OwnerScope) => void
+  citaLink: CitaLinkFilter
+  onCitaLinkChange: (filter: CitaLinkFilter) => void
   search: string
   onSearchChange: (value: string) => void
   onPresetChange: (preset: DateRangePreset) => void
@@ -62,6 +66,8 @@ export default function PendingCitasToolbar({
   estado,
   ownerScope,
   onOwnerScopeChange,
+  citaLink,
+  onCitaLinkChange,
   search,
   onSearchChange,
   onPresetChange,
@@ -93,6 +99,7 @@ export default function PendingCitasToolbar({
       <div className="elevator-filters glass glass-lite">
         <EstadoDoneFilter value={estado} onChange={onEstadoChange} />
         <OwnerScopeFilter value={ownerScope} onChange={onOwnerScopeChange} />
+        <CitaLinkFilterControl value={citaLink} onChange={onCitaLinkChange} />
         <label className="filter-field queue-filter-search">
           <span className="filter-field-label">Buscar</span>
           <span className="relative">

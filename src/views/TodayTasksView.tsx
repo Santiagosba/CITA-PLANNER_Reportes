@@ -19,8 +19,10 @@ import {
   ownerScopeEmptyCopy,
   type OwnerScope,
 } from '../lib/ownerScope'
+import CitaLinkFilterControl from '../components/CitaLinkFilter'
 import EstadoDoneFilter from '../components/EstadoDoneFilter'
 import OwnerScopeFilter from '../components/OwnerScopeFilter'
+import { citaLinkEmptyCopy, matchesCitaLink, type CitaLinkFilter } from '../lib/citaLinkFilter'
 import { compareTicketsByOpenFirst, matchesEstadoDone, type EstadoFilter } from '../lib/doneFilter'
 import { isSlaCritico } from '../lib/tallerStations'
 import { localTodayIso } from '../lib/advisorWorkspace'
@@ -52,6 +54,7 @@ export default function TodayTasksView({ workshop, currentUser, appRole = 'aseso
   const range = useMemo(() => ({ from: period.from, to: period.to }), [period.from, period.to])
   const { items, loading, error, sourceNotice } = useOperationalData(workshop, range)
   const [ownerScope, setOwnerScope] = useState<OwnerScope>('todas')
+  const [citaLink, setCitaLink] = useState<CitaLinkFilter>('todas')
   const [estado, setEstado] = useState<EstadoFilter>('todas')
   const ownerCtx = useMemo(
     () => buildOwnerScopeContext(workspace, currentUser.email),
@@ -67,8 +70,9 @@ export default function TodayTasksView({ workshop, currentUser, appRole = 'aseso
     () =>
       liveItems
         .filter((item) => matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx))
+        .filter((item) => matchesCitaLink(item, citaLink))
         .sort(compareTicketsByOpenFirst),
-    [liveItems, ownerScope, ownerCtx],
+    [liveItems, ownerScope, ownerCtx, citaLink],
   )
   const rows = useMemo(
     () => historyAll.filter((item) => matchesEstadoDone(Boolean(item.gestionado), estado)),
@@ -125,6 +129,7 @@ export default function TodayTasksView({ workshop, currentUser, appRole = 'aseso
         </div>
         <p className="dash-period-label">{period.label}</p>
         <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Tickets" />
+        <CitaLinkFilterControl value={citaLink} onChange={setCitaLink} />
         <EstadoDoneFilter value={estado} onChange={setEstado} label="Hechas o no" />
       </div>
 
@@ -166,17 +171,19 @@ export default function TodayTasksView({ workshop, currentUser, appRole = 'aseso
               ? estado === 'hechas'
                 ? 'No hay consultas hechas con este filtro.'
                 : 'No hay consultas por hacer. Mira «Hechos» o «Todas».'
-              : ownerScope === 'mias'
-                ? 'Aún no hay consultas tuyas en este periodo.'
-                : liveItems.length === 0
-                  ? `No hay consultas en ${period.label}. Prueba otro periodo.`
-                  : ownerScopeEmptyCopy(ownerScope)}
+              : citaLink !== 'todas'
+                ? citaLinkEmptyCopy(citaLink)
+                : ownerScope === 'mias'
+                  ? 'Aún no hay consultas tuyas en este periodo.'
+                  : liveItems.length === 0
+                    ? `No hay consultas en ${period.label}. Prueba otro periodo.`
+                    : ownerScopeEmptyCopy(ownerScope)}
           </p>
         ) : (
           <PaginatedItems
             items={rows}
             label="Historial"
-            resetKey={`${workshopId}-${period.from}-${period.to}-${ownerScope}-${estado}`}
+            resetKey={`${workshopId}-${period.from}-${period.to}-${ownerScope}-${citaLink}-${estado}`}
           >
             {(pageRows) => (
               <div className="scroll-panel">

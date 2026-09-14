@@ -7731,7 +7731,9 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 12px 16px;
+  container-type: inline-size;
+  container-name: lead-win;
 }
 
 .lead-modal-client-id {
@@ -7739,6 +7741,7 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   align-items: center;
   gap: 10px;
   min-width: 0;
+  flex: 1 1 160px;
 }
 
 .lead-drawer-avatar {
@@ -7774,20 +7777,127 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
 
 .lead-modal-contact {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.lead-modal-contact-actions {
+  display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 8px;
+  flex: 0 0 auto;
+}
+
+.lead-modal-contact .lead-contact-btn,
+.dashboard-shell .lead-modal-contact .confirm-action.lead-contact-btn,
+.dashboard-shell.is-light .lead-modal-contact .confirm-action.lead-contact-btn,
+.lead-modal-contact .ticket-owner-card {
+  box-sizing: border-box;
+  height: var(--tap-target);
+  min-height: var(--tap-target);
+  max-height: var(--tap-target);
 }
 
 .lead-contact-btn {
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 40px;
-  padding: 0 12px;
+  gap: 8px;
+  min-width: 112px;
+  padding: 0 16px;
+  border-radius: var(--radius-pill);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
   text-decoration: none;
   white-space: nowrap;
+}
+
+.lead-modal-contact .ticket-owner-card {
+  flex: 0 0 220px;
+  width: 220px;
+  min-width: 220px;
+  max-width: 220px;
+  padding: 0 12px 0 8px;
+}
+
+.lead-modal-contact .ticket-owner-card-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.lead-modal-contact .ticket-owner-card-body {
+  justify-content: center;
+  gap: 0;
+}
+
+.lead-modal-contact .ticket-owner-card-label {
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+.lead-modal-contact .ticket-owner-card-select,
+.lead-modal-contact .ticket-owner-card-name {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.lead-modal-contact .ticket-owner-card:has(.ticket-owner-error) {
+  height: auto;
+  max-height: none;
+}
+
+@container lead-win (max-width: 680px) {
+  .lead-modal-client {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .lead-modal-client-id {
+    flex: 1 1 auto;
+  }
+
+  .lead-modal-contact {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@container lead-win (max-width: 520px) {
+  .lead-modal-contact {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    flex-wrap: wrap;
+    justify-content: stretch;
+  }
+
+  .lead-modal-contact-actions {
+    display: contents;
+  }
+
+  .lead-modal-contact .lead-contact-btn {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .lead-modal-contact .ticket-owner-card {
+    grid-column: 1 / -1;
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
 }
 
 .lead-contact-btn.is-wa {
@@ -8121,13 +8231,55 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   border-bottom-color: var(--color-brand);
 }
 
+.lead-modal-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.lead-modal-scroll.custom-scrollbar-light {
+  scrollbar-width: auto;
+  scrollbar-color: rgba(86, 92, 102, 0.55) rgba(15, 17, 21, 0.06);
+}
+
+.lead-modal-scroll.custom-scrollbar-light::-webkit-scrollbar {
+  width: 10px;
+}
+
+.lead-modal-scroll.custom-scrollbar-light::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(86, 92, 102, 0.45);
+}
+
+.lead-modal-scroll .lead-modal-client,
+.lead-modal-scroll .lead-thermo,
+.lead-modal-scroll .lead-voice-card,
+.lead-modal-scroll .lead-modal-tabs {
+  flex-shrink: 0;
+}
+
+.lead-modal-scroll .lead-calls-list {
+  max-height: none !important;
+  overflow: visible !important;
+}
+
 .lead-modal-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px 18px;
+  padding: 16px 18px 24px;
   container-type: inline-size;
   container-name: lead-body;
+}
+
+.lead-modal-scroll .lead-modal-body {
+  flex: none;
+  overflow: visible !important;
+  min-height: auto;
 }
 
 .lead-drawer-stack {
@@ -8748,6 +8900,8 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   flex-direction: column;
   min-width: 420px;
   min-height: 420px;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
   pointer-events: auto;
   contain: layout style;
   transform: translateZ(0);
@@ -8775,6 +8929,7 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   transition: none !important;
 }
 
+.lead-os-window.is-gesturing .lead-modal-scroll,
 .lead-os-window.is-gesturing .lead-modal-body,
 .lead-os-window.is-gesturing .lead-modal-footer,
 .call-agenda-root.is-gesturing .call-agenda-list {
@@ -8788,10 +8943,14 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
 }
 
 .lead-os-frame {
+  display: flex !important;
+  flex-direction: column !important;
   width: 100% !important;
   max-width: none !important;
   max-height: none !important;
   height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
   border-radius: var(--radius-lg) !important;
   transform: translateZ(0);
   transform-origin: center center;
@@ -9059,13 +9218,19 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   position: absolute;
   z-index: 5;
   touch-action: none;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: none;
+  opacity: 0;
+  pointer-events: auto;
 }
 
 .os-resize-handle.edge-n,
 .os-resize-handle.edge-s {
   left: 12px;
   right: 12px;
-  height: 6px;
+  height: 8px;
   cursor: ns-resize;
 }
 
@@ -9073,28 +9238,28 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
 .os-resize-handle.edge-w {
   top: 12px;
   bottom: 12px;
-  width: 6px;
+  width: 8px;
   cursor: ew-resize;
 }
 
-.os-resize-handle.edge-n { top: -3px; }
-.os-resize-handle.edge-s { bottom: -3px; }
-.os-resize-handle.edge-e { right: -3px; }
-.os-resize-handle.edge-w { left: -3px; }
+.os-resize-handle.edge-n { top: 0; }
+.os-resize-handle.edge-s { bottom: 0; }
+.os-resize-handle.edge-e { right: 0; }
+.os-resize-handle.edge-w { left: 0; }
 
 .os-resize-handle.edge-ne,
 .os-resize-handle.edge-nw,
 .os-resize-handle.edge-se,
 .os-resize-handle.edge-sw {
-  width: 12px;
-  height: 12px;
+  width: 16px;
+  height: 16px;
   z-index: 6;
 }
 
-.os-resize-handle.edge-ne { top: -4px; right: -4px; cursor: nesw-resize; }
-.os-resize-handle.edge-nw { top: -4px; left: -4px; cursor: nwse-resize; }
-.os-resize-handle.edge-se { bottom: -4px; right: -4px; cursor: nwse-resize; }
-.os-resize-handle.edge-sw { bottom: -4px; left: -4px; cursor: nesw-resize; }
+.os-resize-handle.edge-ne { top: 0; right: 0; cursor: nesw-resize; }
+.os-resize-handle.edge-nw { top: 0; left: 0; cursor: nwse-resize; }
+.os-resize-handle.edge-se { bottom: 0; right: 0; cursor: nwse-resize; }
+.os-resize-handle.edge-sw { bottom: 0; left: 0; cursor: nesw-resize; }
 
 .os-zoom-menu {
   position: fixed;
@@ -15605,11 +15770,13 @@ body > .os-desk-layer.dashboard-shell {
   font-size: var(--font-md);
 }
 
-.owner-scope-filter {
+.owner-scope-filter,
+.cita-link-filter {
   min-width: 0;
 }
 
-.owner-scope-filter .estado-filter {
+.owner-scope-filter .estado-filter,
+.cita-link-filter .estado-filter {
   flex-wrap: wrap;
 }
 

@@ -107,8 +107,8 @@ function ChartTip({ tip }: { tip: ChartTipData | null }) {
         <strong>{tip.title}</strong>
       </p>
       <dl>
-        {tip.lines.map((line) => (
-          <div key={line.label}>
+        {tip.lines.map((line, index) => (
+          <div key={`${line.label}-${index}`}>
             <dt>{line.label}</dt>
             <dd>{line.value}</dd>
           </div>
@@ -626,7 +626,7 @@ export function LauraGroupedBars({
                     { label: bLabel, value: formatCount(row.b) },
                     { label: 'Total', value: formatCount(total) },
                     {
-                      label: 'Canceladas',
+                      label: 'Tasa de cancelación',
                       value: total > 0 ? formatLauraPct((row.b / total) * 100) : '0%',
                     },
                   ],

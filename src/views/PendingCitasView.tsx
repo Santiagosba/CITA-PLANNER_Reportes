@@ -29,7 +29,6 @@ import {
   fetchTiposPeticion,
   formatFecha,
   getPeticionesSourceNotice,
-  isPeticionPendiente,
   resolveAvioldTallerIdsDetailed,
   updatePeticionGestion,
   type PeticionPendiente,
@@ -40,6 +39,7 @@ import { isSlaCritico, matchesChannelText } from '../lib/tallerStations'
 import { matchesTicketSearch } from '../lib/aiHeaderSearch'
 import TicketClientBlock from '../components/TicketClientBlock'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
+import { citaLinkEmptyCopy, matchesCitaLink, type CitaLinkFilter } from '../lib/citaLinkFilter'
 import { buildOwnerScopeContext, matchesOwnerScope, ownerScopeEmptyCopy, type OwnerScope } from '../lib/ownerScope'
 import {
   COPY_FALLBACK_NOTICE,
@@ -88,7 +88,7 @@ export default function PendingCitasView({
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [callerFilter, setCallerFilter] = useState('')
   const [tipoFilter, setTipoFilter] = useState<number | ''>('')
-  const [reportSoloPendientes, setReportSoloPendientes] = useState(false)
+  const [citaLink, setCitaLink] = useState<CitaLinkFilter>('todas')
   const [gestionObs, setGestionObs] = useState('')
   const [gestionEmail, setGestionEmail] = useState('')
   const [sourceNotice, setSourceNotice] = useState<string | null>(null)
@@ -264,10 +264,11 @@ export default function PendingCitasView({
       if (!matchesChannelText(text, channel)) return false
       if (slaOnly && !isSlaCritico(p.fechainicio) && !isSlaCritico(p.cita?.fecha)) return false
       if (!matchesOwnerScope(p.gestionemail, ownerScope, ownerCtx)) return false
+      if (!matchesCitaLink(p, citaLink)) return false
       if (!matchesTicketSearch(p, callerFilter)) return false
       return true
     },
-    [channel, slaOnly, ownerScope, ownerCtx, callerFilter],
+    [channel, slaOnly, ownerScope, ownerCtx, citaLink, callerFilter],
   )
 
   const scopedItems = useMemo(() => items.filter(matchesScopeFilters), [items, matchesScopeFilters])
@@ -285,11 +286,8 @@ export default function PendingCitasView({
   const faltanItems = useMemo(() => filteredItems.filter((p) => !p.gestionado), [filteredItems])
   const agendaGroups = useMemo(() => groupPeticionesByAgendaDay(filteredItems), [filteredItems])
   const agendaItems = useMemo(() => agendaGroups.flatMap((group) => group.items), [agendaGroups])
-  const pageFilterKey = JSON.stringify([workshopKey, estado, ownerScope, callerFilter, tipoFilter, dateRange.from, dateRange.to, channel, slaOnly, reportSoloPendientes])
-  const reportItems = useMemo(() => {
-    if (reportSoloPendientes) return filteredItems.filter(isPeticionPendiente)
-    return filteredItems
-  }, [filteredItems, reportSoloPendientes])
+  const pageFilterKey = JSON.stringify([workshopKey, estado, ownerScope, citaLink, callerFilter, tipoFilter, dateRange.from, dateRange.to, channel, slaOnly])
+  const reportItems = filteredItems
   const selected = useMemo(
     () => filteredItems.find((p) => p.idpeticion === selectedId) ?? null,
     [filteredItems, selectedId],
@@ -446,6 +444,8 @@ export default function PendingCitasView({
         estado={estado}
         ownerScope={ownerScope}
         onOwnerScopeChange={setOwnerScope}
+        citaLink={citaLink}
+        onCitaLinkChange={setCitaLink}
         search={callerFilter}
         onSearchChange={setCallerFilter}
         onPresetChange={handlePresetChange}
@@ -549,20 +549,24 @@ export default function PendingCitasView({
             <Card className="glass glass-lite agenda-empty">
               <p className="section-title" style={{ fontSize: 'var(--font-lg)' }}>
                 {items.length > 0
-                  ? ownerScope !== 'todas'
-                    ? ownerScopeEmptyCopy(ownerScope)
-                    : estado === 'hechas'
-                      ? 'Aún no hay consultas hechas'
-                      : 'Nada pendiente'
+                  ? citaLink !== 'todas'
+                    ? citaLinkEmptyCopy(citaLink)
+                    : ownerScope !== 'todas'
+                      ? ownerScopeEmptyCopy(ownerScope)
+                      : estado === 'hechas'
+                        ? 'Aún no hay consultas hechas'
+                        : 'Nada pendiente'
                   : 'Sin consultas en este periodo'}
               </p>
               <p className="section-subtitle mt-2">
                 {items.length > 0
-                  ? ownerScope !== 'todas'
-                    ? 'Prueba «Todas» o cambia el dueño.'
-                    : estado === 'hechas'
-                      ? `Faltan ${stats.porHacer} por terminar.`
-                      : `Hay ${stats.hechas} hechos. Cambia el filtro a «Hechos» o «Todas» para verlos.`
+                  ? citaLink !== 'todas'
+                    ? 'Prueba «Todas» para ver tickets con y sin cita.'
+                    : ownerScope !== 'todas'
+                      ? 'Prueba «Todas» o cambia el dueño.'
+                      : estado === 'hechas'
+                        ? `Faltan ${stats.porHacer} por terminar.`
+                        : `Hay ${stats.hechas} hechos. Cambia el filtro a «Hechos» o «Todas» para verlos.`
                   : 'Prueba «Ver todo» o amplía el rango de fechas.'}
               </p>
             </Card>
@@ -617,15 +621,6 @@ export default function PendingCitasView({
         <div className="dashboard-report panel-stack">
           <Card padding="sm" className="glass glass-lite flex flex-wrap items-center justify-between gap-3">
             <p className="field-label mb-0">{reportItems.length} registros</p>
-            <label className="flex min-h-[var(--tap-target)] cursor-pointer items-center gap-3 text-[var(--font-sm)]">
-              <input
-                type="checkbox"
-                checked={reportSoloPendientes}
-                onChange={(e) => setReportSoloPendientes(e.target.checked)}
-                className="h-5 w-5"
-              />
-              Solo sin cita
-            </label>
           </Card>
 
           {loading ? (
@@ -634,7 +629,9 @@ export default function PendingCitasView({
             </Card>
           ) : reportItems.length === 0 ? (
             <Card className="glass glass-lite py-16 text-center">
-              <p className="section-subtitle">No hay datos para mostrar.</p>
+              <p className="section-subtitle">
+                {citaLink !== 'todas' ? citaLinkEmptyCopy(citaLink) : 'No hay datos para mostrar.'}
+              </p>
             </Card>
           ) : (
             <Card padding="sm" className="glass glass-lite report-table-wrap custom-scrollbar-light">

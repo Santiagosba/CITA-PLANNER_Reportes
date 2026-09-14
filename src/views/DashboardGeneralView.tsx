@@ -14,6 +14,7 @@ import {
   mixToPieSlices,
   mixToRadarAxes,
 } from '../components/LauraCharts'
+import CitaLinkFilterControl from '../components/CitaLinkFilter'
 import OwnerScopeFilter from '../components/OwnerScopeFilter'
 import TicketClientBlock from '../components/TicketClientBlock'
 import TicketOwnerPicker from '../components/TicketOwnerPicker'
@@ -21,7 +22,6 @@ import { HexLoaderScreen } from '../components/ui/HexLoader'
 import Card from '../components/ui/Card'
 import TicketPlate from '../components/TicketPlate'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
-import { useCallCancelNotes } from '../hooks/useCallCancelNotes'
 import { useCitasTaller } from '../hooks/useCitasTaller'
 import { useMotivosCancelada } from '../hooks/useMotivosCancelada'
 import { useOperationalData } from '../hooks/useOperationalData'
@@ -46,6 +46,7 @@ import {
 } from '../lib/dashboardAnalytics'
 import { localTodayIso, type AdvisorWorkspace } from '../lib/advisorWorkspace'
 import { compareTicketsByOpenFirst } from '../lib/doneFilter'
+import { citaLinkEmptyCopy, matchesCitaLink, ticketHasCita, type CitaLinkFilter } from '../lib/citaLinkFilter'
 import { buildOwnerScopeContext, matchesOwnerScope, ownerScopeEmptyCopy, type OwnerScope } from '../lib/ownerScope'
 import { isDemoCitaId, isDemoTicketId } from '../lib/demoTickets'
 import { isLocalPreviewWorkshop } from '../lib/localPreview'
@@ -80,6 +81,7 @@ export default function DashboardGeneralView({
   const { workspace } = useAdvisorWorkspace(workshopId, currentUser, true)
   const [scale, setScale] = useState<CalendarScale>('dia')
   const [ownerScope, setOwnerScope] = useState<OwnerScope>(appRole === 'asesor' ? 'grupo' : 'todas')
+  const [citaLink, setCitaLink] = useState<CitaLinkFilter>('todas')
   const today = localTodayIso()
   const anchor = useMemo(() => new Date(`${today}T12:00:00`), [today])
   const period = useMemo(() => calendarPeriod(scale, anchor), [scale, anchor])
@@ -87,7 +89,6 @@ export default function DashboardGeneralView({
   const { items, tipos, loading, error, sourceNotice, refresh, refreshSilent } = useOperationalData(workshop, fetchRange)
   const { citas, loading: citasLoading, error: citasError } = useCitasTaller(workshop, fetchRange)
   const { byId: cancelMotivosById, loading: cancelMotivosLoading } = useMotivosCancelada()
-  const { notesByPhone } = useCallCancelNotes(workshop, fetchRange)
   const tiposById = useMemo(
     () => new Map(tipos.map((tipo) => [tipo.idtipopeticion, tipo.tipopeticion])),
     [tipos],
@@ -135,7 +136,7 @@ export default function DashboardGeneralView({
     [periodItems],
   )
   const citasCount = useMemo(
-    () => periodItems.reduce((n, item) => n + (item.cita?.fecha ? 1 : 0), 0),
+    () => periodItems.reduce((n, item) => n + (ticketHasCita(item) ? 1 : 0), 0),
     [periodItems],
   )
 
@@ -173,16 +174,17 @@ export default function DashboardGeneralView({
   )
   const cancelHeat = useMemo(
     () =>
-      cancelMotiveHeatmap(liveCitas, periodItems, cancelMotivosById, tiposById, scale, anchor, notesByPhone),
-    [liveCitas, periodItems, cancelMotivosById, tiposById, scale, anchor, notesByPhone],
+      cancelMotiveHeatmap(liveCitas, periodItems, cancelMotivosById, tiposById, scale, anchor),
+    [liveCitas, periodItems, cancelMotivosById, tiposById, scale, anchor],
   )
 
   const historyTicketsAll = useMemo(
     () =>
       liveItems
         .filter((item) => matchesOwnerScope(item.gestionemail, ownerScope, ownerCtx))
+        .filter((item) => matchesCitaLink(item, citaLink))
         .sort(compareTicketsByOpenFirst),
-    [liveItems, ownerScope, ownerCtx],
+    [liveItems, ownerScope, ownerCtx, citaLink],
   )
   const historyPendingTickets = useMemo(
     () => historyTicketsAll.filter((item) => !item.gestionado),
@@ -227,6 +229,7 @@ export default function DashboardGeneralView({
           </div>
         </div>
         <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Tickets" />
+        <CitaLinkFilterControl value={citaLink} onChange={setCitaLink} />
         <p className="dash-period-label">{period.label}</p>
       </div>
 
@@ -329,27 +332,31 @@ export default function DashboardGeneralView({
               liveItems.length === 0
                 ? 'Aún no hay tickets para hacer.'
                 : historyTicketsAll.length === 0
-                  ? ownerScopeEmptyCopy(ownerScope)
+                  ? citaLink !== 'todas'
+                    ? citaLinkEmptyCopy(citaLink)
+                    : ownerScopeEmptyCopy(ownerScope)
                   : 'No hay tickets por hacer.'
             }
             items={historyPendingTickets}
             loading={loading}
             listClassName="dash-history-list"
-            resetKey={`${workshopId}-hist-pend-${ownerScope}`}
+            resetKey={`${workshopId}-hist-pend-${ownerScope}-${citaLink}`}
             {...ticketRow}
           />
           <DashTicketColumn
             title="Hechos"
             empty={
               historyTicketsAll.length === 0
-                ? ownerScopeEmptyCopy(ownerScope)
+                ? citaLink !== 'todas'
+                  ? citaLinkEmptyCopy(citaLink)
+                  : ownerScopeEmptyCopy(ownerScope)
                 : 'No hay tickets hechos.'
             }
             items={historyDoneTickets}
             loading={loading}
             done
             listClassName="dash-history-list"
-            resetKey={`${workshopId}-hist-hechos-${ownerScope}`}
+            resetKey={`${workshopId}-hist-hechos-${ownerScope}-${citaLink}`}
             {...ticketRow}
           />
         </div>

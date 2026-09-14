@@ -191,192 +191,196 @@ function LeadGestionDrawer({
           </div>
         </header>
 
-        <div className="lead-modal-client">
-          <div className="lead-modal-client-id">
-            <span className="lead-drawer-avatar" aria-hidden>
-              <User size={18} />
-            </span>
-            <TicketClientBlock peticion={p} size="lg" />
-            {channel === 'whatsapp' ? <ChannelTag tipo="whatsapp" /> : null}
+        <div className="lead-modal-scroll custom-scrollbar-light">
+          <div className="lead-modal-client">
+            <div className="lead-modal-client-id">
+              <span className="lead-drawer-avatar" aria-hidden>
+                <User size={18} />
+              </span>
+              <TicketClientBlock peticion={p} size="lg" />
+              {channel === 'whatsapp' ? <ChannelTag tipo="whatsapp" /> : null}
+            </div>
+            <div className="lead-modal-contact">
+              <div className="lead-modal-contact-actions">
+                {telHref ? (
+                  <a
+                    href={telHref}
+                    className="confirm-action lead-contact-btn"
+                    data-call-label={cliente}
+                    data-call-peticion={p.idpeticion}
+                    title="Llamar por Telnyx desde el CRM"
+                  >
+                    <PhoneCall size={16} />
+                    Llamar
+                  </a>
+                ) : null}
+                {waHref ? (
+                  <a href={waHref} target="_blank" rel="noreferrer" className="lead-contact-btn is-wa">
+                    <WhatsAppMark size={16} />
+                    WhatsApp
+                  </a>
+                ) : null}
+              </div>
+              {workshop && workspace && currentUser && appRole ? (
+                <TicketOwnerPicker
+                  workshop={workshop}
+                  workspace={workspace}
+                  currentUser={currentUser}
+                  appRole={appRole}
+                  peticion={p}
+                  layout="card"
+                />
+              ) : null}
+            </div>
           </div>
-          <div className="lead-modal-contact">
-            {telHref ? (
-              <a
-                href={telHref}
-                className="confirm-action lead-contact-btn"
-                data-call-label={cliente}
-                data-call-peticion={p.idpeticion}
-                title="Llamar por Telnyx desde el CRM"
-              >
-                <PhoneCall size={14} />
-                Llamar
-              </a>
-            ) : null}
-            {waHref ? (
-              <a href={waHref} target="_blank" rel="noreferrer" className="lead-contact-btn is-wa">
-                <WhatsAppMark size={16} />
-                WhatsApp
-              </a>
-            ) : null}
-            {workshop && workspace && currentUser && appRole ? (
-              <TicketOwnerPicker
-                workshop={workshop}
-                workspace={workspace}
-                currentUser={currentUser}
-                appRole={appRole}
-                peticion={p}
-                layout="card"
-              />
-            ) : null}
+
+          <UrgencyThermometer score={urgencyScore.score} reason={urgencyScore.reasons[0]} />
+
+          <LeadCallHistory
+            phone={telRaw}
+            calls={calls}
+            extraItems={[peticionToHistoryItem(p)]}
+            selectedId={selectedCall?.id ?? null}
+            onSelect={(item) => {
+              setSelectedCall(item)
+              setTab('transcripcion')
+            }}
+          />
+
+          <div className="lead-modal-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'resumen'}
+              className={`lead-modal-tab ${tab === 'resumen' ? 'is-active' : ''}`}
+              onClick={() => setTab('resumen')}
+            >
+              <Sparkles size={14} />
+              Resumen IA Laura
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'transcripcion'}
+              className={`lead-modal-tab ${tab === 'transcripcion' ? 'is-active' : ''}`}
+              onClick={() => setTab('transcripcion')}
+            >
+              <FileText size={14} />
+              Transcripción
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'dms'}
+              className={`lead-modal-tab ${tab === 'dms' ? 'is-active' : ''}`}
+              onClick={() => setTab('dms')}
+            >
+              <Server size={14} />
+              Sync DMS
+            </button>
           </div>
-        </div>
 
-        <UrgencyThermometer score={urgencyScore.score} reason={urgencyScore.reasons[0]} />
+          <div className="lead-modal-body">
+            {tab === 'resumen' ? (
+              <div className="lead-drawer-stack">
+                <section className="lead-info-card">
+                  <p className="lead-info-eyebrow">
+                    <Sparkles size={14} />
+                    Diagnóstico síntesis Laura
+                  </p>
+                  <p className="lead-info-quote">
+                    {p.descripcion?.trim()
+                      ? `“${p.descripcion.trim()}”`
+                      : '“Sin descripción de triage todavía.”'}
+                  </p>
+                </section>
 
-        <LeadCallHistory
-          phone={telRaw}
-          calls={calls}
-          extraItems={[peticionToHistoryItem(p)]}
-          selectedId={selectedCall?.id ?? null}
-          onSelect={(item) => {
-            setSelectedCall(item)
-            setTab('transcripcion')
-          }}
-        />
+                <section className="lead-info-card lead-sentiment-card">
+                  <div className="lead-sentiment-head">
+                    <span className="lead-info-muted">Sentimiento del cliente</span>
+                    <strong className="lead-sentiment">
+                      <span className="lead-sentiment-dot" />
+                      Neutral
+                    </strong>
+                  </div>
+                  <small className="lead-sentiment-detail">
+                    <Sparkles size={13} aria-hidden />
+                    Analizado por entonación y palabras clave
+                  </small>
+                </section>
 
-        <div className="lead-modal-tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'resumen'}
-            className={`lead-modal-tab ${tab === 'resumen' ? 'is-active' : ''}`}
-            onClick={() => setTab('resumen')}
-          >
-            <Sparkles size={14} />
-            Resumen IA Laura
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'transcripcion'}
-            className={`lead-modal-tab ${tab === 'transcripcion' ? 'is-active' : ''}`}
-            onClick={() => setTab('transcripcion')}
-          >
-            <FileText size={14} />
-            Transcripción
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'dms'}
-            className={`lead-modal-tab ${tab === 'dms' ? 'is-active' : ''}`}
-            onClick={() => setTab('dms')}
-          >
-            <Server size={14} />
-            Sync DMS
-          </button>
-        </div>
-
-        <div className="lead-modal-body custom-scrollbar-light">
-          {tab === 'resumen' ? (
-            <div className="lead-drawer-stack">
-              <section className="lead-info-card">
-                <p className="lead-info-eyebrow">
-                  <Sparkles size={14} />
-                  Diagnóstico síntesis Laura
-                </p>
-                <p className="lead-info-quote">
-                  {p.descripcion?.trim()
-                    ? `“${p.descripcion.trim()}”`
-                    : '“Sin descripción de triage todavía.”'}
-                </p>
-              </section>
-
-              <section className="lead-info-card lead-sentiment-card">
-                <div className="lead-sentiment-head">
-                  <span className="lead-info-muted">Sentimiento del cliente</span>
-                  <strong className="lead-sentiment">
-                    <span className="lead-sentiment-dot" />
-                    Neutral
-                  </strong>
-                </div>
-                <small className="lead-sentiment-detail">
-                  <Sparkles size={13} aria-hidden />
-                  Analizado por entonación y palabras clave
-                </small>
-              </section>
-
-              <section className="lead-info-card">
-                <h3 className="lead-info-title">
-                  <TriangleAlert size={14} />
-                  Síntomas y averías
-                </h3>
-                <ul className="lead-bullet-list">
-                  <li>
-                    <span className="lead-bullet-dot" />
-                    {p.tipopeticion || 'Tipo de consulta sin clasificar'}
-                  </li>
-                  {p.descripcion ? (
+                <section className="lead-info-card">
+                  <h3 className="lead-info-title">
+                    <TriangleAlert size={14} />
+                    Síntomas y averías
+                  </h3>
+                  <ul className="lead-bullet-list">
                     <li>
                       <span className="lead-bullet-dot" />
-                      {p.descripcion}
+                      {p.tipopeticion || 'Tipo de consulta sin clasificar'}
                     </li>
-                  ) : null}
-                  <li>
-                    <span className="lead-bullet-dot" />
-                    {c?.matricula ? `Matrícula vinculada: ${c.matricula}` : 'Sin matrícula en CRM'}
-                  </li>
-                </ul>
-              </section>
+                    {p.descripcion ? (
+                      <li>
+                        <span className="lead-bullet-dot" />
+                        {p.descripcion}
+                      </li>
+                    ) : null}
+                    <li>
+                      <span className="lead-bullet-dot" />
+                      {c?.matricula ? `Matrícula vinculada: ${c.matricula}` : 'Sin matrícula en CRM'}
+                    </li>
+                  </ul>
+                </section>
 
-              <label className="field-label" htmlFor={`lead-obs-${p.idpeticion}`}>
-                Notas del asesor
-                <textarea
-                  id={`lead-obs-${p.idpeticion}`}
-                  className="field-input field-textarea"
-                  rows={3}
-                  placeholder="Qué has hecho con esta consulta…"
-                  value={gestionObs}
-                  onChange={(e) => onGestionObsChange(e.target.value)}
-                />
-              </label>
-            </div>
-          ) : null}
+                <label className="field-label" htmlFor={`lead-obs-${p.idpeticion}`}>
+                  Notas del asesor
+                  <textarea
+                    id={`lead-obs-${p.idpeticion}`}
+                    className="field-input field-textarea"
+                    rows={3}
+                    placeholder="Qué has hecho con esta consulta…"
+                    value={gestionObs}
+                    onChange={(e) => onGestionObsChange(e.target.value)}
+                  />
+                </label>
+              </div>
+            ) : null}
 
-          {tab === 'transcripcion' ? (
-            <div className="lead-drawer-stack">
-              <LeadCallTranscript phone={telRaw} selected={selectedCall} />
-            </div>
-          ) : null}
+            {tab === 'transcripcion' ? (
+              <div className="lead-drawer-stack">
+                <LeadCallTranscript phone={telRaw} selected={selectedCall} />
+              </div>
+            ) : null}
 
-          {tab === 'dms' ? (
-            <div className="lead-drawer-stack">
-              <section className="lead-info-card">
-                <p className="lead-info-eyebrow">
-                  <Server size={14} />
-                  Sincronización DMS Quiter
-                </p>
-                <dl className="prow-detail-grid">
-                  <div className="prow-detail">
-                    <dt>Estado cita</dt>
-                    <dd>{pendiente ? 'Sin cita en calendario' : 'Cita vinculada'}</dd>
-                  </div>
-                  <div className="prow-detail">
-                    <dt>ID petición</dt>
-                    <dd className="font-mono">{p.idpeticion}</dd>
-                  </div>
-                  <div className="prow-detail">
-                    <dt>ID cita</dt>
-                    <dd className="font-mono">{p.idcita || '—'}</dd>
-                  </div>
-                  <div className="prow-detail">
-                    <dt>Email gestión</dt>
-                    <dd>{p.gestionemail || '—'}</dd>
-                  </div>
-                </dl>
-              </section>
-            </div>
-          ) : null}
+            {tab === 'dms' ? (
+              <div className="lead-drawer-stack">
+                <section className="lead-info-card">
+                  <p className="lead-info-eyebrow">
+                    <Server size={14} />
+                    Sincronización DMS Quiter
+                  </p>
+                  <dl className="prow-detail-grid">
+                    <div className="prow-detail">
+                      <dt>Estado cita</dt>
+                      <dd>{pendiente ? 'Sin cita en calendario' : 'Cita vinculada'}</dd>
+                    </div>
+                    <div className="prow-detail">
+                      <dt>ID petición</dt>
+                      <dd className="font-mono">{p.idpeticion}</dd>
+                    </div>
+                    <div className="prow-detail">
+                      <dt>ID cita</dt>
+                      <dd className="font-mono">{p.idcita || '—'}</dd>
+                    </div>
+                    <div className="prow-detail">
+                      <dt>Email gestión</dt>
+                      <dd>{p.gestionemail || '—'}</dd>
+                    </div>
+                  </dl>
+                </section>
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <footer className="lead-modal-footer">
@@ -410,6 +414,7 @@ function LeadGestionDrawer({
         <span
           key={edge}
           className={`os-resize-handle edge-${edge}`}
+          aria-hidden="true"
           onPointerDown={os.startResize(edge)}
           onDoubleClick={(e) => {
             e.stopPropagation()

@@ -110,6 +110,7 @@ export default function ToolWindow({
         <span
           key={edge}
           className={`os-resize-handle edge-${edge}`}
+          aria-hidden="true"
           onPointerDown={os.startResize(edge)}
           onDoubleClick={(e) => {
             e.stopPropagation()
