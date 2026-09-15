@@ -36,9 +36,24 @@ type CacheEntry = {
   names?: Promise<PeticionPendiente[]>
 }
 
-const CACHE_TTL = 30_000
+const CACHE_TTL = 120_000
 const cache = new Map<string, CacheEntry>()
 const inflight = new Map<string, Promise<CacheEntry>>()
+
+function seedItems(workshop: Workshop, range: DateRange, cached?: CacheEntry): PeticionPendiente[] {
+  if (cached?.items.length) return cached.items
+  const bounded = boundedDateRange(range)
+  const copy = (loadPeticionesCopy(workshopCopyId(workshop)) ?? []).filter((row) => rowInRange(row, bounded))
+  return mergeLiveAndDemoTickets(copy, workshop, bounded)
+}
+
+export function findCachedPeticion(idpeticion: string): PeticionPendiente | null {
+  for (const entry of cache.values()) {
+    const hit = entry.items.find((row) => row.idpeticion === idpeticion)
+    if (hit) return hit
+  }
+  return null
+}
 
 function workshopKey(workshop: Workshop): string {
   return `${String(workshop.originalId || '')}|${String(workshop.containerIdTaller || '')}`
@@ -89,9 +104,9 @@ export function invalidateOperationalData(workshop: Workshop): void {
 export function useOperationalData(workshop: Workshop, range: DateRange) {
   const key = requestKey(workshop, range)
   const cached = cache.get(key)
-  const [items, setItems] = useState<PeticionPendiente[]>(cached?.items ?? [])
+  const [items, setItems] = useState<PeticionPendiente[]>(() => seedItems(workshop, range, cached))
   const [tipos, setTipos] = useState<TipoPeticionRow[]>(cached?.tipos ?? [])
-  const [loading, setLoading] = useState(!cached)
+  const [loading, setLoading] = useState(() => !cached && seedItems(workshop, range).length === 0)
   const [error, setError] = useState<string | null>(null)
   const [sourceNotice, setSourceNotice] = useState<string | null>(null)
   const requestVersion = useRef(0)
@@ -120,7 +135,9 @@ export function useOperationalData(workshop: Workshop, range: DateRange) {
         return
       }
 
-      if (!silent) setLoading(true)
+      const haveVisible =
+        Boolean(cache.get(key)?.items.length) || seedItems(workshop, range, cache.get(key)).length > 0
+      if (!silent && !haveVisible) setLoading(true)
       setError(null)
       let pending = inflight.get(key)
       try {

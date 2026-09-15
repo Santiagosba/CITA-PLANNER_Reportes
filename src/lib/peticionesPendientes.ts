@@ -206,11 +206,15 @@ async function resolveHubTallerIds(workshop: Workshop): Promise<string[]> {
  * 1) Hub licencia → talleres hijos
  * 2) SQL Server Talleres → valida UUID o busca por nombre / expande Grupo
  */
-export async function resolveAvioldTallerIdsDetailed(workshop: Workshop): Promise<ResolvedTallerIds> {
-  if (isLocalPreviewWorkshop(workshop)) {
-    return { ids: [], talleres: [], via: 'hub' }
-  }
+const RESOLVE_TTL_MS = 10 * 60_000
+const resolveCache = new Map<string, { at: number; value: ResolvedTallerIds }>()
+const resolveInflight = new Map<string, Promise<ResolvedTallerIds>>()
 
+function workshopResolveKey(workshop: Workshop): string {
+  return `${String(workshop.originalId || '')}|${String(workshop.containerIdTaller || '')}|${String(workshop.hubWebId || '')}`
+}
+
+async function resolveAvioldTallerIdsUncached(workshop: Workshop): Promise<ResolvedTallerIds> {
   const hubIds = await resolveHubTallerIds(workshop)
   if (!hubIds.length) {
     return { ids: [], talleres: [], via: 'hub' }
@@ -253,13 +257,48 @@ export async function resolveAvioldTallerIdsDetailed(workshop: Workshop): Promis
   }
 }
 
+export async function resolveAvioldTallerIdsDetailed(workshop: Workshop): Promise<ResolvedTallerIds> {
+  if (isLocalPreviewWorkshop(workshop)) {
+    return { ids: [], talleres: [], via: 'hub' }
+  }
+  const key = workshopResolveKey(workshop)
+  const hit = resolveCache.get(key)
+  if (hit && Date.now() - hit.at < RESOLVE_TTL_MS) return hit.value
+  const pending = resolveInflight.get(key)
+  if (pending) return pending
+  const request = resolveAvioldTallerIdsUncached(workshop)
+    .then((value) => {
+      resolveCache.set(key, { at: Date.now(), value })
+      return value
+    })
+    .finally(() => {
+      if (resolveInflight.get(key) === request) resolveInflight.delete(key)
+    })
+  resolveInflight.set(key, request)
+  return request
+}
+
 export async function resolveAvioldTallerIds(workshop: Workshop): Promise<string[]> {
   const { ids } = await resolveAvioldTallerIdsDetailed(workshop)
   return ids
 }
 
+const TIPOS_TTL_MS = 5 * 60_000
+let tiposCache: { at: number; rows: TipoPeticionRow[] } | null = null
+let tiposInflight: Promise<TipoPeticionRow[]> | null = null
+
 export async function fetchTiposPeticion(): Promise<TipoPeticionRow[]> {
-  return withSqlFallback('tipos', () => sqlFetchTiposPeticion(), () => fetchTiposPeticionSupabase())
+  if (tiposCache && Date.now() - tiposCache.at < TIPOS_TTL_MS) return tiposCache.rows
+  if (tiposInflight) return tiposInflight
+  tiposInflight = withSqlFallback('tipos', () => sqlFetchTiposPeticion(), () => fetchTiposPeticionSupabase())
+    .then((rows) => {
+      tiposCache = { at: Date.now(), rows }
+      return rows
+    })
+    .finally(() => {
+      tiposInflight = null
+    })
+  return tiposInflight
 }
 
 async function fetchCitasByIds(ids: string[]): Promise<Map<string, CitaResumen>> {
@@ -268,21 +307,24 @@ async function fetchCitasByIds(ids: string[]): Promise<Map<string, CitaResumen>>
   if (!unique.length) return map
 
   const chunkSize = 80
+  const chunks: string[][] = []
   for (let i = 0; i < unique.length; i += chunkSize) {
-    const chunk = unique.slice(i, i + chunkSize)
-    try {
+    chunks.push(unique.slice(i, i + chunkSize))
+  }
+  const pages = await Promise.all(
+    chunks.map(async (chunk) => {
       const { data, error } = await supabaseAviOld.from('citas').select(CITA_SELECT).in('idcita', chunk)
       if (error) {
         console.warn('[peticionesPendientes] citas no accesibles:', error.message)
-        return map
+        return [] as Record<string, unknown>[]
       }
-      for (const row of (data ?? []) as Record<string, unknown>[]) {
-        const cita = normalizeCitaResumen(row)
-        map.set(cita.idcita, cita)
-      }
-    } catch (e) {
-      console.warn('[peticionesPendientes] error cargando citas:', e)
-      return map
+      return (data ?? []) as Record<string, unknown>[]
+    }),
+  )
+  for (const page of pages) {
+    for (const row of page) {
+      const cita = normalizeCitaResumen(row)
+      map.set(cita.idcita, cita)
     }
   }
   return map
@@ -327,7 +369,7 @@ async function fetchCitasForNameMatch(
   tallerIds: string[],
   range: { from?: string; to?: string },
 ): Promise<CitaResumen[]> {
-  const from = shiftIsoDays(range.from, -365) ?? range.from
+  const from = shiftIsoDays(range.from, -60) ?? range.from
   const to = range.to
   try {
     if (isSqlServerPeticionesSource() && !sqlServerLoginBlocked) {

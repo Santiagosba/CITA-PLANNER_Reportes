@@ -9,15 +9,20 @@ import type { Workshop } from '../types'
 type Range = { from?: string; to?: string }
 type CacheEntry = { timestamp: number; citas: CitaTaller[] }
 
-const CACHE_TTL = 30_000
+const CACHE_TTL = 120_000
 const cache = new Map<string, CacheEntry>()
 const inflight = new Map<string, Promise<CitaTaller[]>>()
+
+function seedCitas(workshop: Workshop, range: Range, cached?: CacheEntry): CitaTaller[] {
+  if (cached?.citas.length) return cached.citas
+  return mergeLiveAndDemoCitas(loadCitasCopy(workshopCopyId(workshop)) ?? [], workshop, range)
+}
 
 export function useCitasTaller(workshop: Workshop, range: Range) {
   const key = `${String(workshop.originalId)}|${range.from || ''}|${range.to || ''}`
   const cached = cache.get(key)
-  const [citas, setCitas] = useState<CitaTaller[]>(cached?.citas ?? [])
-  const [loading, setLoading] = useState(!cached)
+  const [citas, setCitas] = useState<CitaTaller[]>(() => seedCitas(workshop, range, cached))
+  const [loading, setLoading] = useState(() => !cached && seedCitas(workshop, range).length === 0)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(
@@ -29,7 +34,8 @@ export function useCitasTaller(workshop: Workshop, range: Range) {
         return
       }
 
-      setLoading(true)
+      const haveVisible = Boolean(fresh?.citas.length) || seedCitas(workshop, range, fresh).length > 0
+      if (!haveVisible) setLoading(true)
       setError(null)
       try {
         let request = inflight.get(key)

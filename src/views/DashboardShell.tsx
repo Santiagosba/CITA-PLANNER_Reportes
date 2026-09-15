@@ -42,9 +42,8 @@ import {
   updatePeticionGestion,
   type PeticionPendiente,
 } from '../lib/peticionesPendientes'
-import { resolveDateRange } from '../lib/dateRangePresets'
 import { callNoteLine, useSoftphone } from '../lib/softphone'
-import { useOperationalData } from '../hooks/useOperationalData'
+import { findCachedPeticion } from '../hooks/useOperationalData'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
 import { isDemoTicketId } from '../lib/demoTickets'
 import { applyPeticionPatch, PETICIONES_PATCHED_EVENT } from '../lib/ticketOps'
@@ -453,8 +452,6 @@ export default function DashboardShell({
   // notas de gestión (y abrimos la ficha si no estaba abierta) para que el
   // asesor solo tenga que completar y guardar.
   const { lastCall } = useSoftphone()
-  const callNoteRange = useMemo(() => resolveDateRange('mes', '', ''), [])
-  const { items: operationalItems } = useOperationalData(workshop, callNoteRange)
   const notedCallRef = useRef(0)
   useEffect(() => {
     if (!lastCall?.peticionId || lastCall.endedAt === notedCallRef.current) return
@@ -463,7 +460,7 @@ export default function DashboardShell({
     const line = callNoteLine(lastCall)
     const open = sessionsRef.current.some((s) => s.id === pid)
     if (!open) {
-      const peticion = operationalItems.find((item) => item.idpeticion === pid)
+      const peticion = findCachedPeticion(pid)
       if (!peticion) return
       openLead(peticion)
     }
@@ -475,7 +472,7 @@ export default function DashboardShell({
         return { ...s, gestionObs: current ? `${current}\n${line}` : line }
       }),
     )
-  }, [lastCall, operationalItems, openLead])
+  }, [lastCall, openLead])
 
   useEffect(() => {
     const appWindows = () => apps.getState().windows

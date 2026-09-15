@@ -135,7 +135,7 @@ export default function DashboardGeneralView({
   useEffect(() => {
     const timer = window.setInterval(() => {
       if (document.visibilityState === 'visible') void refreshSilent()
-    }, 20_000)
+    }, 60_000)
     return () => window.clearInterval(timer)
   }, [refreshSilent])
 
