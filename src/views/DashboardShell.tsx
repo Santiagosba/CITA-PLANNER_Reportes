@@ -45,6 +45,7 @@ import {
 import { callNoteLine, useSoftphone } from '../lib/softphone'
 import { findCachedPeticion } from '../hooks/useOperationalData'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
+import { teamLabelForEmail } from '../lib/advisorWorkspace'
 import { isDemoTicketId } from '../lib/demoTickets'
 import { applyPeticionPatch, PETICIONES_PATCHED_EVENT } from '../lib/ticketOps'
 import { isIdleDeskClick } from '../lib/osDeskClick'
@@ -194,6 +195,12 @@ export default function DashboardShell({
   const [shellRoute, setShellRoute] = useState<DashboardShellRoute>(() => defaultRouteForRole(appRole))
   const asesor = mapSessionUserToCrmUser(sessionUser)
   const currentUser = { name: asesor.displayName, email: asesor.email }
+  const workshopId = workshop.containerIdTaller || workshop.id
+  const { workspace } = useAdvisorWorkspace(workshopId, currentUser, true)
+  const asesorTeam = useMemo(
+    () => teamLabelForEmail(workspace, currentUser.email),
+    [workspace, currentUser.email],
+  )
   const [triageTab, setTriageTab] = useState<'kanban' | 'tabla' | 'calendario'>('kanban')
   const [sessions, setSessions] = useState<GestionSession[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -756,6 +763,7 @@ export default function DashboardShell({
       onToggleTheme={onToggleTheme}
       asesorName={asesor.displayName}
       asesorRole={crmAppRoleLabel(appRole, { superAdmin: isSuperAdmin })}
+      asesorTeam={appRole === 'asesor' ? asesorTeam : null}
       appRole={appRole}
       onLocalPreviewRole={onLocalPreviewRole}
       previewAdvisorId={previewAdvisorId}

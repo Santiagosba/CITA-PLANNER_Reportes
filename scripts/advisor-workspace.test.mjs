@@ -224,6 +224,23 @@ test('personMatchesQuery finds name email or role', () => {
   assert.equal(lib.personMatchesQuery(person, 'luis'), false)
 })
 
+test('teamLabelForEmail names the team in plain Spanish', () => {
+  const { lib } = setup()
+  const workspace = {
+    ...lib.emptyAdvisorWorkspace(),
+    people: [
+      { id: 'ana', name: 'Ana', email: 'ana@taller.es' },
+      { id: 'luis', name: 'Luis', email: 'luis@taller.es' },
+    ],
+    teams: [
+      { id: 'recepcion', name: 'Recepción', memberIds: ['ana'], taskTypeIds: [], boardIds: [] },
+      { id: 'comercial', name: 'Comercial', memberIds: ['ana'], taskTypeIds: [], boardIds: [] },
+    ],
+  }
+  assert.equal(lib.teamLabelForEmail(workspace, 'ana@taller.es'), 'Recepción y Comercial')
+  assert.equal(lib.teamLabelForEmail(workspace, 'luis@taller.es'), 'Sin equipo')
+})
+
 test('setPersonRole gives and takes admin without touching teams', () => {
   const { lib } = setup()
   const workspace = {

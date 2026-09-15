@@ -70,8 +70,8 @@ export const ASESOR_SHELL_ROUTES: DashboardShellRoute[] = [
   'configuration',
 ]
 
-export function defaultRouteForRole(role: CrmAppRole): DashboardShellRoute {
-  return 'dashboard-general'
+export function defaultRouteForRole(_role: CrmAppRole): DashboardShellRoute {
+  return 'boards'
 }
 
 export function routeAllowedForRole(route: DashboardShellRoute, role: CrmAppRole): boolean {

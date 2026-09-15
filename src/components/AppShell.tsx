@@ -132,6 +132,7 @@ type Props = {
   onToggleTheme: () => void
   asesorName?: string | null
   asesorRole?: string | null
+  asesorTeam?: string | null
   appRole?: CrmAppRole
   onLocalPreviewRole?: (role: CrmAppRole, advisorId?: string) => void
   previewAdvisorId?: string
@@ -152,6 +153,7 @@ export default function AppShell({
   onToggleTheme,
   asesorName,
   asesorRole,
+  asesorTeam,
   appRole = 'asesor',
   onLocalPreviewRole,
   previewAdvisorId,
@@ -234,6 +236,11 @@ export default function AppShell({
             <p className="dashboard-sidebar-asesor">
               <strong>{asesorName}</strong>
               {asesorRole ? <span>{asesorRole}</span> : null}
+              {asesorTeam ? (
+                <span className={`dashboard-sidebar-team${asesorTeam === 'Sin equipo' ? ' is-empty' : ''}`}>
+                  {asesorTeam === 'Sin equipo' ? 'Sin equipo' : `Equipo ${asesorTeam}`}
+                </span>
+              ) : null}
             </p>
           ) : null}
         </div>
@@ -252,7 +259,12 @@ export default function AppShell({
           {navItems.map((item) => {
             const Icon = item.icon
             const active = activeRoute === item.id
-            const label = item.id === 'laura' ? `Asistente de IA ${botName}` : item.label
+            const label =
+              item.id === 'laura'
+                ? `Asistente de IA ${botName}`
+                : item.id === 'equipos' && appRole === 'asesor' && asesorTeam && asesorTeam !== 'Sin equipo'
+                  ? `Mi equipo · ${asesorTeam}`
+                  : item.label
             return (
               <button
                 key={item.id}

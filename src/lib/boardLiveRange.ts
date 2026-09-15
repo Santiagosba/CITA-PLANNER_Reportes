@@ -8,25 +8,54 @@ function shiftIso(iso: string, days: number): string {
   return toDateInputValue(date)
 }
 
-function ticketWorkDay(
-  item: Pick<PeticionPendiente, 'cita' | 'fechainicio' | 'fechacreacion'>,
-): string {
+export type BoardWorkLane = 'today' | 'atrasado' | 'proximo'
+
+export type BoardWorkDayItem = {
+  cita?: PeticionPendiente['cita']
+  fechainicio?: string | null
+  fechacreacion?: string | null
+}
+
+export function ticketWorkDay(item: BoardWorkDayItem): string {
   return String(item.cita?.fecha || item.fechainicio || item.fechacreacion || '').slice(0, 10)
 }
 
-/** Carga: un poco atrás para no perder abiertas, y un año hacia adelante. */
-export function boardLiveFetchRange(today = localTodayIso()): { from: string; to: string } {
-  return { from: shiftIso(today, -90), to: shiftIso(today, 366) }
+export function boardWorkLane(item: BoardWorkDayItem, today = localTodayIso()): BoardWorkLane {
+  const work = ticketWorkDay(item)
+  if (!work || work === today) return 'today'
+  return work < today ? 'atrasado' : 'proximo'
 }
 
-/**
- * Tablero vivo: hoy y lo futuro.
- * Siguen las abiertas (trabajo actual, aunque llegaran antes) y las hechas de hoy.
- */
+export function boardWorkLaneRank(lane: BoardWorkLane): number {
+  if (lane === 'today') return 0
+  if (lane === 'atrasado') return 1
+  return 2
+}
+
+export function boardWorkLaneLabel(lane: BoardWorkLane): string {
+  if (lane === 'today') return 'Hoy'
+  if (lane === 'atrasado') return 'De días anteriores'
+  return 'Próximos días'
+}
+
+/** Hoy primero, luego atrasados, luego lo que viene. Dentro del mismo tramo, la fecha más cercana. */
+export function compareBoardWorkDay(a: BoardWorkDayItem, b: BoardWorkDayItem, today = localTodayIso()): number {
+  const lane = boardWorkLaneRank(boardWorkLane(a, today)) - boardWorkLaneRank(boardWorkLane(b, today))
+  if (lane !== 0) return lane
+  return ticketWorkDay(a).localeCompare(ticketWorkDay(b))
+}
+
+/** Carga: un poco atrás por si la cita es hoy y la petición nació antes. */
+export function boardLiveFetchRange(today = localTodayIso()): { from: string; to: string } {
+  return { from: shiftIso(today, -90), to: today }
+}
+
+/** Solo el trabajo de hoy (cita o fecha de la consulta). */
 export function isLiveBoardTicket(item: PeticionPendiente, today = localTodayIso()): boolean {
-  const work = ticketWorkDay(item)
-  if (work >= today) return true
-  if (!item.gestionado) return true
-  const done = String(item.gestionfecha || '').slice(0, 10)
-  return Boolean(done && done >= today)
+  return boardWorkLane(item, today) === 'today'
+}
+
+export function isTodayManualEntry(createdAt: string | null | undefined, today = localTodayIso()): boolean {
+  const day = String(createdAt || '').slice(0, 10)
+  return !day || day === today
 }

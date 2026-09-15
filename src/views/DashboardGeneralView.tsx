@@ -340,7 +340,7 @@ export default function DashboardGeneralView({
           <div className="dash-boards-jump-copy">
             <p className="section-eyebrow">Herramienta principal</p>
             <strong>Gestor de tableros</strong>
-            <p>Aquí se trabajan las consultas del taller, por operación y prioridad.</p>
+            <p>El trabajo de hoy del taller, por tipo de consulta.</p>
           </div>
           <button type="button" className="client-submit dash-boards-jump-action" onClick={onOpenBoards}>
             Abrir tableros

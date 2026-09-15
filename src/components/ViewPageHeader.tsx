@@ -97,8 +97,8 @@ function pageCopy(
         title: 'Gestor de tableros',
         subtitle:
           appRole === 'asesor'
-            ? 'Tu herramienta de trabajo: consultas por operación y prioridad.'
-            : 'Herramienta principal del taller: consultas por operación y prioridad.',
+            ? 'Tu trabajo de hoy, por tipo de consulta.'
+            : 'El trabajo de hoy del taller, por tipo de consulta.',
       }
     case 'laura':
       return {

@@ -25,7 +25,16 @@ import {
   manualOperationOf,
   operationKeyOf,
 } from '../lib/boardOperations'
-import { boardLiveFetchRange, isLiveBoardTicket } from '../lib/boardLiveRange'
+import {
+  boardLiveFetchRange,
+  boardWorkLane,
+  compareBoardWorkDay,
+  isLiveBoardTicket,
+  isTodayManualEntry,
+  ticketWorkDay,
+  type BoardWorkDayItem,
+  type BoardWorkLane,
+} from '../lib/boardLiveRange'
 import { formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
 import { defaultBoardPriority, scoreManualUrgency, scoreTicketUrgency } from '../lib/ticketUrgency'
 import TicketClientBlock from '../components/TicketClientBlock'
@@ -188,8 +197,20 @@ function cardId(card: BoardCard): string {
   return card.kind === 'peticion' ? card.item.idpeticion : card.entry.id
 }
 
+function cardWorkItem(card: BoardCard): BoardWorkDayItem {
+  if (card.kind === 'manual') {
+    return { fechainicio: card.entry.createdAt, fechacreacion: card.entry.createdAt }
+  }
+  return card.item
+}
+
+function cardLane(card: BoardCard, today: string): BoardWorkLane {
+  return boardWorkLane(cardWorkItem(card), today)
+}
+
 function cardTime(card: BoardCard): string {
-  return card.kind === 'peticion' ? card.item.fechainicio ?? '' : card.entry.createdAt
+  if (card.kind === 'manual') return card.entry.createdAt
+  return ticketWorkDay(card.item) || card.item.fechainicio || ''
 }
 
 function cardUrgency(card: BoardCard): number {
@@ -203,7 +224,7 @@ function cardUrgency(card: BoardCard): number {
   return scoreTicketUrgency(card.item).score
 }
 
-function applyOrder(cards: BoardCard[], order: string[] | undefined): BoardCard[] {
+function orderLane(cards: BoardCard[], order: string[] | undefined): BoardCard[] {
   if (!cards.length) return []
   const byId = new Map(cards.map((card) => [cardId(card), card]))
   const seen = new Set<string>()
@@ -218,9 +239,48 @@ function applyOrder(cards: BoardCard[], order: string[] | undefined): BoardCard[
   rest.sort((a, b) => {
     const delta = cardUrgency(b) - cardUrgency(a)
     if (delta !== 0) return delta
-    return String(cardTime(b)).localeCompare(String(cardTime(a)))
+    return String(cardTime(a)).localeCompare(String(cardTime(b)))
   })
   return [...next, ...rest]
+}
+
+function applyOrder(cards: BoardCard[], order: string[] | undefined, today: string): BoardCard[] {
+  if (!cards.length) return []
+  const lanes: Record<BoardWorkLane, BoardCard[]> = { today: [], atrasado: [], proximo: [] }
+  const sorted = [...cards].sort((a, b) => compareBoardWorkDay(cardWorkItem(a), cardWorkItem(b), today))
+  for (const card of sorted) {
+    lanes[cardLane(card, today)].push(card)
+  }
+  return [
+    ...orderLane(lanes.today, order),
+    ...orderLane(lanes.atrasado, order),
+    ...orderLane(lanes.proximo, order),
+  ]
+}
+
+function columnCountLabel(cards: BoardCard[]): string {
+  const count = cards.length
+  if (count === 1) return '1 hoy'
+  return `${count} hoy`
+}
+
+function todayHeading(iso: string): string {
+  const date = new Date(`${iso}T12:00:00`)
+  const weekday = date.toLocaleDateString('es-ES', { weekday: 'long' })
+  const rest = date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })
+  return `Hoy, ${weekday} ${rest}`
+}
+
+function formatCardWhen(iso: string | null | undefined, today: string): string {
+  if (!iso) return 'Hoy'
+  const day = String(iso).slice(0, 10)
+  if (day !== today) return formatFecha(iso)
+  try {
+    const time = new Date(iso).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+    return Number.isNaN(new Date(iso).getTime()) ? 'Hoy' : `Hoy, ${time}`
+  } catch {
+    return 'Hoy'
+  }
 }
 
 function insertId(ids: string[], id: string, index: number): string[] {
@@ -428,6 +488,7 @@ const BoardTicket = memo(function BoardTicket({
   card,
   column,
   ghost,
+  today,
   onPointerDown,
   workshop,
   workspace,
@@ -438,6 +499,7 @@ const BoardTicket = memo(function BoardTicket({
   card: BoardCard
   column: PriorityColumn
   ghost?: boolean
+  today: string
   onPointerDown?: (e: ReactPointerEvent<HTMLElement>) => void
   workshop: Workshop
   workspace: AdvisorWorkspace
@@ -453,7 +515,7 @@ const BoardTicket = memo(function BoardTicket({
     return (
       <article
         data-card-id={ghost ? undefined : id}
-        className={`kanban-card${ghost ? ' is-ghost' : ''}`}
+        className={`kanban-card glass glass-lite${ghost ? ' is-ghost' : ''}`}
         onPointerDown={onPointerDown}
         role={ghost ? undefined : 'button'}
         title={ghost ? undefined : 'Abrir ficha en una ventana'}
@@ -463,6 +525,7 @@ const BoardTicket = memo(function BoardTicket({
             <GripVertical size={16} />
           </span>
           <span className="ops-feed-placeholder">MANUAL</span>
+          <span className="kanban-day-chip">Hoy</span>
           <span className={`badge ${tone}`}>{column.label}</span>
         </div>
         <div className="ticket-client is-md">
@@ -471,7 +534,7 @@ const BoardTicket = memo(function BoardTicket({
           <p className="ticket-client-need">{entry.note || 'Sin detalle'}</p>
         </div>
         <footer>
-          <time>{formatFecha(entry.createdAt)}</time>
+          <time dateTime={entry.createdAt}>{formatCardWhen(entry.createdAt, today)}</time>
           <span>Urgencia {scoreManualUrgency({ title: entry.title, note: entry.note, createdAt: entry.createdAt }).score}</span>
         </footer>
       </article>
@@ -486,7 +549,7 @@ const BoardTicket = memo(function BoardTicket({
   return (
     <article
       data-card-id={ghost ? undefined : id}
-      className={`kanban-card${ghost ? ' is-ghost' : ''}`}
+      className={`kanban-card glass glass-lite${ghost ? ' is-ghost' : ''}`}
       onPointerDown={onPointerDown}
       role={ghost ? undefined : 'button'}
       title={ghost ? undefined : 'Abrir ficha en una ventana'}
@@ -496,6 +559,7 @@ const BoardTicket = memo(function BoardTicket({
           <GripVertical size={16} />
         </span>
         <TicketPlate peticion={item} />
+        <span className="kanban-day-chip">Hoy</span>
         <span className={`badge ${tone}`}>{column.label}</span>
       </div>
       <TicketClientBlock peticion={item} size="md" />
@@ -512,7 +576,7 @@ const BoardTicket = memo(function BoardTicket({
         compact
       />
       <footer>
-        <time>{formatFecha(item.fechainicio)}</time>
+        <time dateTime={item.fechainicio ?? undefined}>{formatCardWhen(item.fechainicio, today)}</time>
         <span title={urgency.reasons.join(' · ') || 'Fórmula de urgencia'}>Urgencia {urgency.score}</span>
       </footer>
     </article>
@@ -629,6 +693,7 @@ export default function BoardsManagerView({
       else counts.set(id, { label: item.tipopeticion?.trim() || 'Sin tipo', count: 1 })
     }
     for (const entry of manualEntries) {
+      if (!isTodayManualEntry(entry.createdAt, today)) continue
       if (!matchesManualCitaLink(citaLink)) continue
       if (appRole === 'admin' && !matchesOwnerScope(null, ownerScope, ownerCtx)) continue
       const op = manualOperationOf(entry)
@@ -644,7 +709,7 @@ export default function BoardsManagerView({
         return a.label.localeCompare(b.label, 'es')
       })
     return next.length > 0 ? next : [fallbackOperation()]
-  }, [scopedItems, manualEntries, appRole, ownerScope, ownerCtx, citaLink])
+  }, [scopedItems, manualEntries, appRole, ownerScope, ownerCtx, citaLink, today])
 
   useEffect(() => {
     if (visibleOperations.some((operation) => operation.id === activeOperation)) return
@@ -664,13 +729,14 @@ export default function BoardsManagerView({
       const tickets = grouped.get(operation.id)?.length ?? 0
       const manuals = manualEntries.filter((entry) => {
         if (manualOperationOf(entry).id !== operation.id) return false
+        if (!isTodayManualEntry(entry.createdAt, today)) return false
         if (!matchesManualCitaLink(citaLink)) return false
         return appRole === 'asesor' || matchesOwnerScope(null, ownerScope, ownerCtx)
       }).length
       counts[operation.id] = tickets + manuals
     }
     return counts
-  }, [visibleOperations, grouped, manualEntries, appRole, ownerScope, ownerCtx, citaLink])
+  }, [visibleOperations, grouped, manualEntries, appRole, ownerScope, ownerCtx, citaLink, today])
 
   const columns = useMemo(() => {
     const buckets: Record<PriorityId, BoardCard[]> = {
@@ -688,17 +754,18 @@ export default function BoardsManagerView({
 
     for (const entry of manualEntries) {
       if (manualOperationOf(entry).id !== active.id) continue
+      if (!isTodayManualEntry(entry.createdAt, today)) continue
       if (!matchesManualCitaLink(citaLink)) continue
       if (appRole === 'admin' && !matchesOwnerScope(null, ownerScope, ownerCtx)) continue
       buckets[entry.priority].push({ kind: 'manual', entry })
     }
 
     for (const col of COLUMNS) {
-      buckets[col.id] = applyOrder(buckets[col.id], orders[colOrderKey(active.id, col.id)])
+      buckets[col.id] = applyOrder(buckets[col.id], orders[colOrderKey(active.id, col.id)], today)
     }
 
     return buckets
-  }, [grouped, active.id, priorities, manualEntries, orders, ownerScope, ownerCtx, appRole, citaLink])
+  }, [grouped, active.id, priorities, manualEntries, orders, ownerScope, ownerCtx, appRole, citaLink, today])
 
   useEffect(() => {
     columnsRef.current = columns
@@ -1029,8 +1096,8 @@ export default function BoardsManagerView({
           {citaLink !== 'todas'
             ? citaLinkEmptyCopy(citaLink)
             : appRole === 'asesor'
-              ? 'Tu equipo no tiene consultas de hoy en adelante.'
-              : 'No hay consultas de hoy en adelante.'}
+              ? 'Tu equipo no tiene consultas de hoy.'
+              : 'No hay consultas de hoy.'}
         </p>
       ) : null}
 
@@ -1088,12 +1155,12 @@ export default function BoardsManagerView({
       <section className="board-heading glass glass-lite">
         <div className="department-tab-icon"><ActiveIcon size={20} /></div>
         <div className="board-heading-copy">
-          <p className="section-eyebrow">Tablero por operación</p>
+          <p className="section-eyebrow">{todayHeading(today)}</p>
           <h2 className="ops-card-title">{active.label}</h2>
           <p className="section-subtitle">
             {appRole === 'asesor'
-              ? 'Tus equipos, tickets sueltos y los que puedes pasar · desde hoy'
-              : `${active.description} · desde hoy hacia adelante`}
+              ? 'Solo las consultas de hoy: tus equipos, tickets sueltos y los que puedes pasar.'
+              : `Solo las consultas de hoy · ${active.description}`}
           </p>
           <div className="elevator-filters" style={{ marginTop: 'var(--space-3)' }}>
             <TeamFilter teams={visibleTeams} value={teamFilter} onChange={setTeamFilter} />
@@ -1184,7 +1251,7 @@ export default function BoardsManagerView({
                   <h3>{column.label}</h3>
                   <p className="kanban-column-hint">{column.hint}</p>
                 </div>
-                <span>{loading ? '—' : cards.length}</span>
+                <span>{loading ? '—' : columnCountLabel(cards)}</span>
               </header>
 
               <div className="kanban-cards custom-scrollbar-light">
@@ -1200,6 +1267,7 @@ export default function BoardsManagerView({
                       key={cardId(card)}
                       card={card}
                       column={column}
+                      today={today}
                       workshop={workshop}
                       workspace={workspace}
                       currentUser={currentUser}
