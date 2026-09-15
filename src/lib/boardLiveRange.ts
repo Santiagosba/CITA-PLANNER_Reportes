@@ -55,7 +55,8 @@ export function teamsDeskFetchRange(today = localTodayIso()): { from: string; to
   const year = resolveDateRange('anio')
   const live = boardLiveFetchRange(today)
   const from = [live.from, year.from].filter(Boolean).sort()[0] as string
-  const to = [live.to, year.to].filter(Boolean).sort().at(-1) as string
+  const days = [live.to, year.to].filter(Boolean).sort() as string[]
+  const to = days[days.length - 1]
   return { from, to }
 }
 
