@@ -89,7 +89,7 @@ export async function updateAccountPassword(
 export async function updateAccountRole(
   email: string,
   role: TallerAccountRole,
-  opts?: { idtaller?: string; crmIdtaller?: string; name?: string },
+  opts?: { idtaller?: string; crmIdtaller?: string; name?: string; hubWebId?: string | null },
 ): Promise<{ role?: TallerAccountRole }> {
   return invokeTallerCuenta<{ role?: TallerAccountRole }>({
     action: 'role',
@@ -97,6 +97,7 @@ export async function updateAccountRole(
     role,
     ...(opts?.idtaller ? { idtaller: opts.idtaller } : {}),
     ...(opts?.crmIdtaller ? { crmIdtaller: opts.crmIdtaller } : {}),
+    ...(opts?.hubWebId ? { hubWebId: opts.hubWebId } : {}),
     ...(opts?.name ? { name: opts.name } : {}),
   })
 }

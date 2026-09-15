@@ -823,6 +823,7 @@ export default function DashboardShell({
           currentUser={currentUser}
           readOnly={appRole === 'asesor'}
           canCreateTallerAdmin={canEditHubBranding}
+          onOpenLead={openLead}
         />
       ) : shellRoute === 'asignar-tarea' ? (
         <AssignTaskView

@@ -35,11 +35,18 @@ export function daysUntilPurge(person: Pick<AdvisorPerson, 'purgeAt'>, now = Dat
   return Math.max(0, Math.ceil((at - now) / 86_400_000))
 }
 
+function foldText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+}
+
 export function personMatchesQuery(person: AdvisorPerson, query: string): boolean {
-  const needle = query.trim().toLowerCase()
+  const needle = foldText(query.trim())
   if (!needle) return true
   const role = person.role === 'taller_admin' ? 'admin' : person.role === 'asesor' ? 'asesor' : ''
-  return `${person.name} ${person.email} ${role}`.toLowerCase().includes(needle)
+  return foldText(`${person.name} ${person.email} ${role}`).includes(needle)
 }
 
 export type AdvisorTeam = {
@@ -80,6 +87,116 @@ export type AdvisorWorkspace = {
   taskTypes: CatalogItem[]
   boards: CatalogItem[]
   tasks: AssignedTask[]
+  /** Ticket → equipo que el admin ha fijado. Si no está, se infiere. */
+  ticketTeams: Record<string, string>
+  /** Orden de tickets por columna (equipo o sueltos). */
+  ticketOrder: Record<string, string[]>
+}
+
+/** Conserva acentos, eñes y diéresis. Solo recorta espacios. */
+export function sanitizeTeamName(name: string): string {
+  return String(name || '').replace(/\s+/g, ' ').trim()
+}
+
+export function ticketTeamsOf(workspace: Pick<AdvisorWorkspace, 'ticketTeams' | 'teams'>): Record<string, string> {
+  const raw = workspace.ticketTeams && typeof workspace.ticketTeams === 'object' ? workspace.ticketTeams : {}
+  const known = new Set(workspace.teams.map((team) => team.id))
+  const next: Record<string, string> = {}
+  for (const [peticionId, teamId] of Object.entries(raw)) {
+    if (!peticionId || typeof teamId !== 'string' || !known.has(teamId)) continue
+    next[peticionId] = teamId
+  }
+  return next
+}
+
+export function assignedTicketTeamId(
+  workspace: Pick<AdvisorWorkspace, 'ticketTeams' | 'teams'>,
+  peticionId: string | null | undefined,
+): string | null {
+  const id = String(peticionId || '').trim()
+  if (!id) return null
+  return ticketTeamsOf(workspace)[id] ?? null
+}
+
+export function setTicketTeam(
+  workspace: AdvisorWorkspace,
+  peticionId: string,
+  teamId: string | null,
+): AdvisorWorkspace {
+  const id = String(peticionId || '').trim()
+  if (!id) return workspace
+  const current = ticketTeamsOf(workspace)
+  const next = { ...current }
+  if (!teamId || !workspace.teams.some((team) => team.id === teamId)) {
+    if (!(id in next)) return { ...workspace, ticketTeams: current }
+    delete next[id]
+  } else if (next[id] === teamId) {
+    return { ...workspace, ticketTeams: current }
+  } else {
+    next[id] = teamId
+  }
+  return { ...workspace, ticketTeams: next }
+}
+
+export function setTicketTeams(
+  workspace: AdvisorWorkspace,
+  peticionIds: string[],
+  teamId: string | null,
+): AdvisorWorkspace {
+  return peticionIds.reduce((current, peticionId) => setTicketTeam(current, peticionId, teamId), workspace)
+}
+
+export const TICKET_ORDER_LOOSE = 'sueltos'
+
+export function ticketOrderOf(workspace: Pick<AdvisorWorkspace, 'ticketOrder' | 'teams'>): Record<string, string[]> {
+  const raw = workspace.ticketOrder && typeof workspace.ticketOrder === 'object' ? workspace.ticketOrder : {}
+  const known = new Set(workspace.teams.map((team) => team.id))
+  known.add(TICKET_ORDER_LOOSE)
+  const next: Record<string, string[]> = {}
+  for (const [key, ids] of Object.entries(raw)) {
+    if (!known.has(key) || !Array.isArray(ids)) continue
+    next[key] = ids.filter((id): id is string => typeof id === 'string' && Boolean(id.trim()))
+  }
+  return next
+}
+
+export function sortTicketsByOrder<T extends { idpeticion: string }>(tickets: T[], order?: string[]): T[] {
+  if (!order?.length || tickets.length < 2) return tickets
+  const rank = new Map(order.map((id, index) => [id, index]))
+  return [...tickets].sort((a, b) => {
+    const left = rank.get(a.idpeticion)
+    const right = rank.get(b.idpeticion)
+    if (left == null && right == null) return 0
+    if (left == null) return 1
+    if (right == null) return -1
+    return left - right
+  })
+}
+
+export function placeTicketInOrder(
+  workspace: AdvisorWorkspace,
+  peticionId: string,
+  teamId: string | null,
+  index: number,
+  siblings: string[] = [],
+): AdvisorWorkspace {
+  const id = String(peticionId || '').trim()
+  if (!id) return workspace
+  const column =
+    teamId && workspace.teams.some((team) => team.id === teamId) ? teamId : TICKET_ORDER_LOOSE
+  const assigned = setTicketTeam(workspace, id, column === TICKET_ORDER_LOOSE ? null : column)
+  const order = ticketOrderOf(assigned)
+  const next: Record<string, string[]> = {}
+  for (const [key, ids] of Object.entries(order)) {
+    if (key === column) continue
+    const kept = ids.filter((item) => item !== id)
+    if (kept.length) next[key] = kept
+  }
+  const list = (siblings.length ? siblings : (order[column] ?? [])).filter((item) => item && item !== id)
+  const at = Math.max(0, Math.min(Math.floor(index), list.length))
+  list.splice(at, 0, id)
+  next[column] = list
+  return { ...assigned, ticketOrder: next }
 }
 
 const STORAGE_PREFIX = 'avi_advisor_workspace_v1:'
@@ -280,6 +397,8 @@ export function seedAdvisorWorkspace(opts?: { examples?: boolean }): AdvisorWork
     taskTypes,
     boards,
     tasks: opts?.examples ? exampleAssignedTasks() : [],
+    ticketTeams: {},
+    ticketOrder: {},
   }
 }
 
@@ -293,6 +412,8 @@ export function emptyAdvisorWorkspace(): AdvisorWorkspace {
     taskTypes,
     boards,
     tasks: [],
+    ticketTeams: {},
+    ticketOrder: {},
   }
 }
 
@@ -431,6 +552,28 @@ function refreshDemoTaskDates(workspace: AdvisorWorkspace): AdvisorWorkspace {
   return changed ? { ...workspace, tasks } : workspace
 }
 
+function ensureTicketTeams(workspace: AdvisorWorkspace): AdvisorWorkspace {
+  const ticketTeams = ticketTeamsOf(workspace)
+  const prev = workspace.ticketTeams
+  if (prev && Object.keys(prev).length === Object.keys(ticketTeams).length) {
+    let same = true
+    for (const [key, value] of Object.entries(ticketTeams)) {
+      if (prev[key] !== value) {
+        same = false
+        break
+      }
+    }
+    if (same) return workspace.ticketTeams ? workspace : { ...workspace, ticketTeams }
+  }
+  return { ...workspace, ticketTeams }
+}
+
+function ensureTicketOrder(workspace: AdvisorWorkspace): AdvisorWorkspace {
+  const ticketOrder = ticketOrderOf(workspace)
+  if (workspace.ticketOrder) return { ...workspace, ticketOrder }
+  return { ...workspace, ticketOrder }
+}
+
 /** Completa el catálogo. Los equipos de demo solo se inyectan en la vista local. */
 export function hydrateAdvisorWorkspace(
   workspace: AdvisorWorkspace,
@@ -439,7 +582,8 @@ export function hydrateAdvisorWorkspace(
   const withCatalog = ensureDefaultCatalog(workspace)
   const withTeams = opts?.showcase ? ensureShowcaseTeams(withCatalog) : reconcileTeamMembers(withCatalog)
   const next = refreshDemoTaskDates(withTeams)
-  return opts?.keepExamples ? next : dropExampleTasks(next)
+  const cleaned = opts?.keepExamples ? next : dropExampleTasks(next)
+  return ensureTicketOrder(ensureTicketTeams(cleaned))
 }
 
 export function parseAdvisorWorkspace(value: unknown): AdvisorWorkspace | null {
@@ -646,7 +790,7 @@ export function tasksForAdvisorDay(workspace: AdvisorWorkspace, email: string, d
 }
 
 export function createTeam(workspace: AdvisorWorkspace, name: string): AdvisorWorkspace {
-  const trimmed = name.trim()
+  const trimmed = sanitizeTeamName(name)
   if (!trimmed) return workspace
   const team: AdvisorTeam = {
     id: newId('team'),
@@ -667,17 +811,22 @@ export function patchTeam(
   teamId: string,
   patch: Partial<Pick<AdvisorTeam, 'name' | 'memberIds' | 'taskTypeIds' | 'boardIds'>>,
 ): AdvisorWorkspace {
+  const nextPatch = patch.name != null ? { ...patch, name: sanitizeTeamName(patch.name) } : patch
+  if (nextPatch.name != null && !nextPatch.name) return workspace
   return {
     ...workspace,
-    teams: workspace.teams.map((team) => (team.id === teamId ? { ...team, ...patch } : team)),
+    teams: workspace.teams.map((team) => (team.id === teamId ? { ...team, ...nextPatch } : team)),
   }
 }
 
 export function removeTeam(workspace: AdvisorWorkspace, teamId: string): AdvisorWorkspace {
+  const nextTeams = workspace.teams.filter((team) => team.id !== teamId)
   return {
     ...workspace,
-    teams: workspace.teams.filter((team) => team.id !== teamId),
+    teams: nextTeams,
     tasks: workspace.tasks.map((task) => (task.teamId === teamId ? { ...task, teamId: null } : task)),
+    ticketTeams: ticketTeamsOf({ teams: nextTeams, ticketTeams: workspace.ticketTeams }),
+    ticketOrder: ticketOrderOf({ teams: nextTeams, ticketOrder: workspace.ticketOrder }),
   }
 }
 

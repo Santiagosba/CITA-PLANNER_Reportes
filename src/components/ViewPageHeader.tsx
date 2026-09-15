@@ -69,8 +69,8 @@ function pageCopy(
             subtitle: 'Pulsa un grupo para ver a tus compañeros. Aquí no se cambia nada.',
           }
         : {
-            title: 'Cuentas',
-            subtitle: 'Busca a alguien, ábrelo y cambia lo que haga falta.',
+            title: 'Cuentas y equipos',
+            subtitle: 'Suelta cada tarjeta en el equipo que le toque.',
           }
     case 'asignar-tarea':
       return {

@@ -4,9 +4,9 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type AnimationEvent as ReactAnimationEvent,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
+  type TransitionEvent as ReactTransitionEvent,
 } from 'react'
 import {
   expandSide,
@@ -126,6 +126,7 @@ export function useOsWindow({
   const onMinimizeRef = useRef(onMinimize)
   const onPlaceRef = useRef(onPlace)
   const phaseRef = useRef(phase)
+  const finishTimerRef = useRef(0)
   const maxFromRef = useRef<DOMRect | null>(null)
   const maxAnimationRef = useRef<Animation | null>(null)
 
@@ -196,7 +197,27 @@ export function useOsWindow({
     const el = rootRef.current
     if (!el || phase !== 'enter') return
     applyDockVars(el)
-  }, [phase])
+    let raf2 = 0
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        if (phaseRef.current !== 'enter') return
+        el.style.removeProperty('transform')
+        el.style.removeProperty('opacity')
+        phaseRef.current = 'idle'
+        setPhase('idle')
+      })
+    })
+    window.clearTimeout(finishTimerRef.current)
+    finishTimerRef.current = window.setTimeout(() => {
+      if (phaseRef.current !== 'enter') return
+      phaseRef.current = 'idle'
+      setPhase('idle')
+    }, enterFrom === 'restore' ? 560 : 540)
+    return () => {
+      cancelAnimationFrame(raf1)
+      cancelAnimationFrame(raf2)
+    }
+  }, [enterFrom, phase])
 
   const applyLiveRect = useCallback(
     (next: WinRect) => {
@@ -232,8 +253,13 @@ export function useOsWindow({
     const finalRect = liveRectRef.current
     dragRef.current = null
     liveRectRef.current = null
-    if (el && finalRect) commitWinRectToElement(el, finalRect)
+    if (el && finalRect) {
+      el.style.transition = 'none'
+      commitWinRectToElement(el, finalRect)
+      void el.offsetWidth
+    }
     el?.classList.remove('is-gesturing', 'is-moving', 'is-resizing')
+    if (el) el.style.removeProperty('transition')
     document.body.style.userSelect = ''
     document.body.style.cursor = ''
     clearOsSnapLines()
@@ -325,9 +351,13 @@ export function useOsWindow({
   }, [applyLiveMove, applyLiveRect, endGesture, minH, minW, windowId])
 
   const beginGesture = useCallback((mode: 'move' | 'resize') => {
-    rootRef.current?.classList.add('is-gesturing', mode === 'move' ? 'is-moving' : 'is-resizing')
+    const el = rootRef.current
+    el?.classList.add('is-gesturing', mode === 'move' ? 'is-moving' : 'is-resizing')
     document.body.style.userSelect = 'none'
-    if (phaseRef.current === 'enter') setPhase('idle')
+    if (phaseRef.current === 'enter') {
+      phaseRef.current = 'idle'
+      setPhase('idle')
+    }
   }, [])
 
   const startMove = useCallback(
@@ -387,19 +417,32 @@ export function useOsWindow({
     [beginGesture],
   )
 
+  const finishClose = useCallback(() => {
+    if (phaseRef.current !== 'closing') return
+    window.clearTimeout(finishTimerRef.current)
+    phaseRef.current = 'idle'
+    onCloseRef.current()
+  }, [])
+
+  const finishMinimize = useCallback(() => {
+    if (phaseRef.current !== 'minimizing') return
+    window.clearTimeout(finishTimerRef.current)
+    phaseRef.current = 'idle'
+    if (minStyleRef.current === 'dock') pulseAgendaCatch()
+    onMinimizeRef.current()
+  }, [])
+
   const requestClose = useCallback(() => {
     if (phaseRef.current === 'closing' || phaseRef.current === 'minimizing') return
     if (reducedMotion()) {
       onCloseRef.current()
       return
     }
+    phaseRef.current = 'closing'
     setPhase('closing')
-    window.setTimeout(() => {
-      if (phaseRef.current !== 'closing') return
-      phaseRef.current = 'idle'
-      onCloseRef.current()
-    }, 400)
-  }, [])
+    window.clearTimeout(finishTimerRef.current)
+    finishTimerRef.current = window.setTimeout(finishClose, 480)
+  }, [finishClose])
 
   const requestMinimize = useCallback(
     (style: MinimizeStyle = 'dock') => {
@@ -415,16 +458,13 @@ export function useOsWindow({
         if (style === 'side') applyScatterVars(el, staggerMs)
         else applyDockVars(el)
       }
+      phaseRef.current = 'minimizing'
       setPhase('minimizing')
-      const ms = style === 'side' ? 460 + staggerMs : 420
-      window.setTimeout(() => {
-        if (phaseRef.current !== 'minimizing') return
-        phaseRef.current = 'idle'
-        if (minStyleRef.current === 'dock') pulseAgendaCatch()
-        onMinimizeRef.current()
-      }, ms)
+      window.clearTimeout(finishTimerRef.current)
+      const ms = style === 'side' ? 560 + staggerMs : 500
+      finishTimerRef.current = window.setTimeout(finishMinimize, ms)
     },
-    [staggerMs],
+    [finishMinimize, staggerMs],
   )
 
   const requestPlace = useCallback((next: OsPlacement) => {
@@ -457,36 +497,26 @@ export function useOsWindow({
   useEffect(() => {
     if (!minimizeRequest || minimizeRequest === lastMinReqRef.current) return
     lastMinReqRef.current = minimizeRequest
-    if (phaseRef.current === 'minimizing' || phaseRef.current === 'closing') {
-      onMinimizeRef.current()
-      return
-    }
+    if (phaseRef.current === 'minimizing' || phaseRef.current === 'closing') return
     requestMinimize(minimizeStyle)
   }, [minimizeRequest, minimizeStyle, requestMinimize])
 
-  const onFrameAnimEnd = useCallback((e: ReactAnimationEvent<HTMLDivElement>) => {
+  useEffect(() => () => window.clearTimeout(finishTimerRef.current), [])
+
+  const onWinMotionEnd = useCallback((e: ReactTransitionEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget) return
-    const name = e.animationName
-    if (phaseRef.current === 'enter' && (name.includes('os-win-spawn') || name.includes('os-win-restore'))) {
-      e.currentTarget.style.opacity = '1'
-      e.currentTarget.style.transform = 'translateZ(0)'
+    if (e.propertyName !== 'transform') return
+    if (phaseRef.current === 'enter') {
+      phaseRef.current = 'idle'
       setPhase('idle')
       return
     }
-    if (phaseRef.current === 'closing' && name.includes('os-win-close')) {
-      phaseRef.current = 'idle'
-      onCloseRef.current()
+    if (phaseRef.current === 'closing') {
+      finishClose()
       return
     }
-    if (
-      phaseRef.current === 'minimizing' &&
-      (name.includes('os-win-minimize') || name.includes('os-win-side-out') || name.includes('os-win-scatter-out'))
-    ) {
-      phaseRef.current = 'idle'
-      if (minStyleRef.current === 'dock') pulseAgendaCatch()
-      onMinimizeRef.current()
-    }
-  }, [])
+    if (phaseRef.current === 'minimizing') finishMinimize()
+  }, [finishClose, finishMinimize])
 
   const shown = displayRect(placement, rect)
   const style: CSSProperties & Record<'--tool-min-w' | '--tool-min-h', string> = {
@@ -528,7 +558,8 @@ export function useOsWindow({
     requestPlace,
     requestToggleMaximize,
     expandEdge,
-    onFrameAnimEnd,
+    onWinMotionEnd,
+    onFrameAnimEnd: onWinMotionEnd,
     onFocus: () => onFocusRef.current(),
   }
 }

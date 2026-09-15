@@ -48,7 +48,7 @@ function SidebarItem({
       type="button"
       onClick={onClick}
       title={collapsed ? label : undefined}
-      className={`group relative mb-1 flex h-11 w-full items-center rounded-lg transition-all duration-200 ${
+      className={`group relative mb-1 flex h-11 w-full items-center rounded-lg transition-all duration-150 ${
         collapsed ? 'justify-center px-0' : 'justify-start px-2'
       } ${
         active
@@ -61,7 +61,7 @@ function SidebarItem({
       </div>
       {!collapsed && (
         <span
-          className={`ml-3 overflow-hidden text-[15px] font-medium whitespace-nowrap transition-opacity duration-200 ${active ? 'text-white' : ''}`}
+          className={`ml-3 overflow-hidden text-[15px] font-medium whitespace-nowrap transition-opacity duration-150 ${active ? 'text-white' : ''}`}
         >
           {label}
         </span>
@@ -100,13 +100,13 @@ export default function Sidebar({
 
   return (
     <aside
-      className={`${sidebarOpen ? 'w-64' : 'w-20'} z-30 flex flex-col border-r border-slate-200 bg-white transition-all duration-300 dark:border-slate-800 dark:bg-slate-900 ${
+      className={`${sidebarOpen ? 'w-64' : 'w-20'} z-30 flex flex-col border-r border-slate-200 bg-white transition-all duration-150 dark:border-slate-800 dark:bg-slate-900 ${
         sidebarOpen ? 'fixed inset-y-0 left-0 top-14 md:relative md:inset-auto md:top-0 md:h-full' : 'hidden md:flex md:relative md:h-full'
       }`}
     >
       {/* Logo — misma posición CRM: zona superior del sidebar sobre el ítem Panel (solo con barra expandida). */}
       <div
-        className={`flex shrink-0 items-center justify-center overflow-hidden transition-all duration-300 ${
+        className={`flex shrink-0 items-center justify-center overflow-hidden transition-all duration-150 ${
           sidebarOpen ? 'min-h-0 px-4 py-5' : 'h-0 p-0 opacity-0'
         }`}
       >
@@ -114,14 +114,14 @@ export default function Sidebar({
           <img
             src={licenseLogoUrl}
             alt=""
-            className="max-h-32 w-full object-contain drop-shadow-sm transition-all duration-300"
+            className="max-h-32 w-full object-contain drop-shadow-sm transition-all duration-150"
             referrerPolicy="no-referrer"
           />
         ) : null}
       </div>
 
       <div
-        className={`custom-scrollbar-light flex flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden px-3 pt-2 pb-6 transition-all duration-300 ${
+        className={`custom-scrollbar-light flex flex-1 flex-col gap-4 overflow-y-auto overflow-x-hidden px-3 pt-2 pb-6 transition-all duration-150 ${
           sidebarOpen ? '-mt-2' : 'mt-12'
         }`}
       >
@@ -162,7 +162,7 @@ export default function Sidebar({
       </div>
 
       <div className="mt-auto border-t border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-        <div className={`flex items-center overflow-hidden transition-all duration-300 ${!sidebarOpen ? 'justify-center' : 'justify-between'}`}>
+        <div className={`flex items-center overflow-hidden transition-all duration-150 ${!sidebarOpen ? 'justify-center' : 'justify-between'}`}>
           <div className="flex min-w-0 items-center gap-3">
             <div className="relative shrink-0">
               <div className="flex h-9 w-9 items-center justify-center rounded-full border border-blue-400 bg-blue-600 text-sm font-bold text-white uppercase">

@@ -16,6 +16,9 @@ import {
   setAssignedTaskAssignee,
   setAssignedTaskStatus,
   setPersonRole,
+  placeTicketInOrder,
+  setTicketTeam,
+  setTicketTeams,
   togglePersonOnTeam,
   type AdvisorTeam,
   type AdvisorWorkspace,
@@ -138,6 +141,12 @@ export function useAdvisorWorkspace(
         commit((latest) => setAssignedTaskStatus(latest, taskId, status)),
       setTaskAssignee: (taskId: string, assigneeId: string) =>
         commit((latest) => setAssignedTaskAssignee(latest, taskId, assigneeId)),
+      assignTicketTeam: (peticionId: string, teamId: string | null) =>
+        commit((latest) => setTicketTeam(latest, peticionId, teamId)),
+      assignTicketsToTeam: (peticionIds: string[], teamId: string | null) =>
+        commit((latest) => setTicketTeams(latest, peticionIds, teamId)),
+      placeTicket: (peticionId: string, teamId: string | null, index: number, siblings?: string[]) =>
+        commit((latest) => placeTicketInOrder(latest, peticionId, teamId, index, siblings)),
     }),
     [commit],
   )

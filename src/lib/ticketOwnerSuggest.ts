@@ -1,4 +1,12 @@
-import { isPersonOnTeam, normalizeEmail, personByEmail, type AdvisorPerson, type AdvisorTeam, type AdvisorWorkspace } from './advisorWorkspace'
+import {
+  isPersonOnTeam,
+  isPersonPendingDelete,
+  normalizeEmail,
+  personByEmail,
+  type AdvisorPerson,
+  type AdvisorTeam,
+  type AdvisorWorkspace,
+} from './advisorWorkspace'
 import { teamForTicketType } from './teamScope'
 import { phoneMatchKey } from './ticketClient'
 import type { PeticionPendiente } from './peticionesPendientes'
@@ -14,9 +22,10 @@ function membersOf(
   workspace: AdvisorWorkspace,
   team: AdvisorTeam | undefined,
 ): AdvisorPerson[] {
-  if (!team) return workspace.people
-  const members = workspace.people.filter((person) => isPersonOnTeam(workspace, team, person.id, person.email))
-  return members.length ? members : workspace.people
+  const active = workspace.people.filter((person) => !isPersonPendingDelete(person))
+  if (!team) return active
+  const members = active.filter((person) => isPersonOnTeam(workspace, team, person.id, person.email))
+  return members.length ? members : active
 }
 
 function lastOwnerForPhone(
@@ -82,8 +91,65 @@ export function suggestTicketOwner(
   return { person, reason: team ? 'equipo' : 'carga' }
 }
 
+/** En un equipo concreto: el del mismo teléfono o el que menos tickets abiertos tenga. */
+export function suggestTicketOwnerForTeam(
+  workspace: AdvisorWorkspace,
+  team: AdvisorTeam,
+  ticket: Pick<PeticionPendiente, 'idpeticion' | 'caller' | 'tipopeticion' | 'gestionemail'>,
+  tickets: PeticionPendiente[] = [],
+): SuggestedTicketOwner | null {
+  const current = personByEmail(workspace, ticket.gestionemail || '')
+  if (current && !isPersonPendingDelete(current)) return { person: current, reason: 'cliente' }
+
+  const fromPhone = lastOwnerForPhone(workspace, ticket, tickets)
+  if (fromPhone && !isPersonPendingDelete(fromPhone)) return { person: fromPhone, reason: 'cliente' }
+
+  const members = membersOf(workspace, team)
+  if (!members.length) return null
+  return { person: leastLoaded(members, tickets, ticket.idpeticion), reason: 'equipo' }
+}
+
+export function ticketNeedsOwner(ticket: Pick<PeticionPendiente, 'gestionemail'>): boolean {
+  return !normalizeEmail(ticket.gestionemail || '')
+}
+
 export function ownerSuggestCopy(reason: OwnerSuggestReason, name: string): string {
   if (reason === 'cliente') return `Le tocaría ${name}: ya atendió a este cliente.`
   if (reason === 'equipo') return `Le tocaría ${name}: es de su equipo y tipo.`
   return `Le tocaría ${name}: es quien menos tickets abiertos tiene.`
+}
+
+export function teamRepartirHint(ticketCount: number, memberCount: number, canUndo: boolean): string {
+  if (canUndo) return 'Puedes deshacer este reparto.'
+  if (memberCount === 0) return 'Mete gente en este equipo para poder repartir.'
+  if (ticketCount === 0) return 'Suelta tarjetas aquí para repartirlas.'
+  return 'Se reparte al azar entre el equipo.'
+}
+
+export function shuffleList<T>(items: T[], rand: () => number = Math.random): T[] {
+  const next = [...items]
+  for (let i = next.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rand() * (i + 1))
+    const left = next[i]
+    const right = next[j]
+    if (left === undefined || right === undefined) continue
+    next[i] = right
+    next[j] = left
+  }
+  return next
+}
+
+/** Reparte cada ticket a alguien del equipo, al azar. */
+export function planRandomTeamAssign(
+  members: AdvisorPerson[],
+  tickets: PeticionPendiente[],
+  rand: () => number = Math.random,
+): { ticket: PeticionPendiente; person: AdvisorPerson }[] {
+  if (!members.length || !tickets.length) return []
+  const people = shuffleList(members, rand)
+  const queue = shuffleList(tickets, rand)
+  return queue.map((ticket, index) => ({
+    ticket,
+    person: people[index % people.length] ?? people[0],
+  }))
 }

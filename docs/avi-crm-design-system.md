@@ -78,8 +78,8 @@ de UI. Para portarlo a otra app basta con copiar el bloque `:root`, la receta
   /* ---- Ergonomía / interacción ---- */
   --tap-target: 48px;
   --focus-ring: 0 0 0 3px var(--color-surface-solid), 0 0 0 6px var(--color-brand-ring);
-  --transition-fast: 0.16s ease;
-  --transition-base: 0.24s ease;
+  --transition-fast: 0.1s cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-base: 0.16s cubic-bezier(0.22, 1, 0.36, 1);
 
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   font-optical-sizing: auto;

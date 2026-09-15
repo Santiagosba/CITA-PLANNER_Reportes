@@ -65,8 +65,8 @@
 
   --tap-target: 48px;
   --focus-ring: 0 0 0 3px var(--color-surface-solid), 0 0 0 6px var(--color-brand-ring);
-  --transition-fast: 0.16s ease;
-  --transition-base: 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-fast: 0.1s cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-base: 0.16s cubic-bezier(0.22, 1, 0.36, 1);
   /* Menos blur = texto y bordes m?s n?tidos; el cristal sigue not?ndose */
   --glass-blur: 18px;
   --glass-saturate: 140%;
@@ -1969,7 +1969,7 @@ html.dark .login-asesor-card {
 }
 
 .action-btn-check {
-  animation: action-pop 0.35s ease;
+  animation: action-pop 0.24s ease;
 }
 
 @keyframes action-pop {
@@ -2060,8 +2060,8 @@ html.dark .login-asesor-card {
   opacity: 0;
   transform: translateY(12px);
   transition:
-    opacity 0.45s ease,
-    transform 0.45s ease;
+    opacity 0.31s ease,
+    transform 0.31s ease;
 }
 
 .scroll-reveal.is-visible,
@@ -2071,15 +2071,15 @@ html.dark .login-asesor-card {
 }
 
 .agenda-day-group:nth-child(1) .scroll-reveal {
-  transition-delay: 0.04s;
+  transition-delay: 0.02s;
 }
 
 .agenda-day-group:nth-child(2) .scroll-reveal {
-  transition-delay: 0.08s;
+  transition-delay: 0.05s;
 }
 
 .agenda-day-group:nth-child(3) .scroll-reveal {
-  transition-delay: 0.12s;
+  transition-delay: 0.07s;
 }
 
 @supports (animation-timeline: view()) {
@@ -2117,7 +2117,7 @@ html.dark .login-asesor-card {
     rgba(15, 17, 21, 0.06) 75%
   );
   background-size: 200% 100%;
-  animation: skeleton-shimmer 1.2s ease infinite;
+  animation: skeleton-shimmer 1.03s ease infinite;
 }
 
 .skeleton-line-lg {
@@ -2200,7 +2200,7 @@ html.dark .login-asesor-card {
   );
   filter: blur(18px) saturate(160%);
   opacity: 0.42;
-  animation: hex-aura 3.4s linear infinite;
+  animation: hex-aura 2.92s linear infinite;
 }
 
 .hex-loader.is-sm .hex-loader-aura {
@@ -2215,12 +2215,12 @@ html.dark .login-asesor-card {
     repeating-conic-gradient(from 0deg, transparent 0 54deg, rgba(255, 255, 255, 0.35) 54deg 60deg);
   mask: radial-gradient(circle, transparent 58%, #000 60%, #000 68%, transparent 70%);
   opacity: 0.55;
-  animation: hex-wire 5.2s linear infinite;
+  animation: hex-wire 4.47s linear infinite;
   filter: drop-shadow(0 0 8px #0b63d6);
 }
 
 .hex-loader-orbit {
-  animation: hex-spin 2.55s cubic-bezier(0.42, 0.02, 0.18, 1) infinite;
+  animation: hex-spin 2.19s cubic-bezier(0.42, 0.02, 0.18, 1) infinite;
 }
 
 .hex-loader-orbit i {
@@ -2237,8 +2237,8 @@ html.dark .login-asesor-card {
     0 0 10px #3b82f6,
     0 0 18px #0b63d6;
   transform: rotate(calc(var(--i) * 60deg)) translateY(calc(-1 * var(--hex-r)));
-  animation: hex-dot 1.05s ease-in-out infinite;
-  animation-delay: calc(var(--i) * -0.175s);
+  animation: hex-dot 0.9s ease-in-out infinite;
+  animation-delay: calc(var(--i) * -0.11s);
 }
 
 .hex-loader-screen {
@@ -2597,7 +2597,7 @@ html.dark .hex-loader-aura,
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  animation: fade-in 0.2s ease-out;
+  animation: fade-in 0.14s ease-out;
   /* Sin fondo propio que compita con el borde redondeado del contenedor */
   background: transparent;
 }
@@ -2920,7 +2920,7 @@ html.dark .hex-loader-aura,
   transform-style: preserve-3d;
   /* Rotación controlada por JS (sigue el ratón); casi de frente en reposo */
   transform: rotateX(var(--cube-rx, -3deg)) rotateY(var(--cube-ry, 5deg));
-  transition: transform 120ms ease-out;
+  transition: transform 80ms ease-out;
   will-change: transform;
 }
 
@@ -2940,7 +2940,7 @@ html.dark .hex-loader-aura,
   justify-content: center;
   pointer-events: none;
   /* Flotación sutil */
-  animation: a3d-float 4.6s ease-in-out infinite alternate;
+  animation: a3d-float 3.96s ease-in-out infinite alternate;
 }
 
 @keyframes a3d-float {
@@ -2991,7 +2991,7 @@ html.dark .hex-loader-aura,
     rgba(255, 255, 255, 0.07) 54%,
     transparent 64%
   );
-  animation: logo-glass-sweep 4.2s ease-in-out infinite;
+  animation: logo-glass-sweep 3.61s ease-in-out infinite;
 }
 
 @keyframes logo-glass-sweep {
@@ -4277,7 +4277,7 @@ html.dark .hex-loader-aura,
 }
 
 .dash-live-badge svg {
-  animation: dash-live-pulse 1.6s ease-in-out infinite;
+  animation: dash-live-pulse 1.38s ease-in-out infinite;
 }
 
 @keyframes dash-live-pulse {
@@ -4889,10 +4889,10 @@ html.dark .hex-loader-aura,
   font-size: 13px;
   font-weight: 650;
   transition:
-    color 160ms ease,
-    background 160ms ease,
-    box-shadow 180ms ease,
-    transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+    color 110ms ease,
+    background 110ms ease,
+    box-shadow 120ms ease,
+    transform 120ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .triage-view-btn:hover {
@@ -4912,24 +4912,24 @@ html.dark .hex-loader-aura,
 .triage-stage {
   min-width: 0;
   transform-origin: top center;
-  animation: triage-stage-enter 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: triage-stage-enter 230ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .triage-stage .queue-filterbar,
 .triage-stage .dashboard-report > :first-child {
-  animation: triage-control-enter 300ms 45ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: triage-control-enter 200ms 30ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 .triage-group-enter {
-  animation: triage-group-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: triage-group-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 .triage-item-enter {
-  animation: triage-item-enter 340ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: triage-item-enter 230ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 .triage-stage .report-table tbody tr.triage-row-enter {
-  animation: triage-row-enter 300ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: triage-row-enter 200ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 .triage-stage .calendar-agenda,
@@ -4937,13 +4937,13 @@ html.dark .hex-loader-aura,
 .triage-stage .calendar-month,
 .triage-stage .calendar-year,
 .triage-stage .calendar-week {
-  animation: triage-calendar-enter 380ms 55ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation: triage-calendar-enter 260ms 30ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 .metric-value-refresh {
   display: inline-block;
   transform-origin: center bottom;
-  animation: triage-value-refresh 300ms cubic-bezier(0.22, 1.2, 0.36, 1) both;
+  animation: triage-value-refresh 200ms cubic-bezier(0.22, 1.2, 0.36, 1) both;
 }
 
 @keyframes triage-stage-enter {
@@ -6741,8 +6741,8 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   touch-action: none;
   overflow: visible;
   transition:
-    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 240ms cubic-bezier(0.22, 1, 0.36, 1);
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .kanban-card.glass,
@@ -6781,7 +6781,7 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   border: 1.5px dashed rgba(11, 99, 214, 0.38);
   background: rgba(11, 99, 214, 0.07);
   pointer-events: none;
-  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .kanban-ghost-layer {
@@ -6808,7 +6808,7 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
     0 2px 8px rgba(15, 17, 21, 0.08);
   transform: rotate(1.4deg) scale(1.03);
   opacity: 1;
-  animation: kanban-ghost-in 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: kanban-ghost-in 140ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes kanban-ghost-in {
@@ -6824,7 +6824,7 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
 
 .kanban-grid.is-reordering .kanban-card {
   pointer-events: none;
-  transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .kanban-grid.is-reordering .kanban-empty {
@@ -7494,6 +7494,16 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   color: #6d7a86;
 }
 
+.dashboard-shell.is-light .kanban-day-chip {
+  background: rgba(13, 32, 48, 0.06);
+  color: #14222c;
+}
+
+.dashboard-shell:not(.is-light) .kanban-day-chip {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4f7fb;
+}
+
 .dashboard-shell.is-light .kanban-card-desc {
   color: #4d5a66;
   border-color: rgba(13, 32, 48, 0.08);
@@ -7697,7 +7707,7 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
     0 18px 48px rgba(15, 23, 42, 0.16) !important;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  animation: avi-modal-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: avi-modal-in 0.19s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .lead-modal:not(.lead-os-frame)::after,
@@ -7762,7 +7772,7 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   border: 0.5px solid rgba(0, 0, 0, 0.12);
   cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
-  transition: filter 0.12s ease, transform 0.12s ease;
+  transition: filter 0.08s ease, transform 0.08s ease;
 }
 
 .lead-traffic:hover {
@@ -7790,7 +7800,7 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   content: '';
   position: absolute;
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity 0.08s ease;
   pointer-events: none;
 }
 
@@ -8169,7 +8179,7 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
   border-radius: var(--radius-pill);
   background: linear-gradient(90deg, #ffe0b0, var(--heat));
   box-shadow: 0 0 16px color-mix(in srgb, var(--heat) 55%, transparent);
-  transition: width 0.28s ease, background 0.28s ease;
+  transition: width 0.19s ease, background 0.19s ease;
 }
 
 .lead-thermo-reason {
@@ -8318,7 +8328,7 @@ button.elevator-slot.is-busy.is-clickable:focus-visible {
 
 .ticket-owner-select-trigger svg {
   flex-shrink: 0;
-  transition: transform 0.16s ease;
+  transition: transform 0.11s ease;
 }
 
 .ticket-owner-select-trigger.is-open svg {
@@ -8432,7 +8442,7 @@ html.dark .ticket-owner-menu-item.is-active {
 }
 
 .lead-history-toggle svg {
-  transition: transform 0.18s ease;
+  transition: transform 0.12s ease;
 }
 
 .lead-history-toggle svg.is-open {
@@ -8907,7 +8917,7 @@ html.dark .ticket-owner-menu-item.is-active {
   .inbound-modal {
     width: 100%;
     max-height: 96vh;
-    border-radius: var(--radius-lg) !important;
+    border-radius: var(--radius-xl) !important;
   }
 }
 
@@ -9084,7 +9094,7 @@ html.dark .ticket-owner-menu-item.is-active {
   border: 1px solid rgba(15, 17, 21, 0.08);
   background: rgba(246, 248, 251, 0.95);
   overflow: hidden;
-  animation: os-agenda-item-in 0.42s cubic-bezier(0.22, 1.2, 0.36, 1) both;
+  animation: os-agenda-item-in 0.29s cubic-bezier(0.22, 1.2, 0.36, 1) both;
 }
 
 .dashboard-shell:not(.is-light) .call-agenda-item {
@@ -9271,14 +9281,19 @@ html.dark .ticket-owner-menu-item.is-active {
   flex-direction: column;
   min-width: 420px;
   min-height: 420px;
-  overflow: hidden;
+  overflow: visible;
   border-radius: var(--radius-lg);
   pointer-events: auto;
-  contain: layout style;
-  transform: translateZ(0);
+  contain: layout;
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  transform-origin: center center;
+  box-shadow: var(--lgw-drop);
   --win-tilt: 0deg;
   --dock-dx: 0px;
   --dock-dy: 0px;
+  --win-motion-duration: 0.42s;
+  --win-motion-ease: cubic-bezier(0.22, 1.05, 0.36, 1);
 }
 
 /* Maximizar/restaurar usa FLIP (Web Animations) sobre transform. Mantener aquí
@@ -9322,104 +9337,128 @@ html.dark .ticket-owner-menu-item.is-active {
   height: 100% !important;
   min-height: 0 !important;
   overflow: hidden !important;
-  border-radius: var(--radius-lg) !important;
-  transform: translateZ(0);
-  transform-origin: center center;
-  /* Evita que avi-modal-in se reinicie al quitar is-enter-* (salto a ?ventana est?tica?) */
+  border-radius: inherit !important;
   animation: none !important;
 }
 
-.lead-os-window.is-enter-spawn .lead-os-frame {
-  animation: os-win-spawn 0.42s cubic-bezier(0.22, 1.05, 0.36, 1) both !important;
+.lead-os-window.is-enter-spawn,
+.lead-os-window.is-enter-restore,
+.lead-os-window.is-closing,
+.lead-os-window.is-minimizing,
+.lead-os-window.is-minimizing-side {
+  transition:
+    transform var(--win-motion-duration) var(--win-motion-ease),
+    opacity var(--win-motion-duration) var(--win-motion-ease);
 }
 
-.lead-os-window.is-enter-restore .lead-os-frame {
-  animation: os-win-restore 0.44s cubic-bezier(0.22, 1.08, 0.36, 1) both !important;
+.lead-os-window.is-enter-spawn {
+  --win-motion-duration: 0.42s;
+  --win-motion-ease: cubic-bezier(0.22, 1.05, 0.36, 1);
+  opacity: 0;
+  transform: translate3d(0, 18px, 0) scale(0.94);
 }
 
-.lead-os-window.is-closing .lead-os-frame {
-  animation: os-win-close 0.32s cubic-bezier(0.4, 0, 0.7, 0.2) both !important;
+.lead-os-window.is-enter-restore {
+  --win-motion-duration: 0.44s;
+  --win-motion-ease: cubic-bezier(0.22, 1.08, 0.36, 1);
+  opacity: 0.5;
+  transform: translate3d(var(--dock-dx), var(--dock-dy), 0) scale(0.18);
 }
 
-.lead-os-window.is-minimizing .lead-os-frame {
-  animation: os-win-minimize 0.38s cubic-bezier(0.4, 0.05, 0.55, 1) both !important;
+.lead-os-window.is-closing {
+  --win-motion-duration: 0.32s;
+  --win-motion-ease: cubic-bezier(0.4, 0, 0.7, 0.2);
+  opacity: 0;
+  transform: translate3d(0, 16px, 0) scale(0.92);
 }
 
-.lead-os-window.is-minimizing-side .lead-os-frame {
-  animation: os-win-scatter-out 0.42s cubic-bezier(0.28, 0.08, 0.45, 1) both !important;
-  animation-delay: var(--min-delay, 0ms) !important;
+.lead-os-window.is-minimizing {
+  --win-motion-duration: 0.38s;
+  --win-motion-ease: cubic-bezier(0.4, 0.05, 0.55, 1);
+  opacity: 0;
+  transform: translate3d(var(--dock-dx), var(--dock-dy), 0) scale(0.14);
 }
 
-.lead-os-window.is-enter-done .lead-os-frame {
-  animation: none !important;
+.lead-os-window.is-minimizing-side {
+  --win-motion-duration: 0.42s;
+  --win-motion-ease: cubic-bezier(0.28, 0.08, 0.45, 1);
+  transition-delay: var(--min-delay, 0ms);
+  opacity: 0;
+  transform:
+    translate3d(var(--scatter-dx, 100vw), var(--scatter-dy, -40vh), 0)
+    scale(var(--scatter-scale, 0.8))
+    rotate(var(--scatter-rot, 12deg));
+}
+
+.lead-os-window.is-enter-done {
   opacity: 1;
-  transform: translateZ(0);
+  transform: translate3d(0, 0, 0) scale(1);
 }
 
 @keyframes os-win-spawn {
   0% {
     opacity: 0;
-    transform: translateY(18px) scale(0.94);
+    transform: translate3d(0, 18px, 0) scale(0.94);
   }
   100% {
     opacity: 1;
-    transform: translateZ(0);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
 @keyframes os-win-restore {
   0% {
     opacity: 0.5;
-    transform: translate(var(--dock-dx), var(--dock-dy)) scale(0.18);
+    transform: translate3d(var(--dock-dx), var(--dock-dy), 0) scale(0.18);
   }
   100% {
     opacity: 1;
-    transform: translateZ(0);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
 @keyframes os-win-close {
   0% {
     opacity: 1;
-    transform: translateZ(0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translateY(16px) scale(0.92);
+    transform: translate3d(0, 16px, 0) scale(0.92);
   }
 }
 
 @keyframes os-win-minimize {
   0% {
     opacity: 1;
-    transform: translateZ(0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translate(var(--dock-dx), var(--dock-dy)) scale(0.14);
+    transform: translate3d(var(--dock-dx), var(--dock-dy), 0) scale(0.14);
   }
 }
 
 @keyframes os-win-side-out {
   0% {
     opacity: 1;
-    transform: translateZ(0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
   }
   100% {
     opacity: 0;
-    transform: translateX(var(--side-dx, 108vw)) scale(0.9);
+    transform: translate3d(var(--side-dx, 108vw), 0, 0) scale(0.9);
   }
 }
 
 @keyframes os-win-scatter-out {
   0% {
     opacity: 1;
-    transform: translateZ(0) scale(1) rotate(0deg);
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
   }
   100% {
     opacity: 0;
     transform:
-      translate(var(--scatter-dx, 100vw), var(--scatter-dy, -40vh))
+      translate3d(var(--scatter-dx, 100vw), var(--scatter-dy, -40vh), 0)
       scale(var(--scatter-scale, 0.8))
       rotate(var(--scatter-rot, 12deg));
   }
@@ -9496,7 +9535,7 @@ html.dark .ticket-owner-menu-item.is-active {
 }
 
 .call-agenda-root.is-catching:not(.is-enter):not(.is-exiting):not(.is-tucking) .call-agenda-panel {
-  animation: os-agenda-catch 0.4s cubic-bezier(0.32, 1.2, 0.54, 1);
+  animation: os-agenda-catch 0.27s cubic-bezier(0.32, 1.2, 0.54, 1);
 }
 
 .agenda-peek {
@@ -9526,7 +9565,7 @@ html.dark .ticket-owner-menu-item.is-active {
   font: inherit;
   font-size: 14px;
   font-weight: 600;
-  animation: agenda-peek-in 0.32s cubic-bezier(0.22, 1.1, 0.36, 1) both;
+  animation: agenda-peek-in 0.22s cubic-bezier(0.22, 1.1, 0.36, 1) both;
 }
 
 .agenda-peek:hover {
@@ -9819,7 +9858,7 @@ html.dark .ticket-owner-menu-item.is-active {
   color: var(--fog-strong);
   font-size: 13px;
   font-weight: 650;
-  animation: softphone-toast-rise 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: softphone-toast-rise 160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @keyframes softphone-toast-rise {
@@ -9852,7 +9891,7 @@ html.dark .ticket-owner-menu-item.is-active {
     0 2px 6px rgba(15, 17, 21, 0.06),
     0 18px 40px rgba(15, 23, 42, 0.18);
   color: var(--fog-strong);
-  animation: softphone-rise 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: softphone-rise 190ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .softphone-dock.is-error {
@@ -9899,11 +9938,11 @@ html.dark .ticket-owner-menu-item.is-active {
 .softphone-avatar.is-live {
   background: rgba(16, 185, 129, 0.14);
   color: #047857;
-  animation: softphone-pulse 1.8s ease-in-out infinite;
+  animation: softphone-pulse 1.55s ease-in-out infinite;
 }
 
 .dir-incoming.phase-ringing .softphone-avatar {
-  animation: softphone-pulse 1.1s ease-in-out infinite;
+  animation: softphone-pulse 0.95s ease-in-out infinite;
 }
 
 .softphone-copy {
@@ -10023,7 +10062,7 @@ html.dark .ticket-owner-menu-item.is-active {
   height: 6px;
   border-radius: 999px;
   background: #dc2626;
-  animation: softphone-blink 1.2s ease-in-out infinite;
+  animation: softphone-blink 1.03s ease-in-out infinite;
 }
 
 .softphone-transcript {
@@ -10574,7 +10613,7 @@ html.dark .ticket-owner-menu-item.is-active {
   border: 1px solid rgba(255, 255, 255, 0.7);
   background: rgba(15, 17, 21, 0.05);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  animation: taskbar-dock-reveal 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: taskbar-dock-reveal 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .dashboard-shell:not(.is-light) .taskbar-dock {
@@ -10595,8 +10634,8 @@ html.dark .ticket-owner-menu-item.is-active {
   color: #fff;
   cursor: pointer;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 4px 10px rgba(15, 23, 42, 0.14);
-  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1), filter 160ms ease;
-  animation: taskbar-app-pop 300ms cubic-bezier(0.22, 1.18, 0.36, 1) backwards;
+  transition: transform 110ms cubic-bezier(0.22, 1, 0.36, 1), filter 110ms ease;
+  animation: taskbar-app-pop 200ms cubic-bezier(0.22, 1.18, 0.36, 1) backwards;
 }
 
 .taskbar-dock-app:hover {
@@ -10783,7 +10822,7 @@ html.dark .ticket-owner-menu-item.is-active {
   background: linear-gradient(180deg, #34d058, #16a34a);
   color: #fff;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 6px 14px rgba(22, 163, 74, 0.28);
-  transition: transform 140ms ease;
+  transition: transform 100ms ease;
 }
 
 .contacts-call:hover {
@@ -10901,7 +10940,7 @@ html.dark .ticket-owner-menu-item.is-active {
   border-right: 2px solid var(--muted);
   border-bottom: 2px solid var(--muted);
   transform: rotate(-45deg);
-  transition: transform 160ms ease;
+  transition: transform 110ms ease;
 }
 
 .guide-section[open] summary::after {
@@ -11213,9 +11252,9 @@ html.dark .ticket-owner-menu-item.is-active {
   overflow: hidden;
   transform: translateZ(0);
   transition:
-    transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 140ms ease,
-    background 140ms ease;
+    transform 100ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 100ms ease,
+    background 100ms ease;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -11246,7 +11285,7 @@ html.dark .ticket-owner-menu-item.is-active {
   opacity: 0.75;
   pointer-events: none;
   transform: translateY(0);
-  transition: transform 220ms ease, opacity 220ms ease;
+  transition: transform 150ms ease, opacity 150ms ease;
 }
 
 @media (hover: hover) {
@@ -11333,9 +11372,9 @@ html.dark .ticket-owner-menu-item.is-active {
     0 12px 26px rgba(22, 163, 74, 0.28);
   cursor: pointer;
   transition:
-    transform 140ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 140ms ease,
-    filter 140ms ease;
+    transform 100ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 100ms ease,
+    filter 100ms ease;
 }
 
 .lg-call:hover:not(:disabled) {
@@ -11860,7 +11899,7 @@ html.dark .ticket-owner-menu-item.is-active {
   background: rgba(16, 185, 129, 0.1);
   color: #059669;
   cursor: pointer;
-  transition: background var(--transition-fast), transform 120ms ease;
+  transition: background var(--transition-fast), transform 80ms ease;
 }
 
 .phone-history-call:hover {
@@ -11882,7 +11921,7 @@ html.dark .ticket-owner-menu-item.is-active {
   flex: 0 0 auto;
   color: var(--muted);
   opacity: 0.55;
-  transition: transform 160ms ease, opacity 160ms ease;
+  transition: transform 110ms ease, opacity 110ms ease;
 }
 
 .phone-history-row:hover .phone-history-chevron {
@@ -11926,7 +11965,7 @@ html.dark .ticket-owner-menu-item.is-active {
   min-height: 0;
   overflow-y: auto;
   padding-right: 2px;
-  animation: pane-rise 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: pane-rise 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .phone-detail-head {
@@ -11948,7 +11987,7 @@ html.dark .ticket-owner-menu-item.is-active {
   background: rgba(15, 17, 21, 0.05);
   color: var(--fog-strong);
   cursor: pointer;
-  transition: background var(--transition-fast), transform 120ms ease;
+  transition: background var(--transition-fast), transform 80ms ease;
 }
 
 .phone-detail-back:hover {
@@ -12048,7 +12087,7 @@ html.dark .ticket-owner-menu-item.is-active {
 .phone-stat.tone-rec .phone-stat-icon {
   background: rgba(220, 38, 38, 0.12);
   color: #dc2626;
-  animation: softphone-rec-pulse 1.4s ease-in-out infinite;
+  animation: softphone-rec-pulse 1.2s ease-in-out infinite;
 }
 
 .phone-stat-label {
@@ -12262,7 +12301,7 @@ html.dark .ticket-owner-menu-item.is-active {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
-  animation: pane-rise 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: pane-rise 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .phone-live-head {
@@ -12282,13 +12321,13 @@ html.dark .ticket-owner-menu-item.is-active {
   border-radius: 50%;
   background: rgba(245, 158, 11, 0.14);
   color: #b45309;
-  transition: background 300ms ease, color 300ms ease;
+  transition: background 200ms ease, color 200ms ease;
 }
 
 .phone-live-avatar.is-live {
   background: rgba(16, 185, 129, 0.16);
   color: #059669;
-  animation: softphone-rec-pulse 1.8s ease-in-out infinite;
+  animation: softphone-rec-pulse 1.55s ease-in-out infinite;
 }
 
 .phone-live-title {
@@ -12360,7 +12399,7 @@ html.dark .ticket-owner-menu-item.is-active {
 }
 
 .phone-live-answer {
-  animation: softphone-rec-pulse 1.2s ease-in-out infinite;
+  animation: softphone-rec-pulse 1.03s ease-in-out infinite;
 }
 
 .lg-key.is-compact {
@@ -12374,7 +12413,7 @@ html.dark .ticket-owner-menu-item.is-active {
 
 .phone-live-dtmf {
   gap: 8px 16px;
-  animation: pane-rise 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: pane-rise 140ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .phone-live-transcript {
@@ -12417,7 +12456,7 @@ html.dark .ticket-owner-menu-item.is-active {
   color: #dc2626;
   font-size: 10px;
   letter-spacing: 0.1em;
-  animation: softphone-rec-pulse 1.4s ease-in-out infinite;
+  animation: softphone-rec-pulse 1.2s ease-in-out infinite;
 }
 
 .phone-live-rec::before {
@@ -12533,7 +12572,7 @@ html.dark .ticket-owner-menu-item.is-active {
     background var(--transition-fast),
     color var(--transition-fast),
     border-color var(--transition-fast),
-    transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+    transform 120ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .taskbar-tab em {
@@ -12565,7 +12604,7 @@ html.dark .ticket-owner-menu-item.is-active {
   height: 7px;
   border-radius: 999px;
   background: #10b981;
-  animation: softphone-blink 1.2s ease-in-out infinite;
+  animation: softphone-blink 1.03s ease-in-out infinite;
 }
 
 .dashboard-shell:not(.is-light) .taskbar-tab:hover {
@@ -12599,9 +12638,9 @@ html.dark .ticket-owner-menu-item.is-active {
   text-align: left;
   cursor: pointer;
   transition:
-    transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
-    box-shadow 160ms ease;
-  animation: taskbar-item-reveal 280ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    transform 110ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 110ms ease;
+  animation: taskbar-item-reveal 190ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 .taskbar-tool-tile:hover {
@@ -12816,12 +12855,12 @@ html.dark .ticket-owner-menu-item.is-active {
 
 .softphone-chip.is-call .softphone-chip-dot {
   background: #10b981;
-  animation: softphone-blink 1.2s ease-in-out infinite;
+  animation: softphone-blink 1.03s ease-in-out infinite;
 }
 
 .softphone-chip.is-connecting .softphone-chip-dot {
   background: #f59e0b;
-  animation: softphone-blink 1.2s ease-in-out infinite;
+  animation: softphone-blink 1.03s ease-in-out infinite;
 }
 
 .softphone-chip.is-error .softphone-chip-dot {
@@ -12937,7 +12976,7 @@ html.dark .ticket-owner-menu-item.is-active {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 1),
     0 18px 48px rgba(15, 23, 42, 0.16);
-  animation: avi-modal-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: avi-modal-in 0.19s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .dashboard-inbound-btn {
@@ -12981,7 +13020,7 @@ html.dark .ticket-owner-menu-item.is-active {
   background: rgba(10, 14, 22, 0.28);
   backdrop-filter: none;
   cursor: pointer;
-  animation: avi-backdrop-in 0.22s ease-out;
+  animation: avi-backdrop-in 0.15s ease-out;
 }
 
 .inbound-modal {
@@ -13000,7 +13039,7 @@ html.dark .ticket-owner-menu-item.is-active {
     inset 0 1px 0 rgba(255, 255, 255, 1),
     0 1px 2px rgba(15, 17, 21, 0.04),
     0 18px 48px rgba(15, 23, 42, 0.16) !important;
-  animation: avi-modal-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: avi-modal-in 0.19s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .dashboard-shell:not(.is-light) .inbound-modal {
@@ -13191,7 +13230,7 @@ html.dark .ticket-owner-menu-item.is-active {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition: border-color 0.1s ease, background 0.1s ease;
 }
 
 .inbound-template-chip:hover {
@@ -13522,8 +13561,8 @@ body > .os-desk-layer.dashboard-shell {
   border-radius: inherit;
   background: linear-gradient(90deg, #0a55b8, #3b82f6);
   transform-origin: left center;
-  animation: laura-meter-fill 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: calc(var(--i, 0) * 70ms);
+  animation: laura-meter-fill 0.54s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
 }
 
 .laura-share-head {
@@ -13592,8 +13631,8 @@ body > .os-desk-layer.dashboard-shell {
   max-width: 22px;
   border-radius: 8px 8px 3px 3px;
   transform-origin: center bottom;
-  animation: laura-bar-rise 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: calc(var(--i, 0) * 60ms);
+  animation: laura-bar-rise 0.51s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
 }
 
 .laura-bars-stack span.is-auto {
@@ -13669,8 +13708,8 @@ body > .os-desk-layer.dashboard-shell {
   gap: 10px 12px;
   min-height: var(--tap-target);
   cursor: pointer;
-  animation: laura-rise-fade 0.45s ease both;
-  animation-delay: calc(var(--i, 0) * 50ms);
+  animation: laura-rise-fade 0.31s ease both;
+  animation-delay: calc(var(--i, 0) * 30ms);
 }
 
 .laura-group-bars > li.is-hot .laura-group-track i {
@@ -13707,7 +13746,7 @@ body > .os-desk-layer.dashboard-shell {
   min-width: 0;
   border-radius: inherit;
   transform-origin: left center;
-  animation: laura-bar-rise 0.7s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+  animation: laura-bar-rise 0.48s cubic-bezier(0.34, 1.2, 0.64, 1) both;
 }
 
 .laura-group-counts {
@@ -13930,7 +13969,7 @@ body > .os-desk-layer.dashboard-shell {
   height: 148px;
   transform: rotateX(52deg);
   transform-style: preserve-3d;
-  animation: laura-tilt 6.5s ease-in-out infinite;
+  animation: laura-tilt 5.59s ease-in-out infinite;
 }
 
 .laura-circle-depth {
@@ -13960,8 +13999,8 @@ body > .os-desk-layer.dashboard-shell {
 .laura-circle-svg .is-fill {
   stroke: #0b63d6;
   stroke-linecap: round;
-  animation: laura-circle-draw 1.05s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: calc(var(--i, 0) * 90ms);
+  animation: laura-circle-draw 0.71s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
 }
 
 .laura-circle-scene strong {
@@ -14001,15 +14040,15 @@ body > .os-desk-layer.dashboard-shell {
   stroke-width: 1.2;
   transform-box: fill-box;
   transform-origin: center;
-  animation: laura-ring-in 0.55s ease both;
-  animation-delay: calc(var(--i, 0) * 80ms);
+  animation: laura-ring-in 0.37s ease both;
+  animation-delay: calc(var(--i, 0) * 50ms);
 }
 
 .laura-radar-axis {
   stroke: rgba(11, 99, 214, 0.16);
   stroke-width: 1;
-  animation: laura-fade-in 0.5s ease both;
-  animation-delay: calc(var(--i, 0) * 55ms + 0.25s);
+  animation: laura-fade-in 0.34s ease both;
+  animation-delay: calc(var(--i, 0) * 30ms + 0.16s);
 }
 
 .laura-radar-area {
@@ -14019,8 +14058,8 @@ body > .os-desk-layer.dashboard-shell {
   stroke-linejoin: round;
   transform-box: fill-box;
   transform-origin: center;
-  animation: laura-grow-pop 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  animation-delay: 0.45s;
+  animation: laura-grow-pop 0.61s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: 0.28s;
 }
 
 .laura-radar-dot {
@@ -14029,8 +14068,8 @@ body > .os-desk-layer.dashboard-shell {
   stroke-width: 2.4;
   transform-box: fill-box;
   transform-origin: center;
-  animation: laura-dot-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  animation-delay: calc(var(--i, 0) * 90ms + 0.9s);
+  animation: laura-dot-pop 0.41s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms + 0.56s);
 }
 
 .laura-radar-scale {
@@ -14075,7 +14114,7 @@ body > .os-desk-layer.dashboard-shell {
   inset: 8px 0 8px;
   transform-style: preserve-3d;
   transform: rotateX(-8deg);
-  animation: laura-pie-reveal 0.95s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: laura-pie-reveal 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .laura-upie-layer {
@@ -14107,8 +14146,8 @@ body > .os-desk-layer.dashboard-shell {
   background: #fff;
   transform: translate(-50%, -50%) translateZ(8px);
   box-shadow: 0 10px 18px rgba(15, 17, 21, 0.16);
-  animation: laura-hole-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  animation-delay: 0.7s;
+  animation: laura-hole-pop 0.37s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: 0.43s;
 }
 
 .laura-upie-hole b {
@@ -14144,8 +14183,8 @@ body > .os-desk-layer.dashboard-shell {
   font-variant-numeric: tabular-nums;
   border: 1.5px solid var(--dot, #0a55b8);
   box-shadow: 0 6px 12px rgba(15, 17, 21, 0.14);
-  animation: laura-tag-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  animation-delay: calc(var(--i, 0) * 130ms + 0.85s);
+  animation: laura-tag-in 0.34s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: calc(var(--i, 0) * 80ms + 0.53s);
 }
 
 .laura-mosaic {
@@ -14172,8 +14211,8 @@ body > .os-desk-layer.dashboard-shell {
   background: var(--tile, #c0342b);
   color: #fff;
   cursor: pointer;
-  animation: laura-rise-fade 0.45s ease both;
-  animation-delay: calc(var(--i, 0) * 40ms);
+  animation: laura-rise-fade 0.31s ease both;
+  animation-delay: calc(var(--i, 0) * 20ms);
 }
 
 .laura-mosaic > li.is-hot {
@@ -14417,8 +14456,8 @@ body > .os-desk-layer.dashboard-shell {
   font-size: 11px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  animation: laura-rise-fade 0.5s ease both;
-  animation-delay: calc(var(--i, 0) * 70ms + 0.35s);
+  animation: laura-rise-fade 0.34s ease both;
+  animation-delay: calc(var(--i, 0) * 40ms + 0.22s);
 }
 
 .laura-pareto-bar {
@@ -14429,8 +14468,8 @@ body > .os-desk-layer.dashboard-shell {
   background: linear-gradient(180deg, #93c5fd, #0a55b8);
   box-shadow: 5px 0 0 rgba(8, 63, 138, 0.28);
   transform-origin: center bottom;
-  animation: laura-bar-rise 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  animation-delay: calc(var(--i, 0) * 70ms);
+  animation: laura-bar-rise 0.54s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: calc(var(--i, 0) * 40ms);
 }
 
 .laura-pareto-line {
@@ -14451,8 +14490,8 @@ body > .os-desk-layer.dashboard-shell {
   stroke-linejoin: round;
   filter: drop-shadow(0 3px 5px rgba(245, 158, 11, 0.35));
   stroke-dasharray: 100;
-  animation: laura-line-trace 1.2s cubic-bezier(0.65, 0, 0.35, 1) both;
-  animation-delay: 0.4s;
+  animation: laura-line-trace 0.82s cubic-bezier(0.65, 0, 0.35, 1) both;
+  animation-delay: 0.25s;
 }
 
 .laura-pareto-dot {
@@ -14466,8 +14505,8 @@ body > .os-desk-layer.dashboard-shell {
   border: 2px solid #fff;
   box-shadow: 0 2px 5px rgba(245, 158, 11, 0.4);
   pointer-events: none;
-  animation: laura-dot-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  animation-delay: calc(var(--i, 0) * 70ms + 0.7s);
+  animation: laura-dot-pop 0.34s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: calc(var(--i, 0) * 40ms + 0.43s);
 }
 
 .laura-pareto-dot em {
@@ -14547,8 +14586,8 @@ body > .os-desk-layer.dashboard-shell {
   filter: drop-shadow(0 10px 16px rgba(15, 17, 21, 0.16));
   transform-box: fill-box;
   transform-origin: center;
-  animation: laura-bubble-pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  animation-delay: calc(var(--i, 0) * 150ms + 0.15s);
+  animation: laura-bubble-pop 0.48s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: calc(var(--i, 0) * 90ms + 0.09s);
 }
 
 .laura-bubble-ring {
@@ -14575,8 +14614,8 @@ body > .os-desk-layer.dashboard-shell {
 .laura-bubble-gloss {
   fill: url(#lauraBubbleGloss);
   pointer-events: none;
-  animation: laura-fade-in 0.6s ease both;
-  animation-delay: calc(var(--i, 0) * 150ms + 0.6s);
+  animation: laura-fade-in 0.41s ease both;
+  animation-delay: calc(var(--i, 0) * 90ms + 0.37s);
 }
 
 .laura-bubble-val {
@@ -14711,8 +14750,8 @@ body > .os-desk-layer.dashboard-shell {
   font-size: 10px;
   font-weight: 700;
   transform-style: preserve-3d;
-  animation: laura-dot-pop 0.7s cubic-bezier(0.22, 1, 0.36, 1) both, laura-dot-float 3.6s ease-in-out infinite;
-  animation-delay: calc(var(--i, 0) * 70ms), calc(var(--i, 0) * 70ms + 0.7s);
+  animation: laura-dot-pop 0.48s cubic-bezier(0.22, 1, 0.36, 1) both, laura-dot-float 3.1s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 40ms), calc(var(--i, 0) * 40ms + 0.43s);
 }
 
 .laura-scatter-dot.is-auto {
@@ -15341,32 +15380,37 @@ body > .os-desk-layer.dashboard-shell {
   /* Cuerpo: vidrio claro. Mismo comportamiento óptico que el filo (refracción
      por --lg-filter) más un blur ligero y un tinte suave para que el texto de la
      ventana siga leyéndose sobre el fondo que se ve doblado detrás. */
-  --lgw-blur: blur(14px) saturate(1.15);
-  --lgw-bg: rgba(255, 255, 255, 0.6);
-  --lgw-bg-soft: rgba(255, 255, 255, 0.42);
-  --lgw-bg-card: rgba(255, 255, 255, 0.58);
-  --lgw-border: rgba(255, 255, 255, 0.78);
-  --lgw-edge: rgba(15, 23, 42, 0.12);
+  --lgw-blur: blur(18px) saturate(1.28);
+  --lgw-bg: rgba(255, 255, 255, 0.58);
+  --lgw-bg-soft: rgba(255, 255, 255, 0.4);
+  --lgw-bg-card: rgba(255, 255, 255, 0.56);
+  --lgw-border: rgba(15, 17, 21, 0.5);
+  --lgw-edge: rgba(15, 17, 21, 0.34);
   --lgw-sheen: linear-gradient(
     165deg,
-    rgba(255, 255, 255, 0.38) 0%,
-    rgba(255, 255, 255, 0.12) 28%,
+    rgba(255, 255, 255, 0.42) 0%,
+    rgba(255, 255, 255, 0.14) 28%,
     rgba(255, 255, 255, 0) 52%,
     rgba(255, 255, 255, 0.08) 100%
   );
-  --lgw-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.95),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.35),
-    0 1px 2px rgba(15, 23, 42, 0.06),
-    0 24px 60px rgba(15, 23, 42, 0.18);
+  --lgw-inset:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.22);
+  --lgw-drop:
+    0 0 0 1px rgba(15, 17, 21, 0.08),
+    0 2px 8px rgba(15, 17, 21, 0.16),
+    0 14px 28px rgba(15, 23, 42, 0.18),
+    0 32px 64px rgba(15, 23, 42, 0.2),
+    0 56px 120px rgba(15, 23, 42, 0.16);
+  --lgw-shadow: var(--lgw-inset), var(--lgw-drop);
 }
 
 .dashboard-shell:not(.is-light) {
   --lgw-bg: rgba(18, 21, 28, 0.62);
   --lgw-bg-soft: rgba(255, 255, 255, 0.07);
   --lgw-bg-card: rgba(255, 255, 255, 0.1);
-  --lgw-border: rgba(255, 255, 255, 0.16);
-  --lgw-edge: rgba(0, 0, 0, 0.45);
+  --lgw-border: rgba(0, 0, 0, 0.62);
+  --lgw-edge: rgba(0, 0, 0, 0.58);
   --lgw-sheen: linear-gradient(
     165deg,
     rgba(255, 255, 255, 0.16) 0%,
@@ -15374,11 +15418,14 @@ body > .os-desk-layer.dashboard-shell {
     rgba(255, 255, 255, 0) 52%,
     rgba(255, 255, 255, 0.03) 100%
   );
-  --lgw-shadow:
+  --lgw-inset:
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
-    0 1px 2px rgba(0, 0, 0, 0.3),
-    0 24px 60px rgba(0, 0, 0, 0.55);
+    inset 0 -1px 0 rgba(255, 255, 255, 0.05);
+  --lgw-drop:
+    0 1px 3px rgba(0, 0, 0, 0.5),
+    0 18px 40px rgba(0, 0, 0, 0.48),
+    0 44px 96px rgba(0, 0, 0, 0.62);
+  --lgw-shadow: var(--lgw-inset), var(--lgw-drop);
 }
 
 /* ── Marco de las ventanas (fichas + apps) y barra de tareas ──
@@ -15423,8 +15470,7 @@ body > .os-desk-layer.dashboard-shell {
   border: 1px solid var(--lgw-border) !important;
   background: transparent !important;
   box-shadow:
-    0 1px 2px var(--lgw-edge),
-    0 28px 70px rgba(15, 23, 42, 0.22),
+    var(--lgw-inset),
     0 0 0 1px var(--lgw-edge) !important;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
@@ -15433,8 +15479,14 @@ body > .os-desk-layer.dashboard-shell {
 .dashboard-shell:not(.is-light) .lead-modal.lead-os-frame,
 .dashboard-shell:not(.is-light) .call-agenda-panel {
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.4),
-    0 28px 70px rgba(0, 0, 0, 0.6),
+    var(--lgw-inset),
+    0 0 0 1px var(--lgw-edge) !important;
+}
+
+.call-agenda-panel,
+.dashboard-shell:not(.is-light) .call-agenda-panel {
+  box-shadow:
+    var(--lgw-shadow),
     0 0 0 1px var(--lgw-edge) !important;
 }
 
@@ -15670,12 +15722,14 @@ body > .os-desk-layer.dashboard-shell {
 .dashboard-shell:not(.is-light) .lead-os-window.is-moving .lead-os-frame,
 .dashboard-shell:not(.is-light) .lead-os-window.is-resizing .lead-os-frame {
   box-shadow:
-    0 1px 2px var(--lgw-edge),
-    0 28px 70px rgba(15, 23, 42, 0.22),
+    var(--lgw-inset),
     0 0 0 1px var(--lgw-edge) !important;
 }
 
-.lead-os-window:is(.is-enter-spawn, .is-enter-restore, .is-closing, .is-minimizing) .lead-os-frame,
+.lead-os-window:is(.is-enter-spawn, .is-enter-restore, .is-closing, .is-minimizing) {
+  will-change: transform, opacity;
+}
+
 .call-agenda-root:is(.is-size-tween, .is-enter, .is-exiting, .is-tucking) .call-agenda-panel {
   will-change: transform, opacity;
 }
@@ -15696,19 +15750,19 @@ body > .os-desk-layer.dashboard-shell {
 /* ── Motion de carga y actualización ──
    Solo transform + opacity: entrada orgánica sin forzar layout ni paint extra. */
 .app-sidebar-enter {
-  animation: app-sidebar-enter 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: app-sidebar-enter 330ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .app-sidebar-enter > * {
-  animation: app-content-rise 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: app-content-rise 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.app-sidebar-enter > :nth-child(2) { animation-delay: 55ms; }
-.app-sidebar-enter > :nth-child(3) { animation-delay: 90ms; }
-.app-sidebar-enter > :nth-child(4) { animation-delay: 125ms; }
+.app-sidebar-enter > :nth-child(2) { animation-delay: 30ms; }
+.app-sidebar-enter > :nth-child(3) { animation-delay: 60ms; }
+.app-sidebar-enter > :nth-child(4) { animation-delay: 80ms; }
 
 .app-view-enter {
-  animation: app-view-enter 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: app-view-enter 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .dashboard-main > .app-view-enter {
@@ -15716,17 +15770,17 @@ body > .os-desk-layer.dashboard-shell {
 }
 
 .app-view-enter > .dashboard-page > * {
-  animation: app-content-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: app-content-rise 290ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.app-view-enter > .dashboard-page > :nth-child(2) { animation-delay: 45ms; }
-.app-view-enter > .dashboard-page > :nth-child(3) { animation-delay: 80ms; }
-.app-view-enter > .dashboard-page > :nth-child(4) { animation-delay: 110ms; }
-.app-view-enter > .dashboard-page > :nth-child(n + 5) { animation-delay: 135ms; }
+.app-view-enter > .dashboard-page > :nth-child(2) { animation-delay: 30ms; }
+.app-view-enter > .dashboard-page > :nth-child(3) { animation-delay: 50ms; }
+.app-view-enter > .dashboard-page > :nth-child(4) { animation-delay: 70ms; }
+.app-view-enter > .dashboard-page > :nth-child(n + 5) { animation-delay: 80ms; }
 
 .taskbar-section-content {
   transform-origin: top center;
-  animation: taskbar-section-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: taskbar-section-in 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .call-agenda-list.taskbar-section-content,
@@ -15737,7 +15791,7 @@ body > .os-desk-layer.dashboard-shell {
 }
 
 .taskbar-title-value {
-  animation: taskbar-title-refresh 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: taskbar-title-refresh 150ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes app-sidebar-enter {
@@ -16600,6 +16654,10 @@ body > .os-desk-layer.dashboard-shell {
   min-height: var(--tap-target);
 }
 
+.local-preview-switch .field-input {
+  min-height: var(--tap-target);
+}
+
 .local-preview-switch .ghost-button.is-active {
   border-color: var(--color-brand);
   background: var(--color-brand-soft);
@@ -16767,5 +16825,390 @@ body > .os-desk-layer.dashboard-shell {
 @media (max-width: 900px) {
   .password-account-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+.ticket-team-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ticket-team-picker .field-select,
+.dashboard-shell .ticket-team-picker .field-select,
+.kanban-card .ticket-team-picker .field-select {
+  min-height: var(--tap-target);
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.team-ticket-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.team-ticket-board-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.team-ticket-board-head .client-submit {
+  flex: 0 0 auto;
+}
+
+.team-ticket-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-4);
+}
+
+.team-ticket-card {
+  min-width: 0;
+}
+
+.team-ticket-card.is-draggable {
+  cursor: move;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.team-ticket-card.is-lite {
+  min-height: 164px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 164px;
+}
+
+.team-ticket-owner-line {
+  margin: 0;
+  color: var(--fog-strong);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.team-drop-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.team-drop-board .kanban-card.is-dragging-source {
+  display: none;
+}
+
+.team-drop-board.is-live .kanban-card,
+.team-drop-board.is-live .team-drop-slot,
+.team-drop-board.is-live .team-drop-stack-item {
+  pointer-events: none;
+  transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.team-drop-board.is-live .kanban-card:hover {
+  transform: none;
+}
+
+.team-drop-board.is-live .kanban-empty {
+  display: none;
+}
+
+.team-drop-slot {
+  flex-shrink: 0;
+  min-height: 164px;
+  border-radius: var(--radius-xl);
+  border: 1.5px dashed rgba(11, 99, 214, 0.38);
+  background: rgba(11, 99, 214, 0.07);
+  pointer-events: none;
+}
+
+body.is-team-drop-dragging,
+body.is-team-drop-dragging * {
+  cursor: move !important;
+  user-select: none !important;
+}
+
+.team-drop-rail {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(260px, 1fr);
+  gap: var(--space-4);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+}
+
+.team-drop-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 360px;
+  max-height: min(72vh, 820px);
+  padding: 14px 12px 16px;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(15, 17, 21, 0.07);
+  background: rgba(232, 236, 242, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.team-drop-col.is-drop {
+  border-color: rgba(11, 99, 214, 0.45);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 0 0 3px rgba(11, 99, 214, 0.16);
+}
+
+.team-drop-col > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 2px 12px;
+  border-bottom: 1px solid rgba(15, 17, 21, 0.08);
+  margin-bottom: 10px;
+}
+
+.team-drop-col > header h3,
+.team-drop-open {
+  margin: 0;
+  color: var(--fog-strong);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: left;
+}
+
+.team-drop-open {
+  background: none;
+  border: 0;
+  padding: 0;
+  min-height: var(--tap-target);
+  cursor: pointer;
+}
+
+.team-drop-col > header span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding-inline: 8px;
+  border-radius: 999px;
+  color: var(--fog-strong);
+  background: rgba(15, 17, 21, 0.06);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.team-drop-people {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.team-drop-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  color: var(--fog-strong);
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(15, 17, 21, 0.08);
+  box-shadow: inset 0 1px 0 #fff, 0 4px 10px rgba(15, 17, 21, 0.06);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.team-drop-avatar.is-more {
+  background: rgba(11, 99, 214, 0.1);
+  color: var(--color-brand);
+}
+
+.team-drop-people-names {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.team-drop-people .team-drop-people-names {
+  margin: 0;
+  flex: 1 1 120px;
+}
+
+.team-drop-auto {
+  margin-bottom: 8px;
+}
+
+.team-drop-auto-hint {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.team-drop-avatar.is-catch {
+  transform: scale(1.28);
+  box-shadow: 0 0 0 5px rgba(11, 99, 214, 0.38);
+}
+
+.team-drop-fly {
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: 0 22px 48px rgba(15, 23, 42, 0.28);
+  will-change: transform, opacity;
+}
+
+.team-drop-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+  min-height: 180px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.team-drop-cards.is-stack {
+  --stack-overlap: 72px;
+  --stack-lift: calc(var(--stack-overlap) + 8px);
+  gap: 0;
+  padding: 4px 2px 12px;
+}
+
+.team-drop-stack-item {
+  position: relative;
+  flex-shrink: 0;
+  transition: margin-top 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.team-drop-stack-item + .team-drop-stack-item {
+  margin-top: calc(-1 * var(--stack-overlap));
+}
+
+.team-drop-cards.is-stack .team-ticket-card {
+  content-visibility: visible;
+}
+
+.team-drop-board:not(.is-live) .team-drop-stack-item:hover .kanban-card {
+  transform: translate3d(0, calc(-1 * var(--stack-lift)), 0);
+}
+
+.team-drop-board:not(.is-live) .team-drop-stack-item:first-child:hover .kanban-card {
+  transform: none;
+}
+
+.team-drop-board:not(.is-live) .team-drop-stack-item:first-child:hover + .team-drop-stack-item {
+  margin-top: 8px;
+}
+
+.team-drop-cards.is-stack > .team-drop-slot {
+  margin: 8px 0;
+  z-index: 40;
+}
+
+.team-drop-virtual {
+  position: relative;
+}
+
+.team-drop-virtual-item {
+  position: absolute;
+  left: 0;
+  right: 0;
+  padding-bottom: 14px;
+}
+
+.team-drop-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 160;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.team-drop-ghost .kanban-card {
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 14px 32px rgba(15, 23, 42, 0.22);
+  transform: rotate(1.4deg) scale(1.03);
+}
+
+.board-team-assign {
+  margin-top: var(--space-4);
+}
+
+.board-team-assign-grid {
+  grid-template-columns: minmax(160px, 1fr) minmax(160px, 1fr) minmax(180px, 0.8fr);
+}
+
+.board-team-assign-grid .dash-assign-submit {
+  grid-column: auto;
+}
+
+.board-team-assign-tickets {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.board-team-assign-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.board-team-assign-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--tap-target);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  cursor: pointer;
+}
+
+.board-team-assign-item.is-selected {
+  outline: 2px solid color-mix(in srgb, var(--color-brand) 45%, transparent);
+}
+
+.board-team-assign-item input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+.board-team-assign-item span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.board-team-assign-item small {
+  color: var(--muted);
+}
+
+@media (max-width: 980px) {
+  .board-team-assign-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .board-team-assign-grid .dash-assign-submit {
+    grid-column: 1 / -1;
   }
 }

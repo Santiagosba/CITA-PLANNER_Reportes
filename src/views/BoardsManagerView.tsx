@@ -51,6 +51,7 @@ import TeamFilter from '../components/TeamFilter'
 import {
   matchesTeamFilter,
   TEAM_FILTER_ALL,
+  TEAM_FILTER_LOOSE,
   visibleTeamsForUser,
   type TeamFilterId,
 } from '../lib/teamScope'
@@ -58,6 +59,7 @@ import CitaLinkFilterControl from '../components/CitaLinkFilter'
 import OwnerScopeFilter from '../components/OwnerScopeFilter'
 import TicketOwnerPicker from '../components/TicketOwnerPicker'
 import TicketTeamBadge from '../components/TicketTeamBadge'
+import TicketTeamPicker from '../components/TicketTeamPicker'
 import type { CrmAppRole } from '../lib/crmRoles'
 import type { Workshop } from '../types'
 
@@ -495,6 +497,7 @@ const BoardTicket = memo(function BoardTicket({
   currentUser,
   appRole,
   tickets,
+  onAssignTeam,
 }: {
   card: BoardCard
   column: PriorityColumn
@@ -506,6 +509,7 @@ const BoardTicket = memo(function BoardTicket({
   currentUser: { name: string; email: string }
   appRole: CrmAppRole
   tickets: PeticionPendiente[]
+  onAssignTeam?: (peticionId: string, teamId: string | null) => void
 }) {
   const id = cardId(card)
   const tone = badgeTone(column.tone)
@@ -564,7 +568,15 @@ const BoardTicket = memo(function BoardTicket({
       </div>
       <TicketClientBlock peticion={item} size="md" />
       {item.tipopeticion ? <span className="kanban-card-meta">{item.tipopeticion}</span> : null}
-      <TicketTeamBadge workspace={workspace} ticket={item} />
+      {appRole === 'admin' && onAssignTeam ? (
+        <TicketTeamPicker
+          workspace={workspace}
+          ticket={item}
+          onAssign={(teamId) => onAssignTeam(item.idpeticion, teamId)}
+        />
+      ) : (
+        <TicketTeamBadge workspace={workspace} ticket={item} />
+      )}
       {vehicle ? <span className="kanban-card-meta">{vehicle}</span> : null}
       <TicketOwnerPicker
         workshop={workshop}
@@ -594,7 +606,7 @@ export default function BoardsManagerView({
   const range = useMemo(() => boardLiveFetchRange(today), [today])
   const { items, loading, error, sourceNotice, refresh } = useOperationalData(workshop, range)
   const workshopKey = workshop.containerIdTaller || workshop.id
-  const { workspace } = useAdvisorWorkspace(workshopKey, currentUser, true)
+  const { workspace, assignTicketTeam } = useAdvisorWorkspace(workshopKey, currentUser, true)
   const [ownerScope, setOwnerScope] = useState<OwnerScope>('todas')
   const [teamFilter, setTeamFilter] = useState<TeamFilterId>(TEAM_FILTER_ALL)
   const [citaLink, setCitaLink] = useState<CitaLinkFilter>('todas')
@@ -606,6 +618,10 @@ export default function BoardsManagerView({
     () => visibleTeamsForUser(workspace, currentUser.email, appRole),
     [workspace, currentUser.email, appRole],
   )
+  useEffect(() => {
+    if (teamFilter === TEAM_FILTER_ALL || teamFilter === TEAM_FILTER_LOOSE) return
+    if (!visibleTeams.some((team) => team.id === teamFilter)) setTeamFilter(TEAM_FILTER_ALL)
+  }, [visibleTeams, teamFilter])
   const scopedItems = useMemo(
     () =>
       items.filter((item) => {
@@ -1097,7 +1113,9 @@ export default function BoardsManagerView({
             ? citaLinkEmptyCopy(citaLink)
             : appRole === 'asesor'
               ? 'Tu equipo no tiene consultas de hoy.'
-              : 'No hay consultas de hoy.'}
+              : teamFilter !== TEAM_FILTER_ALL
+                ? 'Este equipo no tiene consultas de hoy.'
+                : 'No hay consultas de hoy.'}
         </p>
       ) : null}
 
@@ -1162,8 +1180,16 @@ export default function BoardsManagerView({
               ? 'Solo las consultas de hoy: tus equipos, tickets sueltos y los que puedes pasar.'
               : `Solo las consultas de hoy · ${active.description}`}
           </p>
+          <div className="board-team-bar">
+            <TeamFilter
+              teams={visibleTeams}
+              value={teamFilter}
+              onChange={setTeamFilter}
+              label={appRole === 'admin' ? 'Ver equipo' : 'Equipo'}
+              alwaysShow={appRole === 'admin'}
+            />
+          </div>
           <div className="elevator-filters" style={{ marginTop: 'var(--space-3)' }}>
-            <TeamFilter teams={visibleTeams} value={teamFilter} onChange={setTeamFilter} />
             {appRole === 'admin' ? (
               <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} />
             ) : (
@@ -1273,6 +1299,7 @@ export default function BoardsManagerView({
                       currentUser={currentUser}
                       appRole={appRole}
                       tickets={items}
+                      onAssignTeam={appRole === 'admin' ? assignTicketTeam : undefined}
                     />
                   ))
                 )}

@@ -25,9 +25,11 @@ import {
   isPersonOnTeam,
   isPersonPendingDelete,
   isPersonPurgeDue,
+  localTodayIso,
   normalizeEmail,
   personByEmail,
   personMatchesQuery,
+  sanitizeTeamName,
   teamForPerson,
   teamNamesForPerson,
   teamsForPerson,
@@ -37,6 +39,12 @@ import {
 } from '../lib/advisorWorkspace'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
 import { isLocalPreviewWorkshop } from '../lib/localPreview'
+import { isLiveBoardTicket, teamsDeskFetchRange } from '../lib/boardLiveRange'
+import { useOperationalData } from '../hooks/useOperationalData'
+import AdvisorTicketList from '../components/AdvisorTicketList'
+import TeamTicketBoard from '../components/TeamTicketBoard'
+import TeamDropBoard from '../components/TeamDropBoard'
+import type { PeticionPendiente } from '../lib/peticionesPendientes'
 import type { Workshop } from '../types'
 
 type Screen = 'list' | 'team' | 'create-team' | 'create-person' | 'password' | 'person'
@@ -54,6 +62,7 @@ type Props = {
   currentUser: { name: string; email: string }
   readOnly?: boolean
   canCreateTallerAdmin?: boolean
+  onOpenLead?: (peticion: PeticionPendiente) => void
 }
 
 function initials(name: string): string {
@@ -116,6 +125,7 @@ export default function TeamsManagerView({
   currentUser,
   readOnly = false,
   canCreateTallerAdmin = false,
+  onOpenLead,
 }: Props) {
   const workshopId = workshop.containerIdTaller || workshop.id
   const {
@@ -133,7 +143,26 @@ export default function TeamsManagerView({
     toggleAdvisorTeam,
     addTaskType,
     addBoard,
+    assignTicketTeam,
+    placeTicket,
   } = useAdvisorWorkspace(workshopId, currentUser, true)
+  const today = localTodayIso()
+  const ticketRange = useMemo(() => teamsDeskFetchRange(today), [today])
+  const { items: periodItems, loading: ticketsLoading } = useOperationalData(workshop, ticketRange)
+  const todayTickets = useMemo(
+    () => periodItems.filter((item) => isLiveBoardTicket(item, today)),
+    [periodItems, today],
+  )
+  const openTicketCountByEmail = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const item of periodItems) {
+      if (item.gestionado) continue
+      const email = normalizeEmail(item.gestionemail || '')
+      if (!email) continue
+      counts.set(email, (counts.get(email) || 0) + 1)
+    }
+    return counts
+  }, [periodItems])
   const localPreview = isLocalPreviewWorkshop(workshop)
   const myTeamId = useMemo(() => {
     const me = personByEmail(workspace, currentUser.email)
@@ -197,7 +226,7 @@ export default function TeamsManagerView({
     )
   }, [selected, workspace])
 
-  const nameDirty = Boolean(selected && nameDraft.trim() && nameDraft.trim() !== selected.name)
+  const nameDirty = Boolean(selected && sanitizeTeamName(nameDraft) && sanitizeTeamName(nameDraft) !== selected.name)
 
   const canManageAccounts = canCreateTallerAdmin || isSuperAdminEmail(currentUser.email)
 
@@ -225,7 +254,7 @@ export default function TeamsManagerView({
           }
           if (!cancelled) removeAdvisor(person.id)
         } catch {
-          /* se reintenta al volver a abrir Cuentas */
+          /* se reintenta al volver a abrir Cuentas y equipos */
         }
       }
     })()
@@ -365,7 +394,7 @@ export default function TeamsManagerView({
 
   const onCreateTeam = (event: FormEvent) => {
     event.preventDefault()
-    const name = teamName.trim()
+    const name = sanitizeTeamName(teamName)
     const id = addTeam(name)
     if (!id) return
     setTeamName('')
@@ -443,8 +472,10 @@ export default function TeamsManagerView({
 
   const saveTeamName = () => {
     if (!selected || !nameDirty) return
-    updateTeam(selected.id, { name: nameDraft.trim() })
-    setNotice(`El equipo ahora se llama «${nameDraft.trim()}».`)
+    const name = sanitizeTeamName(nameDraft)
+    if (!name) return
+    updateTeam(selected.id, { name })
+    setNotice(`El equipo ahora se llama «${name}».`)
   }
 
   const toggleMember = (person: AdvisorPerson) => {
@@ -507,6 +538,7 @@ export default function TeamsManagerView({
             name: person.name,
             idtaller: account.idtaller,
             crmIdtaller: account.crmIdtaller,
+            hubWebId: account.hubWebId,
           })
         }
         setAdvisorRole(person.id, role)
@@ -576,6 +608,7 @@ export default function TeamsManagerView({
     const isMe = normalizeEmail(person.email) === normalizeEmail(currentUser.email)
     const waitingDelete = isPersonPendingDelete(person)
     const names = teamNamesForPerson(workspace, person.id)
+    const openTickets = waitingDelete ? 0 : openTicketCountByEmail.get(normalizeEmail(person.email)) || 0
     return (
       <li key={person.id}>
         <button
@@ -591,7 +624,10 @@ export default function TeamsManagerView({
               {person.name}
               {isMe ? ' · Tú' : ''}
             </strong>
-            <small>{opts?.extra || person.email}</small>
+            <small>
+              {opts?.extra || person.email}
+              {openTickets === 0 ? '' : openTickets === 1 ? ' · 1 por hacer' : ` · ${openTickets} por hacer`}
+            </small>
           </span>
           <span className={`badge ${roleBadgeTone(person)}`}>
             {waitingDelete ? purgeLabel(person) : accountRoleLabel(person)}
@@ -795,7 +831,7 @@ export default function TeamsManagerView({
   if (loading && workspace.teams.length === 0 && workspace.people.length === 0) {
     return (
       <div className="dashboard-page role-desk">
-        <HexLoaderScreen size="md" label={readOnly ? 'Cargando equipos…' : 'Cargando cuentas…'} />
+        <HexLoaderScreen size="md" label={readOnly ? 'Cargando equipos…' : 'Cargando cuentas y equipos…'} />
       </div>
     )
   }
@@ -824,7 +860,7 @@ export default function TeamsManagerView({
             </>
           ) : (
             <>
-              <div className="nav-segment teams-guide-tabs" role="tablist" aria-label="Cuentas">
+              <div className="nav-segment teams-guide-tabs" role="tablist" aria-label="Cuentas y equipos">
                 <button
                   type="button"
                   role="tab"
@@ -893,38 +929,48 @@ export default function TeamsManagerView({
 
           {readOnly || listTab === 'equipos' ? (
             <div className="teams-guide-block">
-              {readOnly ? null : (
-                <p className="section-subtitle">Agrupa a la gente. Una persona puede estar en varios equipos.</p>
-              )}
-              {listedTeams.length === 0 ? (
-                <p className="section-subtitle">
-                  {readOnly ? 'Aún no estás en ningún equipo.' : 'Todavía no hay equipos.'}
-                </p>
+              {readOnly ? (
+                listedTeams.length === 0 ? (
+                  <p className="section-subtitle">Aún no estás en ningún equipo.</p>
+                ) : (
+                  <ul className="teams-guide-pick">
+                    {listedTeams.map((team) => {
+                      const people = peopleOnTeam(workspace, team)
+                      const mine = team.id === myTeamId
+                      return (
+                        <li key={team.id}>
+                          <button type="button" className="teams-guide-pick-card" onClick={() => openTeam(team.id)}>
+                            <span className="teams-guide-avatar" aria-hidden>
+                              {initials(team.name)}
+                            </span>
+                            <span className="teams-guide-pick-copy">
+                              <strong>{team.name}</strong>
+                              <small>
+                                {peopleCountLabel(people.length)}
+                                {people.length > 0 ? ` · ${firstNames(people)}` : ''}
+                              </small>
+                            </span>
+                            {mine ? <span className="badge tone-positive">Tu grupo</span> : null}
+                            <ChevronRight size={22} aria-hidden className="teams-guide-chevron" />
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )
+              ) : listedTeams.length === 0 ? (
+                <p className="section-subtitle">Todavía no hay equipos. Crea el primero y luego suelta las tarjetas.</p>
               ) : (
-                <ul className="teams-guide-pick">
-                  {listedTeams.map((team) => {
-                    const people = peopleOnTeam(workspace, team)
-                    const mine = team.id === myTeamId
-                    return (
-                      <li key={team.id}>
-                        <button type="button" className="teams-guide-pick-card" onClick={() => openTeam(team.id)}>
-                          <span className="teams-guide-avatar" aria-hidden>
-                            {initials(team.name)}
-                          </span>
-                          <span className="teams-guide-pick-copy">
-                            <strong>{team.name}</strong>
-                            <small>
-                              {peopleCountLabel(people.length)}
-                              {people.length > 0 ? ` · ${firstNames(people)}` : ''}
-                            </small>
-                          </span>
-                          {mine ? <span className="badge tone-positive">Tu grupo</span> : null}
-                          <ChevronRight size={22} aria-hidden className="teams-guide-chevron" />
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
+                <TeamDropBoard
+                  workshop={workshop}
+                  workspace={workspace}
+                  currentUser={currentUser}
+                  teams={listedTeams}
+                  tickets={todayTickets}
+                  onAssignTeam={assignTicketTeam}
+                  onPlaceTicket={placeTicket}
+                  onOpenTeam={openTeam}
+                />
               )}
               {readOnly ? null : (
                 <form className="teams-guide-form teams-guide-inline-create" onSubmit={onCreateTeam}>
@@ -935,15 +981,19 @@ export default function TeamsManagerView({
                     <input
                       id="new-team-name"
                       className="field-input"
+                      lang="es"
+                      autoComplete="off"
+                      spellCheck
                       value={teamName}
                       onChange={(event) => setTeamName(event.target.value)}
                       placeholder="Por ejemplo: Recepción"
                     />
-                    <button type="submit" className="client-submit" disabled={!teamName.trim()}>
+                    <button type="submit" className="client-submit" disabled={!sanitizeTeamName(teamName)}>
                       <Plus size={18} aria-hidden />
                       Crear
                     </button>
                   </div>
+                  <p className="section-subtitle">Puedes usar acentos: Recepción, Mecánica, Atención.</p>
                 </form>
               )}
             </div>
@@ -965,14 +1015,18 @@ export default function TeamsManagerView({
             <input
               id="create-team-name"
               className="field-input"
+              lang="es"
+              autoComplete="off"
+              spellCheck
               value={teamName}
               onChange={(event) => setTeamName(event.target.value)}
-              placeholder="Comercial, Recambios…"
+              placeholder="Recepción, Mecánica…"
               autoFocus
             />
-            <button type="submit" className="client-submit" disabled={!teamName.trim()}>
+            <button type="submit" className="client-submit" disabled={!sanitizeTeamName(teamName)}>
               Crear y abrir
             </button>
+            <p className="section-subtitle">El nombre puede llevar acentos (Recepción, Mecánica…).</p>
           </form>
         </Card>
       ) : null}
@@ -1003,6 +1057,17 @@ export default function TeamsManagerView({
               </div>
             </div>
           </div>
+          <AdvisorTicketList
+            person={selectedPerson}
+            workshop={workshop}
+            workspace={workspace}
+            currentUser={currentUser}
+            tickets={periodItems}
+            loading={ticketsLoading}
+            readOnly={readOnly}
+            onAssignTeam={assignTicketTeam}
+            onOpenLead={onOpenLead}
+          />
           {renderFichaActions(selectedPerson)}
         </Card>
       ) : null}
@@ -1038,6 +1103,9 @@ export default function TeamsManagerView({
                   id="team-name"
                   key={selected.id}
                   className="field-input"
+                  lang="es"
+                  autoComplete="off"
+                  spellCheck
                   value={nameDraft}
                   onChange={(event) => setNameDraft(event.target.value)}
                   onKeyDown={(event) => {
@@ -1097,6 +1165,18 @@ export default function TeamsManagerView({
                 })}
               </ul>
             )}
+          </div>
+
+          <div className="teams-guide-block">
+            <TeamTicketBoard
+              workshop={workshop}
+              workspace={workspace}
+              currentUser={currentUser}
+              team={selected}
+              tickets={todayTickets}
+              readOnly={readOnly}
+              onAssignTeam={assignTicketTeam}
+            />
           </div>
 
           {readOnly ? (

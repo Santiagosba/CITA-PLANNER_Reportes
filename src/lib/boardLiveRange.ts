@@ -1,5 +1,5 @@
 import { localTodayIso } from './advisorWorkspace'
-import { toDateInputValue } from './dateRangePresets'
+import { resolveDateRange, toDateInputValue } from './dateRangePresets'
 import type { PeticionPendiente } from './peticionesPendientes'
 
 function shiftIso(iso: string, days: number): string {
@@ -48,6 +48,15 @@ export function compareBoardWorkDay(a: BoardWorkDayItem, b: BoardWorkDayItem, to
 /** Carga: un poco atrás por si la cita es hoy y la petición nació antes. */
 export function boardLiveFetchRange(today = localTodayIso()): { from: string; to: string } {
   return { from: shiftIso(today, -90), to: today }
+}
+
+/** Cuentas y equipos: año en curso y, si hace falta, los 90 días anteriores. */
+export function teamsDeskFetchRange(today = localTodayIso()): { from: string; to: string } {
+  const year = resolveDateRange('anio')
+  const live = boardLiveFetchRange(today)
+  const from = [live.from, year.from].filter(Boolean).sort()[0] as string
+  const to = [live.to, year.to].filter(Boolean).sort().at(-1) as string
+  return { from, to }
 }
 
 /** Solo el trabajo de hoy (cita o fecha de la consulta). */

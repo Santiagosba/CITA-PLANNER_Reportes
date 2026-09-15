@@ -525,7 +525,7 @@ export default function DashboardGeneralView({
                 rows={teamMosaicRows}
                 valueLabel="Consultas"
                 helper="Pulsa un equipo arriba para ver solo sus tickets."
-                empty="Crea equipos en Cuentas y asígnales asesores."
+                empty="Crea equipos en Cuentas y equipos y asígnales asesores."
               />
             )}
           </Card>

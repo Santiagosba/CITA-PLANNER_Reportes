@@ -61,6 +61,16 @@ function mergeIds(existing: unknown, nextId: string | null): string[] {
   return [...ids];
 }
 
+function mergeConnectSites(
+  appMeta: Record<string, unknown>,
+  userMeta: Record<string, unknown>,
+  hubWebId: string | null,
+): string[] {
+  const fromApp = Array.isArray(appMeta.connect_site_ids) ? appMeta.connect_site_ids : [];
+  const fromUser = Array.isArray(userMeta.connect_site_ids) ? userMeta.connect_site_ids : [];
+  return mergeIds([...fromApp, ...fromUser], hubWebId);
+}
+
 function withoutId(existing: unknown, removeId: string | null): string[] {
   if (!removeId) return mergeIds(existing, null);
   return mergeIds(existing, null).filter((id) => id !== removeId.toLowerCase());
@@ -141,6 +151,7 @@ Deno.serve(async (req) => {
   const email = normEmail(body.email);
   const idtaller = isUuid(body.idtaller) ? String(body.idtaller).toLowerCase() : null;
   const crmIdtaller = isUuid(body.crmIdtaller) ? String(body.crmIdtaller).toLowerCase() : idtaller;
+  const hubWebId = isUuid(body.hubWebId) ? String(body.hubWebId).toLowerCase() : null;
   const hasRole = body.role != null && String(body.role).trim() !== "";
   const requestedRole = String(body.role || "asesor").trim().toLowerCase() === "taller_admin"
     ? "taller_admin"
@@ -182,6 +193,7 @@ Deno.serve(async (req) => {
       let appliedRole = requestedRole;
 
       if (!userId) {
+        const connectSites = mergeConnectSites({}, {}, hubWebId);
         const { data: createdUser, error } = await auth.auth.admin.createUser({
           email,
           password,
@@ -189,6 +201,7 @@ Deno.serve(async (req) => {
           app_metadata: {
             role: requestedRole,
             ...(crmIdtaller ? { crm_idtalleres: [crmIdtaller] } : {}),
+            ...(connectSites.length ? { connect_site_ids: connectSites } : {}),
           },
           user_metadata: displayName ? { full_name: displayName } : {},
         });
@@ -209,6 +222,7 @@ Deno.serve(async (req) => {
             ? currentRole
             : requestedRole;
         appliedRole = nextRole;
+        const connectSites = mergeConnectSites(currentApp, currentUser, hubWebId);
         const { error } = await auth.auth.admin.updateUserById(userId, {
           password,
           email_confirm: true,
@@ -216,6 +230,7 @@ Deno.serve(async (req) => {
             ...currentApp,
             role: nextRole,
             crm_idtalleres: mergeIds(currentApp.crm_idtalleres, crmIdtaller),
+            ...(connectSites.length ? { connect_site_ids: connectSites } : {}),
           },
           user_metadata: {
             ...currentUser,
@@ -252,11 +267,13 @@ Deno.serve(async (req) => {
         return json(403, { error: "Solo el super admin puede quitar el rol de admin." });
       }
       const displayName = String(body.name || "").trim();
+      const connectSites = mergeConnectSites(currentApp, currentUser, hubWebId);
       const { error } = await auth.auth.admin.updateUserById(userId, {
         app_metadata: {
           ...currentApp,
           role: requestedRole,
           crm_idtalleres: mergeIds(currentApp.crm_idtalleres, crmIdtaller),
+          ...(connectSites.length ? { connect_site_ids: connectSites } : {}),
         },
         user_metadata: {
           ...currentUser,

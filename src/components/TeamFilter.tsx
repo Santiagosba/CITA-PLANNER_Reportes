@@ -7,6 +7,8 @@ type Props = {
   onChange: (filter: TeamFilterId) => void
   showLoose?: boolean
   label?: string
+  alwaysShow?: boolean
+  emptyHint?: string
 }
 
 export default function TeamFilter({
@@ -15,12 +17,17 @@ export default function TeamFilter({
   onChange,
   showLoose = true,
   label = 'Equipo',
+  alwaysShow = false,
+  emptyHint = 'Crea equipos en Cuentas y equipos para filtrar.',
 }: Props) {
-  if (teams.length === 0) return null
+  if (teams.length === 0 && !alwaysShow) return null
 
   return (
     <div className="filter-field team-filter">
       <span className="filter-field-label">{label}</span>
+      {teams.length === 0 ? (
+        <p className="section-subtitle">{emptyHint}</p>
+      ) : (
       <div className="estado-filter" role="group" aria-label={label}>
         <button
           type="button"
@@ -49,6 +56,7 @@ export default function TeamFilter({
           </button>
         ) : null}
       </div>
+      )}
     </div>
   )
 }

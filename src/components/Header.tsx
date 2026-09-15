@@ -84,7 +84,7 @@ export default function Header({
   const productName = getAppProductName()
 
   return (
-    <header className="relative z-50 flex h-14 w-full shrink-0 items-center justify-between border-b border-slate-200 bg-white px-2 shadow-sm transition-colors duration-300 dark:border-slate-800 dark:bg-slate-900 md:h-16 md:px-4 md:shadow-md">
+    <header className="relative z-50 flex h-14 w-full shrink-0 items-center justify-between border-b border-slate-200 bg-white px-2 shadow-sm transition-colors duration-150 dark:border-slate-800 dark:bg-slate-900 md:h-16 md:px-4 md:shadow-md">
       <div className="flex min-w-0 items-center gap-1 sm:gap-[5px]">
         <button
           type="button"

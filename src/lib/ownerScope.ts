@@ -12,6 +12,7 @@ import {
   type AdvisorWorkspace,
   type AssignedTask,
 } from './advisorWorkspace'
+import type { PeticionPendiente } from './peticionesPendientes'
 
 export type OwnerScope = 'todas' | 'mias' | 'grupo' | 'companeros' | 'sin_dueno'
 
@@ -87,6 +88,15 @@ export function matchesTaskOwnerScope(
   ctx: OwnerScopeContext,
 ): boolean {
   return matchesOwnerScope(taskOwnerEmail(workspace, task), scope, ctx)
+}
+
+export function ticketsOwnedByEmail(
+  tickets: PeticionPendiente[],
+  email: string,
+): PeticionPendiente[] {
+  const key = normalizeEmail(email)
+  if (!key) return []
+  return tickets.filter((row) => normalizeEmail(row.gestionemail || '') === key)
 }
 
 export function ownerScopeEmptyCopy(scope: OwnerScope): string {

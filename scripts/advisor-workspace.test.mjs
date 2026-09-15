@@ -128,6 +128,75 @@ test('showcase teams assign each advisor to one group', () => {
   assert.equal(moved.teams.find((team) => team.id === lib.TEAM_RECEPCION_ID).memberIds.includes('demo-asesor-ana'), false)
 })
 
+test('team names keep accents and assigned tickets stay in that team', () => {
+  const { lib } = setup()
+  const source = readFileSync(new URL('../src/lib/teamScope.ts', import.meta.url), 'utf8')
+  const exports = {}
+  const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } })
+  vm.runInNewContext(outputText, { exports, require: (name) => {
+    if (name === './advisorWorkspace') return lib
+    throw new Error(name)
+  } })
+  const named = lib.createTeam(lib.emptyAdvisorWorkspace(), '  Recepción  ')
+  assert.equal(named.teams[0].name, 'Recepción')
+  const renamed = lib.patchTeam(named, named.teams[0].id, { name: 'Mecánica' })
+  assert.equal(renamed.teams[0].name, 'Mecánica')
+  const workspace = lib.seedAdvisorWorkspace()
+  const ticket = { idpeticion: 't-1', gestionemail: 'luis@demo.test', tipopeticion: 'Cita' }
+  assert.equal(exports.matchesTeamFilter(workspace, ticket, lib.TEAM_RECEPCION_ID, 'admin', 'santy@gmail.com'), false)
+  const pinned = lib.setTicketTeam(workspace, ticket.idpeticion, lib.TEAM_RECEPCION_ID)
+  assert.equal(exports.matchesTeamFilter(pinned, ticket, lib.TEAM_RECEPCION_ID, 'admin', 'santy@gmail.com'), true)
+  assert.equal(exports.ticketTeamLabel(pinned, ticket), 'Recepción')
+  const loose = { idpeticion: 't-2', gestionemail: '', tipopeticion: 'WhatsApp' }
+  assert.equal(exports.ticketDropColumnId(workspace, loose), exports.TEAM_FILTER_LOOSE)
+  assert.equal(exports.ticketDropColumnId(pinned, ticket), lib.TEAM_RECEPCION_ID)
+})
+
+test('auto assign in a team prefers the phone owner then the least loaded member', () => {
+  const { lib } = setup()
+  const ticketClient = { phoneMatchKey: (value) => String(value || '').replace(/\D/g, '').slice(-9) }
+  const scope = {}
+  const suggest = {}
+  const load = (path, exports, requireMap) => {
+    const source = readFileSync(new URL(`../src/${path}.ts`, import.meta.url), 'utf8')
+    const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } })
+    vm.runInNewContext(outputText, { exports, require: (name) => requireMap[name] })
+  }
+  load('lib/teamScope', scope, { './advisorWorkspace': lib })
+  load('lib/ticketOwnerSuggest', suggest, { './advisorWorkspace': lib, './teamScope': scope, './ticketClient': ticketClient })
+  const workspace = lib.seedAdvisorWorkspace()
+  const team = workspace.teams.find((row) => row.id === lib.TEAM_RECEPCION_ID)
+  const open = { idpeticion: 'open-1', caller: '600111222', tipopeticion: 'WhatsApp', gestionemail: '' }
+  const previous = { idpeticion: 'old-1', caller: '600111222', tipopeticion: 'WhatsApp', gestionemail: 'carmen@demo.test' }
+  const byPhone = suggest.suggestTicketOwnerForTeam(workspace, team, open, [open, previous])
+  assert.equal(byPhone.person.email, 'carmen@demo.test')
+  assert.equal(byPhone.reason, 'cliente')
+  const fresh = { idpeticion: 'open-2', caller: '600000000', tipopeticion: 'WhatsApp', gestionemail: '' }
+  const loaded = [
+    { idpeticion: 'a', caller: '1', tipopeticion: 'WhatsApp', gestionemail: 'ana@demo.test', gestionado: false },
+    { idpeticion: 'c', caller: '2', tipopeticion: 'WhatsApp', gestionemail: 'carmen@demo.test', gestionado: false },
+    { idpeticion: 'c2', caller: '3', tipopeticion: 'WhatsApp', gestionemail: 'carmen@demo.test', gestionado: false },
+    { idpeticion: 'm', caller: '4', tipopeticion: 'WhatsApp', gestionemail: 'marta.gil@taller.demo', gestionado: false },
+    { idpeticion: 'm2', caller: '5', tipopeticion: 'WhatsApp', gestionemail: 'marta.gil@taller.demo', gestionado: false },
+  ]
+  const byLoad = suggest.suggestTicketOwnerForTeam(workspace, team, fresh, loaded)
+  assert.equal(byLoad.person.email, 'ana@demo.test')
+  assert.equal(byLoad.reason, 'equipo')
+  assert.equal(suggest.teamRepartirHint(0, 0, false), 'Mete gente en este equipo para poder repartir.')
+  assert.equal(suggest.teamRepartirHint(0, 2, false), 'Suelta tarjetas aquí para repartirlas.')
+  assert.equal(suggest.teamRepartirHint(3, 2, false), 'Se reparte al azar entre el equipo.')
+  assert.equal(suggest.teamRepartirHint(0, 2, true), 'Puedes deshacer este reparto.')
+  const ana = workspace.people[0]
+  const luis = workspace.people[1]
+  const planned = suggest.planRandomTeamAssign(
+    [ana, luis],
+    [{ idpeticion: 'r1' }, { idpeticion: 'r2' }, { idpeticion: 'r3' }, { idpeticion: 'r4' }],
+    () => 0.2,
+  )
+  assert.equal(planned.length, 4)
+  assert.ok(planned.every((row) => row.person.email === ana.email || row.person.email === luis.email))
+})
+
 test('team filter keeps loose tickets for the matching group', () => {
   const { lib } = setup()
   const source = readFileSync(new URL('../src/lib/teamScope.ts', import.meta.url), 'utf8')
@@ -239,6 +308,47 @@ test('teamLabelForEmail names the team in plain Spanish', () => {
   }
   assert.equal(lib.teamLabelForEmail(workspace, 'ana@taller.es'), 'Recepción y Comercial')
   assert.equal(lib.teamLabelForEmail(workspace, 'luis@taller.es'), 'Sin equipo')
+})
+
+test('ticketsOwnedByEmail lists every ticket of that advisor', () => {
+  const { lib } = setup()
+  const source = readFileSync(new URL('../src/lib/ownerScope.ts', import.meta.url), 'utf8')
+  const exports = {}
+  const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } })
+  vm.runInNewContext(outputText, { exports, require: (name) => {
+    if (name === './advisorWorkspace') return lib
+    if (name === './peticionesPendientes') return {}
+    throw new Error(name)
+  } })
+  const rows = [
+    { idpeticion: 'a', gestionemail: 'Ana@Demo.test', gestionado: false },
+    { idpeticion: 'b', gestionemail: 'luis@demo.test', gestionado: false },
+    { idpeticion: 'c', gestionemail: 'ana@demo.test', gestionado: true },
+    { idpeticion: 'd', gestionemail: '', gestionado: false },
+  ]
+  const ana = exports.ticketsOwnedByEmail(rows, 'ana@demo.test')
+  assert.equal(ana.length, 2)
+  assert.equal(ana[0].idpeticion, 'a')
+  assert.equal(ana[1].idpeticion, 'c')
+  assert.equal(exports.ticketsOwnedByEmail(rows, '').length, 0)
+})
+
+test('tickets keep the order they were dropped in', () => {
+  const { lib } = setup()
+  const workspace = lib.seedAdvisorWorkspace()
+  const team = workspace.teams[0]
+  let next = lib.placeTicketInOrder(workspace, 't-a', team.id, 0, [])
+  next = lib.placeTicketInOrder(next, 't-b', team.id, 1, ['t-a'])
+  next = lib.placeTicketInOrder(next, 't-c', team.id, 0, ['t-a', 't-b'])
+  const ordered = lib.sortTicketsByOrder(
+    [{ idpeticion: 't-a' }, { idpeticion: 't-b' }, { idpeticion: 't-c' }],
+    next.ticketOrder[team.id],
+  )
+  assert.equal(ordered.map((row) => row.idpeticion).join(','), 't-c,t-a,t-b')
+  next = lib.placeTicketInOrder(next, 't-c', null, 0, [])
+  assert.equal(next.ticketTeams['t-c'], undefined)
+  assert.equal(next.ticketOrder[lib.TICKET_ORDER_LOOSE].join(','), 't-c')
+  assert.equal(next.ticketOrder[team.id].includes('t-c'), false)
 })
 
 test('setPersonRole gives and takes admin without touching teams', () => {

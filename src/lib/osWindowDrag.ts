@@ -97,15 +97,8 @@ export function animateWinBox(el: HTMLElement, from: DOMRect): Animation {
   )
 }
 
-/** Sincroniza la luz del cristal al terminar un resize/maximizado. */
-export function refreshLiquidGlass(root: HTMLElement | null): void {
-  if (!root) return
-  const frame = root.matches('.lead-os-frame, .call-agenda-panel')
-    ? root
-    : root.querySelector<HTMLElement>('.lead-os-frame, .call-agenda-panel')
-  if (!frame) return
-  requestAnimationFrame(() => frame.dispatchEvent(new Event('liquidglass:refresh')))
-}
+/** El cristal líquido está apagado: no hay capa que regenerar. */
+export function refreshLiquidGlass(_root: HTMLElement | null): void {}
 
 /** Vector hacia la barra de tareas para el minimizado «dock» (la ventana vuela hacia ella). */
 export function applyDockVars(el: HTMLElement): void {

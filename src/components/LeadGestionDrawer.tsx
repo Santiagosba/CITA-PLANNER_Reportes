@@ -144,12 +144,9 @@ function LeadGestionDrawer({
       role="dialog"
       aria-labelledby={`lead-title-${p.idpeticion}`}
       onMouseDown={os.onFocus}
+      onTransitionEnd={os.onWinMotionEnd}
     >
-      <div
-        ref={os.frameRef}
-        className="lead-modal lead-os-frame"
-        onAnimationEnd={os.onFrameAnimEnd}
-      >
+      <div ref={os.frameRef} className="lead-modal lead-os-frame">
         {os.glassDefs}
         <header
           className="lead-modal-header lead-os-titlebar"

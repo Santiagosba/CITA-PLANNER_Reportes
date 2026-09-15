@@ -29,7 +29,7 @@ export default function GlassSurface({
     <Tag
       type={onClick ? 'button' : undefined}
       onClick={onClick}
-      className={`${surface} ${shape} transition-all duration-300 ${onClick ? 'cursor-pointer hover:scale-[1.005] active:scale-[0.995]' : ''} ${className}`}
+      className={`${surface} ${shape} transition-all duration-150 ${onClick ? 'cursor-pointer hover:scale-[1.005] active:scale-[0.995]' : ''} ${className}`}
     >
       {children}
     </Tag>

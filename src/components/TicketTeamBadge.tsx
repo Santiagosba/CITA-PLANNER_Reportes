@@ -4,7 +4,7 @@ import type { PeticionPendiente } from '../lib/peticionesPendientes'
 
 type Props = {
   workspace: AdvisorWorkspace
-  ticket: Pick<PeticionPendiente, 'gestionemail' | 'tipopeticion'>
+  ticket: Pick<PeticionPendiente, 'idpeticion' | 'gestionemail' | 'tipopeticion'>
   className?: string
 }
 

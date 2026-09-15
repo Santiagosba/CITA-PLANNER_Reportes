@@ -5,6 +5,7 @@
 
 import type { CrmAppRole } from './crmRoles'
 import {
+  assignedTicketTeamId,
   boardsForTeam,
   normalizeEmail,
   personByEmail,
@@ -106,8 +107,11 @@ export function visibleTeamsForUser(
 
 export function ticketTeamIds(
   workspace: AdvisorWorkspace,
-  ticket: Pick<PeticionPendiente, 'gestionemail' | 'tipopeticion'>,
+  ticket: Pick<PeticionPendiente, 'idpeticion' | 'gestionemail' | 'tipopeticion'> | Pick<PeticionPendiente, 'gestionemail' | 'tipopeticion'>,
 ): string[] {
+  const peticionId = 'idpeticion' in ticket ? ticket.idpeticion : ''
+  const assigned = assignedTicketTeamId(workspace, peticionId)
+  if (assigned) return [assigned]
   const ownerEmail = normalizeEmail(ticket.gestionemail || '')
   if (ownerEmail) {
     const byMember = workspace.teams.filter((team) => teamMemberEmails(workspace, team).includes(ownerEmail))
@@ -127,7 +131,7 @@ export function ticketTeamIds(
 
 export function ticketTeamLabel(
   workspace: AdvisorWorkspace,
-  ticket: Pick<PeticionPendiente, 'gestionemail' | 'tipopeticion'>,
+  ticket: Pick<PeticionPendiente, 'idpeticion' | 'gestionemail' | 'tipopeticion'> | Pick<PeticionPendiente, 'gestionemail' | 'tipopeticion'>,
 ): string {
   return ticketTeamIds(workspace, ticket)
     .map((id) => workspace.teams.find((team) => team.id === id)?.name)
@@ -135,16 +139,36 @@ export function ticketTeamLabel(
     .join(' · ')
 }
 
+/** Una sola columna para arrastrar: equipo fijado, si no el del dueño, si no sueltos. */
+export function ticketDropColumnId(
+  workspace: AdvisorWorkspace,
+  ticket: Pick<PeticionPendiente, 'idpeticion' | 'gestionemail' | 'tipopeticion'> | Pick<PeticionPendiente, 'gestionemail' | 'tipopeticion'>,
+): string {
+  const peticionId = 'idpeticion' in ticket ? ticket.idpeticion : ''
+  const assigned = assignedTicketTeamId(workspace, peticionId)
+  if (assigned) return assigned
+  const ownerEmail = normalizeEmail(ticket.gestionemail || '')
+  if (!ownerEmail) return TEAM_FILTER_LOOSE
+  const owned = teamsForEmail(workspace, ownerEmail)
+  if (owned.length) return owned[0].id
+  const owner = personByEmail(workspace, ownerEmail)
+  if (owner) {
+    const byPerson = teamsForPerson(workspace, owner.id)
+    if (byPerson.length) return byPerson[0].id
+  }
+  return TEAM_FILTER_LOOSE
+}
+
 export function inferredTicketTeamId(
   workspace: AdvisorWorkspace,
-  ticket: Pick<PeticionPendiente, 'gestionemail' | 'tipopeticion'>,
+  ticket: Pick<PeticionPendiente, 'idpeticion' | 'gestionemail' | 'tipopeticion'> | Pick<PeticionPendiente, 'gestionemail' | 'tipopeticion'>,
 ): string | null {
   return ticketTeamIds(workspace, ticket)[0] ?? null
 }
 
 export function matchesTeamFilter(
   workspace: AdvisorWorkspace,
-  ticket: Pick<PeticionPendiente, 'gestionemail' | 'tipopeticion'>,
+  ticket: Pick<PeticionPendiente, 'idpeticion' | 'gestionemail' | 'tipopeticion'> | Pick<PeticionPendiente, 'gestionemail' | 'tipopeticion'>,
   filter: TeamFilterId,
   role: CrmAppRole,
   email: string,

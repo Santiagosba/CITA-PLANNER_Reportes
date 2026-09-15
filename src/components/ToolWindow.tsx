@@ -83,8 +83,9 @@ export default function ToolWindow({
       role="dialog"
       aria-label={title}
       onMouseDown={os.onFocus}
+      onTransitionEnd={os.onWinMotionEnd}
     >
-      <div ref={os.frameRef} className="lead-modal lead-os-frame tool-window-frame" onAnimationEnd={os.onFrameAnimEnd}>
+      <div ref={os.frameRef} className="lead-modal lead-os-frame tool-window-frame">
         {os.glassDefs}
         <header
           className="lead-os-titlebar tool-window-titlebar"

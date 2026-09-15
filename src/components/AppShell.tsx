@@ -29,7 +29,7 @@ const ADMIN_NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] 
   { id: 'dashboard-general', label: 'Dashboard general', icon: LayoutDashboard },
   { id: 'boards', label: 'Gestor de tableros', icon: Columns3 },
   { id: 'pending-citas', label: 'Triage operativo', icon: ClipboardList },
-  { id: 'equipos', label: 'Cuentas', icon: Users },
+  { id: 'equipos', label: 'Cuentas y equipos', icon: Users },
   { id: 'asignar-tarea', label: 'Asignar tarea', icon: UserPlus },
   { id: 'tareas-hoy', label: 'Historial', icon: History },
   { id: 'stats-equipo', label: 'Estadísticas', icon: BarChart3 },
