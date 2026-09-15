@@ -21,11 +21,11 @@ import LauraIntelligenceView from './LauraIntelligenceView'
 import BotIdentityView from './BotIdentityView'
 import TeamsManagerView from './TeamsManagerView'
 import AssignTaskView from './AssignTaskView'
-import PasswordsAdminView from './PasswordsAdminView'
 import EmployeeStatsView from './EmployeeStatsView'
 import AiUsageView from './AiUsageView'
 import TodayTasksView from './TodayTasksView'
 import { mapSessionUserToCrmUser, type Workshop } from '../types'
+import { isSuperAdminEmail, isSuperAdminUser } from '../lib/crmAccess'
 import { isGlobalAviAdmin } from '../lib/operationsConnect'
 import {
   bindCrmAppRole,
@@ -215,7 +215,8 @@ export default function DashboardShell({
   // La agenda comparte el orden de apilado con las fichas: nace por debajo de la
   // primera ficha y sube al frente cuando se pulsa.
   const [agendaZ, setAgendaZ] = useState(99)
-  const canEditHubBranding = isGlobalAviAdmin({ user: sessionUser })
+  const isSuperAdmin = isSuperAdminUser(sessionUser) || isSuperAdminEmail(asesor.email)
+  const canEditHubBranding = isSuperAdmin || isGlobalAviAdmin({ user: sessionUser })
   bindCrmAppRole(appRole)
   const showCallCosts = canSeeTelnyxCosts(appRole)
 
@@ -225,6 +226,10 @@ export default function DashboardShell({
   }, [appRole])
 
   useEffect(() => {
+    if (shellRoute === 'contrasenas') {
+      setShellRoute('equipos')
+      return
+    }
     if (!routeAllowedForRole(shellRoute, appRole)) {
       setShellRoute(defaultRouteForRole(appRole))
     }
@@ -753,7 +758,7 @@ export default function DashboardShell({
       isDarkMode={isDarkMode}
       onToggleTheme={onToggleTheme}
       asesorName={asesor.displayName}
-      asesorRole={crmAppRoleLabel(appRole)}
+      asesorRole={crmAppRoleLabel(appRole, { superAdmin: isSuperAdmin })}
       appRole={appRole}
       onLocalPreviewRole={onLocalPreviewRole}
       previewAdvisorId={previewAdvisorId}
@@ -812,6 +817,7 @@ export default function DashboardShell({
           workshop={workshop}
           currentUser={currentUser}
           readOnly={appRole === 'asesor'}
+          canCreateTallerAdmin={canEditHubBranding}
         />
       ) : shellRoute === 'asignar-tarea' ? (
         <AssignTaskView
@@ -822,8 +828,6 @@ export default function DashboardShell({
             setShellRoute('tareas-hoy')
           }}
         />
-      ) : shellRoute === 'contrasenas' ? (
-        <PasswordsAdminView workshop={workshop} currentUser={currentUser} />
       ) : shellRoute === 'stats-equipo' ? (
         <EmployeeStatsView workshop={workshop} currentUser={currentUser} />
       ) : shellRoute === 'gasto-ia' ? (

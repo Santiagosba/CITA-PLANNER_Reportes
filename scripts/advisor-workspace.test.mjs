@@ -25,27 +25,53 @@ function setup() {
   }
   const lib = load('lib/advisorWorkspace')
   modules['../lib/advisorWorkspace'] = lib
+  modules['../lib/advisorWorkspaceStore'] = {
+    advisorWorkspacePersistState: () => ({ persistError: null, remote: false }),
+    peekAdvisorWorkspace: (id) => lib.loadAdvisorWorkspace(id),
+    hydrateAdvisorWorkspaceStore: async (id) => lib.loadAdvisorWorkspace(id),
+    commitAdvisorWorkspace: (id, update) => {
+      const keepExamples = id === 'local-preview'
+      const next = lib.hydrateAdvisorWorkspace(update(lib.loadAdvisorWorkspace(id)), {
+        keepExamples,
+        showcase: keepExamples,
+      })
+      lib.saveAdvisorWorkspace(id, next)
+      return next
+    },
+    retainAdvisorWorkspaceLive: () => {},
+    releaseAdvisorWorkspaceLive: () => {},
+  }
   function mount(workshopId) {
-    let state
+    const states = []
+    let cursor = 0
     const effects = []
     const cleanup = []
     modules.react = {
-      useState: (init) => [state = init(), (next) => { state = next }],
+      useState: (init) => {
+        const index = cursor++
+        if (states[index] === undefined) states[index] = typeof init === 'function' ? init() : init
+        return [
+          states[index],
+          (next) => {
+            states[index] = typeof next === 'function' ? next(states[index]) : next
+          },
+        ]
+      },
       useCallback: (fn) => fn,
       useMemo: (fn) => fn(),
       useEffect: (fn) => effects.push(fn),
     }
     const actions = load('hooks/useAdvisorWorkspace').useAdvisorWorkspace(workshopId)
     for (const effect of effects) cleanup.push(effect())
-    return { actions, current: () => state, unmount: () => cleanup.forEach((fn) => fn?.()) }
+    return { actions, current: () => states[0], unmount: () => cleanup.forEach((fn) => fn?.()) }
   }
   return { lib, mount, window, localStorage }
 }
 
 test('dashboard receives assignments from another mounted view without losing earlier edits', () => {
   const { mount, lib } = setup()
-  const dashboard = mount('workshop')
-  const assign = mount('workshop')
+  const dashboard = mount('local-preview')
+  const assign = mount('local-preview')
   const first = dashboard.current().tasks[0]
   assign.actions.assignTask({ ...first, title: 'Assigned today' })
   dashboard.actions.setTaskStatus(first.id, 'hecho')
@@ -56,27 +82,36 @@ test('dashboard receives assignments from another mounted view without losing ea
 
 test('storage events sync only the matching workshop and listeners are cleaned up', () => {
   const { mount, lib, window, localStorage } = setup()
-  const dashboard = mount('one')
+  const dashboard = mount('local-preview')
   const other = mount('two')
   const next = lib.setAssignedTaskStatus(dashboard.current(), 'task-local-1', 'hecho')
-  const key = lib.advisorWorkspaceStorageKey('one')
+  const key = lib.advisorWorkspaceStorageKey('local-preview')
   localStorage.setItem(key, JSON.stringify(next))
   const event = new Event('storage')
   Object.assign(event, { key, storageArea: localStorage })
   window.dispatchEvent(event)
   assert.equal(dashboard.current().tasks[0].status, 'hecho')
-  assert.equal(other.current().tasks[0].status, 'pendiente')
+  assert.equal(other.current().teams.length, 0)
   dashboard.unmount()
-  lib.saveAdvisorWorkspace('one', lib.setAssignedTaskStatus(next, 'task-local-1', 'pendiente'))
+  lib.saveAdvisorWorkspace('local-preview', lib.setAssignedTaskStatus(next, 'task-local-1', 'pendiente'))
   assert.equal(dashboard.current().tasks[0].status, 'hecho')
 })
 
 test('completed demo tasks stay completed after reopening the dashboard', () => {
   const { lib } = setup()
-  const workspace = lib.loadAdvisorWorkspace('one')
+  const workspace = lib.loadAdvisorWorkspace('local-preview')
   workspace.tasks = workspace.tasks.map((task) => ({ ...task, status: 'hecho' }))
-  lib.saveAdvisorWorkspace('one', workspace)
-  assert.ok(lib.loadAdvisorWorkspace('one').tasks.every((task) => task.status === 'hecho'))
+  lib.saveAdvisorWorkspace('local-preview', workspace)
+  assert.ok(lib.loadAdvisorWorkspace('local-preview').tasks.every((task) => task.status === 'hecho'))
+})
+
+test('a real workshop starts empty without Recepción or Comercial', () => {
+  const { lib } = setup()
+  const workspace = lib.loadAdvisorWorkspace('e6f001b2-2501-42f7-888c-bd96a02d4ee1')
+  assert.equal(workspace.teams.length, 0)
+  assert.equal(workspace.people.length, 0)
+  assert.ok(workspace.taskTypes.length > 0)
+  assert.equal(lib.hydrateAdvisorWorkspace(lib.emptyAdvisorWorkspace()).teams.length, 0)
 })
 
 test('showcase teams assign each advisor to one group', () => {
@@ -142,4 +177,63 @@ test('daily selection includes overdue tasks, excludes future tasks and other ad
     { ...first, id: 'other', dueDate: '2026-09-10', assigneeId: 'demo-asesor-luis' },
   ]
   assert.equal(lib.tasksForAdvisorDay(workspace, 'ana@demo.test', '2026-09-10').map((task) => task.id).join(','), 'today,overdue')
+})
+
+test('removePerson drops the advisor and leaves their tasks without owner', () => {
+  const { lib } = setup()
+  const workspace = {
+    ...lib.emptyAdvisorWorkspace(),
+    people: [{ id: 'ana', name: 'Ana', email: 'ana@taller.es' }],
+    teams: [{ id: 'recepcion', name: 'Recepción', memberIds: ['ana'], taskTypeIds: [], boardIds: [] }],
+    tasks: [{ id: 't1', title: 'Llamar', taskTypeId: 'tt', assigneeId: 'ana', dueDate: '2026-04-10', completed: false }],
+  }
+  const next = lib.removePerson(workspace, 'ana')
+  assert.equal(next.people.length, 0)
+  assert.deepEqual(next.teams[0].memberIds, [])
+  assert.equal(next.tasks[0].assigneeId, '')
+})
+
+test('schedulePersonDelete waits 15 days and restorePerson clears the mark', () => {
+  const { lib } = setup()
+  const now = new Date('2026-04-01T10:00:00.000Z')
+  const workspace = {
+    ...lib.emptyAdvisorWorkspace(),
+    people: [{ id: 'ana', name: 'Ana', email: 'ana@taller.es', role: 'asesor' }],
+    teams: [{ id: 'recepcion', name: 'Recepción', memberIds: ['ana'], taskTypeIds: [], boardIds: [] }],
+  }
+  const pending = lib.schedulePersonDelete(workspace, 'ana', now)
+  assert.equal(lib.isPersonPendingDelete(pending.people[0]), true)
+  assert.equal(lib.daysUntilPurge(pending.people[0], now.getTime()), 15)
+  assert.equal(lib.isPersonPurgeDue(pending.people[0], now.getTime()), false)
+  assert.deepEqual(pending.teams[0].memberIds, ['ana'])
+  const restored = lib.restorePerson(pending, 'ana')
+  assert.equal(lib.isPersonPendingDelete(restored.people[0]), false)
+  assert.equal(restored.people[0].purgeAt, undefined)
+  const due = lib.schedulePersonDelete(workspace, 'ana', now)
+  const after = lib.purgeExpiredPeople(due, Date.parse('2026-04-16T10:00:00.000Z'))
+  assert.equal(after.purged.length, 1)
+  assert.equal(after.workspace.people.length, 0)
+  assert.deepEqual(after.workspace.teams[0].memberIds, [])
+})
+
+test('personMatchesQuery finds name email or role', () => {
+  const { lib } = setup()
+  const person = { id: '1', name: 'Ana Ruiz', email: 'ana@taller.es', role: 'taller_admin' }
+  assert.equal(lib.personMatchesQuery(person, 'ruiz'), true)
+  assert.equal(lib.personMatchesQuery(person, 'admin'), true)
+  assert.equal(lib.personMatchesQuery(person, 'luis'), false)
+})
+
+test('setPersonRole gives and takes admin without touching teams', () => {
+  const { lib } = setup()
+  const workspace = {
+    ...lib.emptyAdvisorWorkspace(),
+    people: [{ id: 'ana', name: 'Ana', email: 'ana@taller.es', role: 'asesor' }],
+    teams: [{ id: 'recepcion', name: 'Recepción', memberIds: ['ana'], taskTypeIds: [], boardIds: [] }],
+  }
+  const admin = lib.setPersonRole(workspace, 'ana', 'taller_admin')
+  assert.equal(admin.people[0].role, 'taller_admin')
+  assert.deepEqual(admin.teams[0].memberIds, ['ana'])
+  const asesor = lib.setPersonRole(admin, 'ana', 'asesor')
+  assert.equal(asesor.people[0].role, 'asesor')
 })

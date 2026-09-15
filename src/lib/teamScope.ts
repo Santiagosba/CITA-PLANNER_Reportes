@@ -120,7 +120,9 @@ export function ticketTeamIds(
       if (byPerson.length) return byPerson.map((team) => team.id)
     }
   }
-  return teamsMatchingTicketType(workspace, ticket.tipopeticion).map((team) => team.id)
+  const inferred = teamsMatchingTicketType(workspace, ticket.tipopeticion)
+  const withPeople = inferred.filter((team) => teamMemberEmails(workspace, team).length > 0)
+  return (withPeople.length ? withPeople : inferred).map((team) => team.id)
 }
 
 export function ticketTeamLabel(

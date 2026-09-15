@@ -9,6 +9,7 @@ import {
   LogOut, Search as SearchIcon, ArrowRight, ChevronLeft, Building2,
 } from 'lucide-react';
 import { HexLoaderScreen } from '../components/ui/HexLoader';
+import { filterWorkshopsForUser } from '../lib/crmAccess';
 import { canBrowseAllWorkshops } from '../lib/operationsConnect';
 import {
   parseConnectSiteIds,
@@ -206,7 +207,7 @@ const WorkshopSelectorView: React.FC<WorkshopSelectorViewProps> = ({
             setLoading(false);
             return;
           }
-          const merged = await mergeAllWorkshopsFromContainers(visible);
+          const merged = filterWorkshopsForUser(await mergeAllWorkshopsFromContainers(visible), user, true);
           if (cancelled) return;
           if (merged.length === 0) {
             setError('No hay talleres activos en las licencias de este módulo.');
@@ -297,11 +298,12 @@ const WorkshopSelectorView: React.FC<WorkshopSelectorViewProps> = ({
           }
         }
 
-        setWorkshops(real);
+        const scoped = filterWorkshopsForUser(real, user, isSuperUser);
+        setWorkshops(scoped);
 
-        if (real.length === 1) {
-          try { localStorage.setItem(RECENT_STORAGE_KEY, real[0].id); } catch { /* ignore */ }
-          onSelect(real[0]);
+        if (scoped.length === 1) {
+          try { localStorage.setItem(RECENT_STORAGE_KEY, scoped[0].id); } catch { /* ignore */ }
+          onSelect(scoped[0]);
           return;
         }
 
@@ -313,7 +315,7 @@ const WorkshopSelectorView: React.FC<WorkshopSelectorViewProps> = ({
     })();
 
     return () => { cancelled = true; };
-  }, [activeContainer, onSelect]);
+  }, [activeContainer, onSelect, user, isSuperUser]);
 
   const handleSelect = (w: Workshop) => {
     setScanning(true);

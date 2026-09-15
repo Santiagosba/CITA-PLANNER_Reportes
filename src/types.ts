@@ -24,7 +24,17 @@ export type CrmUser = {
 export function mapSessionUserToCrmUser(user: unknown): CrmUser {
   const u = user as Record<string, unknown> | null | undefined
   const md = (u?.user_metadata as Record<string, unknown>) ?? {}
-  const email = String(u?.email ?? '')
+  const identities = Array.isArray(u?.identities) ? (u?.identities as Array<Record<string, unknown>>) : []
+  const email = [
+    u?.email,
+    md.email,
+    ...identities.flatMap((identity) => {
+      const data = (identity.identity_data as Record<string, unknown> | undefined) ?? {}
+      return [identity.email, data.email]
+    }),
+  ]
+    .map((value) => String(value ?? '').trim())
+    .find((value) => value.includes('@')) ?? ''
   const full = md.full_name
   let firstName = ''
   let lastName = ''

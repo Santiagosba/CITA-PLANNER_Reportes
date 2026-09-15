@@ -304,6 +304,10 @@ export default function App() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, newSession) => {
       if (newSession) {
+        if (_event === 'SIGNED_IN') {
+          clearLocalPreview()
+          setLocalPreview(null)
+        }
         setSession(newSession)
       } else {
         setSession(null)

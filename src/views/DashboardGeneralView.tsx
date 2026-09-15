@@ -54,11 +54,11 @@ import {
   matchesTeamFilter,
   TEAM_FILTER_ALL,
   teamFilterEmptyCopy,
-  ticketTeamLabel,
   teamWorkloadRows,
   visibleTeamsForUser,
   type TeamFilterId,
 } from '../lib/teamScope'
+import TicketTeamBadge from '../components/TicketTeamBadge'
 import { isDemoCitaId, isDemoTicketId } from '../lib/demoTickets'
 import { isLocalPreviewWorkshop } from '../lib/localPreview'
 import { computePeticionesStats, formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
@@ -525,7 +525,7 @@ export default function DashboardGeneralView({
                 rows={teamMosaicRows}
                 valueLabel="Consultas"
                 helper="Pulsa un equipo arriba para ver solo sus tickets."
-                empty="Crea equipos en Equipos y asígnales asesores."
+                empty="Crea equipos en Cuentas y asígnales asesores."
               />
             )}
           </Card>
@@ -635,7 +635,6 @@ function MetricCard({ icon: Icon, label, value, helper, tone, onClick }: MetricP
 
 function DashTicketRow({ item, workshop, workspace, currentUser, appRole, onOpenLead, tickets }: DashTicketRowProps) {
   const sla = !item.gestionado && (isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha))
-  const teamLabel = ticketTeamLabel(workspace, item)
   return (
     <li
       className={`ops-feed-row dash-ticket-row${item.gestionado ? ' is-done' : ''}`}
@@ -656,7 +655,7 @@ function DashTicketRow({ item, workshop, workspace, currentUser, appRole, onOpen
           <TicketClientBlock peticion={item} size="sm" />
           <span>
             {item.tipopeticion || 'Sin tipo'}
-            {teamLabel ? <span className="badge tone-neutral">{teamLabel}</span> : null}
+            <TicketTeamBadge workspace={workspace} ticket={item} />
             {isDemoTicketId(item.idpeticion) ? <span className="badge tone-info">Prueba</span> : null}
           </span>
         </div>

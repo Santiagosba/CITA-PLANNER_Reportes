@@ -105,7 +105,7 @@ export function buildLocalPreviewUser(role: CrmAppRole, advisorId?: string) {
       id: 'local-admin',
       email: 'santy@gmail.com',
       user_metadata: { full_name: 'Santy', role_label: 'Admin' },
-      app_metadata: { role: 'admin', local_preview: true },
+      app_metadata: { role: 'aviadmin', local_preview: true },
     }
   }
   const advisor = previewAdvisorById(advisorId)

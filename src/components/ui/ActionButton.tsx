@@ -26,6 +26,7 @@ export default function ActionButton({
   fullWidth,
   className = '',
   disabled,
+  type = 'button',
   ...rest
 }: Props) {
   const isBusy = status === 'loading' || status === 'success'
@@ -33,7 +34,7 @@ export default function ActionButton({
 
   return (
     <button
-      type="button"
+      type={type}
       disabled={disabled || isBusy}
       aria-busy={status === 'loading'}
       aria-live="polite"

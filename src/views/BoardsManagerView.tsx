@@ -48,6 +48,7 @@ import {
 import CitaLinkFilterControl from '../components/CitaLinkFilter'
 import OwnerScopeFilter from '../components/OwnerScopeFilter'
 import TicketOwnerPicker from '../components/TicketOwnerPicker'
+import TicketTeamBadge from '../components/TicketTeamBadge'
 import type { CrmAppRole } from '../lib/crmRoles'
 import type { Workshop } from '../types'
 
@@ -499,6 +500,7 @@ const BoardTicket = memo(function BoardTicket({
       </div>
       <TicketClientBlock peticion={item} size="md" />
       {item.tipopeticion ? <span className="kanban-card-meta">{item.tipopeticion}</span> : null}
+      <TicketTeamBadge workspace={workspace} ticket={item} />
       {vehicle ? <span className="kanban-card-meta">{vehicle}</span> : null}
       <TicketOwnerPicker
         workshop={workshop}

@@ -5,7 +5,6 @@ import type { CrmAppRole } from '../lib/crmRoles'
 import {
   isPersonOnTeam,
   normalizeEmail,
-  teamsForPerson,
   type AdvisorPerson,
   type AdvisorTeam,
   type AdvisorWorkspace,
@@ -18,6 +17,7 @@ import {
   teammatesForReassign,
 } from '../lib/ticketOps'
 import { ownerSuggestCopy, suggestTicketOwner } from '../lib/ticketOwnerSuggest'
+import { ticketTeamLabel } from '../lib/teamScope'
 import type { PeticionPendiente } from '../lib/peticionesPendientes'
 import type { Workshop } from '../types'
 
@@ -229,6 +229,8 @@ export default function TicketOwnerPicker({
   const label = showSuggest ? 'Le tocaría' : 'Dueño del ticket'
   const applying = useRef(false)
   const grouped = useMemo(() => groupedTeammates(workspace, people), [workspace, people])
+  const teamLabel = ticketTeamLabel(workspace, peticion)
+  const teamLine = teamLabel ? <span className="ticket-owner-team">Grupo {teamLabel}</span> : null
 
   const onChange = async (next: string) => {
     setBusy(true)
@@ -322,6 +324,7 @@ export default function TicketOwnerPicker({
             {allowed ? select : <strong className="ticket-owner-card-name">{currentName}</strong>}
             {actions}
           </div>
+          {teamLine}
           {showSuggest && suggested ? (
             <span className="ticket-owner-hint">{ownerSuggestCopy(suggested.reason, suggested.person.name)}</span>
           ) : null}
@@ -332,22 +335,12 @@ export default function TicketOwnerPicker({
   }
 
   if (!allowed) {
-    const teamLabel = people
-      .find((person) => normalizeEmail(person.email) === displayEmail)
-      ? teamsForPerson(
-          workspace,
-          people.find((person) => normalizeEmail(person.email) === displayEmail)?.id ?? '',
-        )
-          .map((team) => team.name)
-          .join(', ')
-      : ''
     return (
       <span className={`ticket-owner-readonly${showSuggest ? ' is-suggested' : ''}`}>
         {showSuggest && suggested
           ? `${suggested.person.name} · le tocaría`
-          : teamLabel
-            ? `${currentName} · ${teamLabel}`
-            : currentName}
+          : currentName}
+        {teamLine}
       </span>
     )
   }
@@ -363,6 +356,7 @@ export default function TicketOwnerPicker({
         {select}
         {actions}
       </div>
+      {teamLine}
       {error ? <span className="ticket-owner-error">{error}</span> : null}
     </div>
   )

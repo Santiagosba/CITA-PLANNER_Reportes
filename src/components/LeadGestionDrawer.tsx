@@ -22,6 +22,7 @@ import { ticketClientLabel, ticketClientPhone, ticketVehicleLabel } from '../lib
 import { scoreTicketUrgency } from '../lib/ticketUrgency'
 import TicketClientBlock from './TicketClientBlock'
 import TicketOwnerPicker from './TicketOwnerPicker'
+import TicketTeamBadge from './TicketTeamBadge'
 import type { CrmAppRole } from '../lib/crmRoles'
 import type { AdvisorWorkspace } from '../lib/advisorWorkspace'
 import type { Workshop } from '../types'
@@ -198,6 +199,7 @@ function LeadGestionDrawer({
                 <User size={18} />
               </span>
               <TicketClientBlock peticion={p} size="lg" />
+              {workspace ? <TicketTeamBadge workspace={workspace} ticket={p} /> : null}
               {channel === 'whatsapp' ? <ChannelTag tipo="whatsapp" /> : null}
             </div>
             <div className="lead-modal-contact">

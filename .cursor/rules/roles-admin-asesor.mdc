@@ -7,9 +7,13 @@ alwaysApply: true
 
 Dos experiencias distintas. No mezclar pantallas ni datos entre ellas.
 
-## Admin (vista de taller)
+## Super admin
 
-Admin de taller por email: `santy@gmail.com`. Los asesores `@taller.demo` son asesores.
+`santy@gmail.com` (y `app_metadata.role = aviadmin`). Ve todos los talleres. Puede crear un **admin de taller** real.
+
+## Admin de taller
+
+`app_metadata.role = taller_admin` + fila en `operations.taller_users`. Ve solo sus talleres. Puede crear asesores de ese taller. No es el super admin.
 
 Puede:
 

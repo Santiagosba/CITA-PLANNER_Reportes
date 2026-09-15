@@ -41,7 +41,7 @@ import TicketClientBlock from '../components/TicketClientBlock'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
 import { citaLinkEmptyCopy, matchesCitaLink, type CitaLinkFilter } from '../lib/citaLinkFilter'
 import { buildOwnerScopeContext, matchesOwnerScope, ownerScopeEmptyCopy, type OwnerScope } from '../lib/ownerScope'
-import { matchesTeamFilter, TEAM_FILTER_ALL, visibleTeamsForUser, type TeamFilterId } from '../lib/teamScope'
+import { matchesTeamFilter, TEAM_FILTER_ALL, ticketTeamLabel, visibleTeamsForUser, type TeamFilterId } from '../lib/teamScope'
 import {
   COPY_FALLBACK_NOTICE,
   loadPeticionesCopy,
@@ -56,6 +56,7 @@ import { isLocalPreviewWorkshop } from '../lib/localPreview'
 import { compareTicketsByOpenFirst } from '../lib/doneFilter'
 import { applyPeticionPatch, PETICIONES_PATCHED_EVENT } from '../lib/ticketOps'
 import TicketOwnerPicker from '../components/TicketOwnerPicker'
+import TicketTeamBadge from '../components/TicketTeamBadge'
 import type { CrmAppRole } from '../lib/crmRoles'
 
 type Props = {
@@ -608,6 +609,7 @@ export default function PendingCitasView({
                         onMarkGestionado={handleMarkGestionado}
                         onOpenLead={onOpenLead}
                         revealIndex={groupIndex === 0 ? itemIndex : 16}
+                        teamLabel={ticketTeamLabel(workspace, p)}
                         ownerSlot={
                           <TicketOwnerPicker
                             workshop={workshop}
@@ -684,6 +686,8 @@ export default function PendingCitasView({
                         <td><TicketPlate peticion={p} /></td>
                         <td>
                           {p.tipopeticion ?? '—'}
+                          {' '}
+                          <TicketTeamBadge workspace={workspace} ticket={p} />
                           {isDemoTicketId(p.idpeticion) ? (
                             <>
                               {' '}

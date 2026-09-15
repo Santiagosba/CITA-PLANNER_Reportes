@@ -6,12 +6,13 @@
 import { isCrmUuid } from './crmUuid'
 import {
   ADVISOR_WORKSPACE_CHANGED,
+  emptyAdvisorWorkspace,
   hydrateAdvisorWorkspace,
+  isShowcaseWorkspace,
   keepExampleAssignedTasks,
   loadAdvisorWorkspace,
   parseAdvisorWorkspace,
   rawWorkspaceHasExampleTasks,
-  rawWorkspaceNeedsShowcase,
   saveAdvisorWorkspace,
   type AdvisorWorkspace,
 } from './advisorWorkspace'
@@ -91,7 +92,7 @@ async function fetchRemote(workshopId: string): Promise<
     return {
       kind: 'row',
       workspace: parsed,
-      shouldUpload: rawWorkspaceHasExampleTasks(raw) || rawWorkspaceNeedsShowcase(raw),
+      shouldUpload: rawWorkspaceHasExampleTasks(raw),
     }
   } catch (error) {
     return { kind: 'error', message: error instanceof Error ? error.message : 'No se pudo leer el taller.' }
@@ -150,11 +151,13 @@ export async function hydrateAdvisorWorkspaceStore(workshopId: string): Promise<
       return remote.workspace
     }
     if (remote.kind === 'empty') {
-      const uploadError = await upsertRemote(workshopId, local)
+      const keepExamples = keepExampleAssignedTasks(workshopId)
+      const starter = keepExamples || !isShowcaseWorkspace(local) ? local : emptyAdvisorWorkspace()
+      const uploadError = await upsertRemote(workshopId, starter)
       persistErrors.set(workshopId, uploadError)
-      writeMemory(workshopId, local, true)
-      saveAdvisorWorkspace(workshopId, local)
-      return local
+      writeMemory(workshopId, starter, true)
+      saveAdvisorWorkspace(workshopId, starter)
+      return starter
     }
     persistErrors.set(workshopId, remote.message)
     writeMemory(workshopId, local, true)
@@ -174,8 +177,10 @@ export function commitAdvisorWorkspace(
   update: (latest: AdvisorWorkspace) => AdvisorWorkspace,
 ): AdvisorWorkspace {
   const latest = peekAdvisorWorkspace(workshopId)
+  const keepExamples = keepExampleAssignedTasks(workshopId)
   const next = hydrateAdvisorWorkspace(update(latest), {
-    keepExamples: keepExampleAssignedTasks(workshopId),
+    keepExamples,
+    showcase: keepExamples,
   })
   bumpWrite(workshopId)
   writeMemory(workshopId, next, true)

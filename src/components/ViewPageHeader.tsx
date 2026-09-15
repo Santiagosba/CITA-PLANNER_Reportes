@@ -62,24 +62,20 @@ function pageCopy(
         subtitle: 'Llamadas y tareas del chatbot: cuántas están hechas y cuántas faltan.',
       }
     case 'equipos':
+    case 'contrasenas':
       return appRole === 'asesor'
         ? {
             title: 'Mi equipo',
-            subtitle: 'Tus compañeros y el grupo con el que compartes tickets.',
+            subtitle: 'Pulsa un grupo para ver a tus compañeros. Aquí no se cambia nada.',
           }
         : {
-            title: 'Equipos',
-            subtitle: 'Crea asesores y equipos. Una persona puede estar en varios grupos.',
+            title: 'Cuentas',
+            subtitle: 'Busca a alguien, ábrelo y cambia lo que haga falta.',
           }
     case 'asignar-tarea':
       return {
         title: 'Asignar tarea',
         subtitle: 'Elige asesor, tipo y día. La tarea aparece en su bandeja.',
-      }
-    case 'contrasenas':
-      return {
-        title: 'Contraseñas',
-        subtitle: 'Cambia la tuya o la de un asesor del taller.',
       }
     case 'stats-equipo':
       return {

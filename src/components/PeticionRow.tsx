@@ -21,6 +21,7 @@ type Props = {
   onOpenLead?: (peticion: PeticionPendiente) => void
   revealIndex?: number
   ownerSlot?: ReactNode
+  teamLabel?: string
 }
 
 function PeticionRow({
@@ -36,6 +37,7 @@ function PeticionRow({
   onOpenLead,
   revealIndex = 0,
   ownerSlot,
+  teamLabel,
 }: Props) {
   const pendiente = isPeticionPendiente(p)
   const c = p.cita
@@ -49,6 +51,7 @@ function PeticionRow({
   // Datos que el asesor necesita ver de un vistazo para llamar con contexto
   const facts: { label: string; value: ReactNode }[] = []
   facts.push({ label: 'Tipo', value: p.tipopeticion ?? 'Sin tipo' })
+  if (teamLabel) facts.push({ label: 'Grupo', value: teamLabel })
   facts.push({ label: 'Consulta', value: formatFecha(p.fechainicio) })
   if (vehiculo) facts.push({ label: 'Vehículo', value: vehiculo })
   if (c?.email) facts.push({ label: 'Email', value: c.email })

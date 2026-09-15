@@ -6,6 +6,7 @@ import Card from '../components/ui/Card'
 import PaginatedItems from '../components/PaginatedItems'
 import TicketClientBlock from '../components/TicketClientBlock'
 import TicketOwnerPicker from '../components/TicketOwnerPicker'
+import TicketTeamBadge from '../components/TicketTeamBadge'
 import TicketPlate from '../components/TicketPlate'
 import { computePeticionesStats, formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
@@ -213,6 +214,8 @@ export default function TodayTasksView({ workshop, currentUser, appRole = 'aseso
                         <p className="list-row-meta">
                           {item.tipopeticion || 'Sin tipo'}
                           {` · ${formatFecha(item.fechainicio)}`}
+                          {' '}
+                          <TicketTeamBadge workspace={workspace} ticket={item} />
                         </p>
                         <div className="role-task-actions">
                           <TicketOwnerPicker

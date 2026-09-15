@@ -5,10 +5,41 @@
 
 import { DEMO_ASESORES } from './demoAsesores'
 
+export type AdvisorAccountRole = 'asesor' | 'taller_admin'
+
 export type AdvisorPerson = {
   id: string
   name: string
   email: string
+  role?: AdvisorAccountRole
+  deletedAt?: string
+  purgeAt?: string
+}
+
+export const ACCOUNT_PURGE_DAYS = 15
+
+export function isPersonPendingDelete(person: Pick<AdvisorPerson, 'deletedAt'>): boolean {
+  return Boolean(person.deletedAt)
+}
+
+export function isPersonPurgeDue(person: Pick<AdvisorPerson, 'purgeAt'>, now = Date.now()): boolean {
+  if (!person.purgeAt) return false
+  const at = Date.parse(person.purgeAt)
+  return Number.isFinite(at) && at <= now
+}
+
+export function daysUntilPurge(person: Pick<AdvisorPerson, 'purgeAt'>, now = Date.now()): number | null {
+  if (!person.purgeAt) return null
+  const at = Date.parse(person.purgeAt)
+  if (!Number.isFinite(at)) return null
+  return Math.max(0, Math.ceil((at - now) / 86_400_000))
+}
+
+export function personMatchesQuery(person: AdvisorPerson, query: string): boolean {
+  const needle = query.trim().toLowerCase()
+  if (!needle) return true
+  const role = person.role === 'taller_admin' ? 'admin' : person.role === 'asesor' ? 'asesor' : ''
+  return `${person.name} ${person.email} ${role}`.toLowerCase().includes(needle)
 }
 
 export type AdvisorTeam = {
@@ -252,6 +283,27 @@ export function seedAdvisorWorkspace(opts?: { examples?: boolean }): AdvisorWork
   }
 }
 
+/** Taller real: catálogo de tipos/tableros, sin gente ni equipos de demo. */
+export function emptyAdvisorWorkspace(): AdvisorWorkspace {
+  const { taskTypes, boards } = seedCatalog()
+  return {
+    version: 1,
+    people: [],
+    teams: [],
+    taskTypes,
+    boards,
+    tasks: [],
+  }
+}
+
+export function isShowcaseWorkspace(workspace: AdvisorWorkspace): boolean {
+  const hasShowcaseTeam = workspace.teams.some(
+    (team) => team.id === TEAM_RECEPCION_ID || team.id === TEAM_COMERCIAL_ID,
+  )
+  const hasDemoPerson = workspace.people.some((person) => String(person.id).startsWith('demo-asesor-'))
+  return hasShowcaseTeam && hasDemoPerson
+}
+
 export function advisorWorkspaceStorageKey(workshopId: string): string {
   return `${STORAGE_PREFIX}${workshopId}`
 }
@@ -357,7 +409,7 @@ export function reconcileTeamMembers(workspace: AdvisorWorkspace): AdvisorWorksp
 
 function ensureDefaultCatalog(workspace: AdvisorWorkspace): AdvisorWorkspace {
   if (workspace.taskTypes.length > 0 && workspace.boards.length > 0) return workspace
-  const seed = seedAdvisorWorkspace()
+  const seed = emptyAdvisorWorkspace()
   return {
     ...workspace,
     taskTypes: workspace.taskTypes.length > 0 ? workspace.taskTypes : seed.taskTypes,
@@ -379,14 +431,14 @@ function refreshDemoTaskDates(workspace: AdvisorWorkspace): AdvisorWorkspace {
   return changed ? { ...workspace, tasks } : workspace
 }
 
-/** Completa huecos de demo sin reescribir equipos ni tareas que ya existan. */
+/** Completa el catálogo. Los equipos de demo solo se inyectan en la vista local. */
 export function hydrateAdvisorWorkspace(
   workspace: AdvisorWorkspace,
-  opts?: { keepExamples?: boolean },
+  opts?: { keepExamples?: boolean; showcase?: boolean },
 ): AdvisorWorkspace {
-  const next = refreshDemoTaskDates(
-    reconcileTeamMembers(ensureDefaultCatalog(ensureShowcaseTeams(workspace))),
-  )
+  const withCatalog = ensureDefaultCatalog(workspace)
+  const withTeams = opts?.showcase ? ensureShowcaseTeams(withCatalog) : reconcileTeamMembers(withCatalog)
+  const next = refreshDemoTaskDates(withTeams)
   return opts?.keepExamples ? next : dropExampleTasks(next)
 }
 
@@ -395,14 +447,8 @@ export function parseAdvisorWorkspace(value: unknown): AdvisorWorkspace | null {
   return hydrateAdvisorWorkspace(value)
 }
 
-export function rawWorkspaceNeedsShowcase(value: unknown): boolean {
-  if (!value || typeof value !== 'object') return true
-  const teams = (value as { teams?: unknown }).teams
-  if (!Array.isArray(teams)) return true
-  const ids = new Set(
-    teams.map((row) => (row && typeof row === 'object' ? String((row as { id?: unknown }).id ?? '') : '')),
-  )
-  return !ids.has(TEAM_RECEPCION_ID) || !ids.has(TEAM_COMERCIAL_ID)
+export function rawWorkspaceNeedsShowcase(_value: unknown): boolean {
+  return false
 }
 
 export function rawWorkspaceHasExampleTasks(value: unknown): boolean {
@@ -421,16 +467,19 @@ export function rawWorkspaceHasExampleTasks(value: unknown): boolean {
 
 export function loadAdvisorWorkspace(workshopId: string): AdvisorWorkspace {
   const keepExamples = keepExampleAssignedTasks(workshopId)
-  const seed = () => seedAdvisorWorkspace({ examples: keepExamples })
-  if (!workshopId || typeof localStorage === 'undefined') return hydrateAdvisorWorkspace(seed(), { keepExamples })
+  const showcase = keepExamples
+  const seed = () => (showcase ? seedAdvisorWorkspace({ examples: true }) : emptyAdvisorWorkspace())
+  if (!workshopId || typeof localStorage === 'undefined') {
+    return hydrateAdvisorWorkspace(seed(), { keepExamples, showcase })
+  }
   try {
     const raw = localStorage.getItem(advisorWorkspaceStorageKey(workshopId))
-    if (!raw) return hydrateAdvisorWorkspace(seed(), { keepExamples })
+    if (!raw) return hydrateAdvisorWorkspace(seed(), { keepExamples, showcase })
     const parsed = JSON.parse(raw) as unknown
-    if (!isWorkspace(parsed)) return hydrateAdvisorWorkspace(seed(), { keepExamples })
-    return hydrateAdvisorWorkspace(parsed, { keepExamples })
+    if (!isWorkspace(parsed)) return hydrateAdvisorWorkspace(seed(), { keepExamples, showcase })
+    return hydrateAdvisorWorkspace(parsed, { keepExamples, showcase })
   } catch {
-    return hydrateAdvisorWorkspace(seed(), { keepExamples })
+    return hydrateAdvisorWorkspace(seed(), { keepExamples, showcase })
   }
 }
 
@@ -672,22 +721,92 @@ export function setPersonTeam(workspace: AdvisorWorkspace, personId: string, tea
   }
 }
 
+export function removePerson(workspace: AdvisorWorkspace, personId: string): AdvisorWorkspace {
+  if (!personId || !workspace.people.some((person) => person.id === personId)) return workspace
+  return {
+    ...workspace,
+    people: workspace.people.filter((person) => person.id !== personId),
+    teams: workspace.teams.map((team) =>
+      team.memberIds.includes(personId)
+        ? { ...team, memberIds: team.memberIds.filter((id) => id !== personId) }
+        : team,
+    ),
+    tasks: workspace.tasks.map((task) => (task.assigneeId === personId ? { ...task, assigneeId: '' } : task)),
+  }
+}
+
 export function addPerson(
   workspace: AdvisorWorkspace,
   name: string,
   email: string,
   teamId?: string | null,
+  role?: AdvisorAccountRole,
 ): AdvisorWorkspace {
   const normalized = normalizeEmail(email)
   const trimmedName = name.trim()
   if (!normalized || !trimmedName) return workspace
   const existing = workspace.people.find((person) => normalizeEmail(person.email) === normalized)
   if (existing) {
-    return teamId ? addPersonToTeam(workspace, existing.id, teamId) : workspace
+    const withRole = role && existing.role !== role ? { ...workspace, people: workspace.people.map((person) => (person.id === existing.id ? { ...person, role } : person)) } : workspace
+    return teamId ? addPersonToTeam(withRole, existing.id, teamId) : withRole
   }
-  const person: AdvisorPerson = { id: newId('person'), name: trimmedName, email: normalized }
+  const person: AdvisorPerson = { id: newId('person'), name: trimmedName, email: normalized, ...(role ? { role } : {}) }
   const withPerson = { ...workspace, people: [...workspace.people, person] }
   return teamId ? addPersonToTeam(withPerson, person.id, teamId) : withPerson
+}
+
+export function setPersonRole(
+  workspace: AdvisorWorkspace,
+  personId: string,
+  role: AdvisorAccountRole,
+): AdvisorWorkspace {
+  if (!workspace.people.some((person) => person.id === personId)) return workspace
+  return {
+    ...workspace,
+    people: workspace.people.map((person) => (person.id === personId ? { ...person, role } : person)),
+  }
+}
+
+export function schedulePersonDelete(
+  workspace: AdvisorWorkspace,
+  personId: string,
+  now = new Date(),
+): AdvisorWorkspace {
+  if (!workspace.people.some((person) => person.id === personId)) return workspace
+  const purge = new Date(now.getTime() + ACCOUNT_PURGE_DAYS * 86_400_000)
+  return {
+    ...workspace,
+    people: workspace.people.map((person) =>
+      person.id === personId
+        ? { ...person, deletedAt: now.toISOString(), purgeAt: purge.toISOString() }
+        : person,
+    ),
+  }
+}
+
+export function restorePerson(workspace: AdvisorWorkspace, personId: string): AdvisorWorkspace {
+  if (!workspace.people.some((person) => person.id === personId)) return workspace
+  return {
+    ...workspace,
+    people: workspace.people.map((person) => {
+      if (person.id !== personId) return person
+      const next = { ...person }
+      delete next.deletedAt
+      delete next.purgeAt
+      return next
+    }),
+  }
+}
+
+export function purgeExpiredPeople(
+  workspace: AdvisorWorkspace,
+  now = Date.now(),
+): { workspace: AdvisorWorkspace; purged: AdvisorPerson[] } {
+  const purged = workspace.people.filter((person) => isPersonPurgeDue(person, now))
+  return {
+    workspace: purged.reduce((current, person) => removePerson(current, person.id), workspace),
+    purged,
+  }
 }
 
 export function addCatalogItem(

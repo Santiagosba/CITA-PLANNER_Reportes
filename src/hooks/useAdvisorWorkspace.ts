@@ -9,9 +9,13 @@ import {
   createdTeamId,
   ensurePersonInWorkspace,
   patchTeam,
+  removePerson,
   removeTeam,
+  restorePerson,
+  schedulePersonDelete,
   setAssignedTaskAssignee,
   setAssignedTaskStatus,
+  setPersonRole,
   togglePersonOnTeam,
   type AdvisorTeam,
   type AdvisorWorkspace,
@@ -117,8 +121,13 @@ export function useAdvisorWorkspace(
       updateTeam: (teamId: string, patch: Partial<Pick<AdvisorTeam, 'name' | 'memberIds' | 'taskTypeIds' | 'boardIds'>>) =>
         commit((latest) => patchTeam(latest, teamId, patch)),
       deleteTeam: (teamId: string) => commit((latest) => removeTeam(latest, teamId)),
-      addAdvisor: (name: string, email: string, teamId?: string | null) =>
-        commit((latest) => addPerson(latest, name, email, teamId)),
+      addAdvisor: (name: string, email: string, teamId?: string | null, role?: 'asesor' | 'taller_admin') =>
+        commit((latest) => addPerson(latest, name, email, teamId, role)),
+      setAdvisorRole: (personId: string, role: 'asesor' | 'taller_admin') =>
+        commit((latest) => setPersonRole(latest, personId, role)),
+      scheduleAdvisorDelete: (personId: string) => commit((latest) => schedulePersonDelete(latest, personId)),
+      restoreAdvisor: (personId: string) => commit((latest) => restorePerson(latest, personId)),
+      removeAdvisor: (personId: string) => commit((latest) => removePerson(latest, personId)),
       toggleAdvisorTeam: (personId: string, teamId: string) =>
         commit((latest) => togglePersonOnTeam(latest, personId, teamId)),
       addTaskType: (name: string) => commit((latest) => addCatalogItem(latest, 'taskTypes', name)),

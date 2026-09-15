@@ -4,8 +4,7 @@
 
 import { isCrmUuid } from './crmUuid'
 import { supabase, supabaseOperations } from './supabase'
-import { isAviAdminProfile } from './aviAdminGate'
-import { isDemoAsesor } from './demoAsesores'
+import { isSuperAdminUser } from './crmAccess'
 import { getCrmHubWebIdFromEnv } from './hubWebEnv'
 import { parseConnectSiteIds, sessionAllowsThisHubWeb } from './connectSiteScope'
 import { isContainerActiveForHubWeb } from './tallerWebActivo'
@@ -21,23 +20,12 @@ export interface ConnectRoute {
 }
 
 export function isGlobalAviAdmin(session: { user?: any } | null | undefined): boolean {
-  const user = session?.user
-  if (!user) return false
-  const am = (user.app_metadata && typeof user.app_metadata === 'object' ? user.app_metadata : {}) as Record<
-    string,
-    unknown
-  >
-  // `user_metadata` lo puede editar el propio usuario: nunca concede privilegios.
-  const roleRaw = (am.role ?? am.user_role ?? '') as unknown
-  const role = String(roleRaw).trim().toLowerCase()
-  if (role === 'aviadmin' || role === 'admin') return true
-  return isAviAdminProfile(user.email ?? null, (am.role as string | undefined) ?? null)
+  return isSuperAdminUser(session?.user)
 }
 
-/** Admin real o asesor de prueba: puede listar talleres y ver toda la bandeja. */
+/** Solo el super admin lista todos los talleres. El admin de taller y el asesor ven los suyos. */
 export function canBrowseAllWorkshops(session: { user?: unknown } | null | undefined): boolean {
-  if (isGlobalAviAdmin(session)) return true
-  return isDemoAsesor(session?.user)
+  return isSuperAdminUser(session?.user)
 }
 
 export async function fetchRouteBySlug(slug: string): Promise<ConnectRoute | null> {

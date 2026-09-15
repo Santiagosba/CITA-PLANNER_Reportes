@@ -448,12 +448,54 @@ export function fetchCallCostStats(range?: { from?: string; to?: string }): Prom
   return crmFetch<CallCostStats>(`/api/calls/cost-stats${suffix}`, { endpointKey: 'GET /api/calls/cost-stats' })
 }
 
-/** Cambia o crea la contraseña de un asesor (`POST /api/taller/cuentas/password`). */
-export async function crmUpdateAccountPassword(email: string, password: string): Promise<void> {
-  await crmFetch<{ ok: boolean }>('/api/taller/cuentas/password', {
+export type TallerAccountRole = 'asesor' | 'taller_admin'
+
+/** Crea o actualiza una cuenta del taller (`POST /api/taller/cuentas/password`). */
+export async function crmUpdateAccountPassword(
+  email: string,
+  password: string,
+  opts?: {
+    name?: string
+    idtaller?: string
+    role?: TallerAccountRole
+    hubWebId?: string | null
+    crmIdtaller?: string
+  },
+): Promise<{ created?: boolean; role?: TallerAccountRole }> {
+  return crmFetch<{ ok: boolean; created?: boolean; role?: TallerAccountRole }>('/api/taller/cuentas/password', {
     method: 'POST',
     endpointKey: 'POST /api/taller/cuentas/password',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({
+      email,
+      password,
+      ...(opts?.name ? { name: opts.name } : {}),
+      ...(opts?.idtaller ? { idtaller: opts.idtaller } : {}),
+      ...(opts?.role ? { role: opts.role } : {}),
+      ...(opts?.hubWebId ? { hubWebId: opts.hubWebId } : {}),
+      ...(opts?.crmIdtaller ? { crmIdtaller: opts.crmIdtaller } : {}),
+    }),
+  })
+}
+
+/** Saca a una cuenta de este taller (`POST /api/taller/cuentas/revoke`). */
+export async function crmRevokeTallerAccount(opts: {
+  email: string
+  idtaller: string
+  crmIdtaller?: string
+}): Promise<void> {
+  await crmFetch<{ ok: boolean }>('/api/taller/cuentas/revoke', {
+    method: 'POST',
+    endpointKey: 'POST /api/taller/cuentas/revoke',
+    body: JSON.stringify(opts),
+  })
+}
+
+/** Borra la cuenta de entrada (`POST /api/taller/cuentas/delete`). */
+export async function crmDeleteTallerAccount(opts: { email: string; idtaller?: string }): Promise<void> {
+  await crmFetch<{ ok: boolean }>('/api/taller/cuentas/delete', {
+    method: 'POST',
+    endpointKey: 'POST /api/taller/cuentas/delete',
+    body: JSON.stringify(opts),
   })
 }
 

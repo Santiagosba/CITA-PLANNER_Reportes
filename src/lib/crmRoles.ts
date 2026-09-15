@@ -1,18 +1,19 @@
 /**
  * Rol de la app CRM (taller), distinto de AviAdmin global.
+ * Super admin: todos los talleres. Admin de taller / asesor: solo los suyos.
  * Solo `app_metadata` concede privilegios; `user_metadata` lo edita el usuario.
  */
 
 import { isDemoAsesor } from './demoAsesores'
+import { isSuperAdminUser, isTallerAdminUser } from './crmAccess'
 import { readLocalPreview } from './localPreview'
-import { isGlobalAviAdmin } from './operationsConnect'
 import type { DashboardShellRoute } from '../components/Sidebar'
 
 export type CrmAppRole = 'admin' | 'asesor'
 
 const ADMIN_APP_ROLES = new Set(['admin', 'aviadmin', 'taller_admin', 'jefe', 'responsable'])
 
-/** Admins de taller por email (no son AviAdmin global). */
+/** @deprecated El super admin ya no se decide solo por este email; se mantiene por compatibilidad. */
 export const TALLER_ADMIN_EMAILS = ['santy@gmail.com'] as const
 
 function sessionEmail(sessionUser: unknown): string {
@@ -28,9 +29,9 @@ export function isTallerAdminEmail(email: string | null | undefined): boolean {
 export function resolveCrmAppRole(sessionUser: unknown): CrmAppRole {
   const preview = readLocalPreview()
   if (preview) return preview.role
-  if (isTallerAdminEmail(sessionEmail(sessionUser))) return 'admin'
   if (isDemoAsesor(sessionUser)) return 'asesor'
-  if (isGlobalAviAdmin({ user: sessionUser })) return 'admin'
+  if (isSuperAdminUser(sessionUser) || isTallerAdminUser(sessionUser)) return 'admin'
+  if (isTallerAdminEmail(sessionEmail(sessionUser))) return 'admin'
 
   const record = sessionUser as { app_metadata?: Record<string, unknown> } | null
   const am = record?.app_metadata && typeof record.app_metadata === 'object' ? record.app_metadata : {}
@@ -39,7 +40,8 @@ export function resolveCrmAppRole(sessionUser: unknown): CrmAppRole {
   return 'asesor'
 }
 
-export function crmAppRoleLabel(role: CrmAppRole): string {
+export function crmAppRoleLabel(role: CrmAppRole, opts?: { superAdmin?: boolean }): string {
+  if (opts?.superAdmin) return 'Super admin'
   return role === 'admin' ? 'Admin' : 'Asesor'
 }
 
@@ -49,7 +51,6 @@ export const ADMIN_SHELL_ROUTES: DashboardShellRoute[] = [
   'pending-citas',
   'equipos',
   'asignar-tarea',
-  'contrasenas',
   'tareas-hoy',
   'stats-equipo',
   'gasto-ia',
