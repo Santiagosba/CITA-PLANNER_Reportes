@@ -10,7 +10,7 @@ export default function ChannelTag({ tipo, tipopeticion }: Props) {
   const channel = tipo || inferPeticionTipo(tipopeticion)
   if (channel === 'whatsapp') {
     return (
-      <span className="badge tone-wa is-wa-tag">
+      <span className="badge tone-wa is-wa-tag inline-flex items-center gap-1">
         <WhatsAppMark size={14} />
         WhatsApp
       </span>

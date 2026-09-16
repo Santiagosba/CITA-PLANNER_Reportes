@@ -96,14 +96,16 @@ export default function TodayTasksView({ workshop, currentUser, appRole = 'aseso
   }
 
   return (
-    <div className="dashboard-page role-desk">
+    <div className="dashboard-page role-desk flex min-w-0 flex-col gap-4">
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
       {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
 
-      <div className="elevator-filters glass glass-lite">
-        <div className="filter-field">
-          <span className="filter-field-label">Periodo</span>
-          <div className="estado-filter" role="group" aria-label="Periodo del historial">
+      <div className="elevator-filters glass glass-lite squircle flex flex-wrap items-end gap-x-5 gap-y-4 px-4 py-3.5">
+        <div className="filter-field flex max-w-full flex-col justify-end gap-1.5">
+          <span className="filter-field-label block min-h-[18px] text-[13px] font-semibold leading-tight text-avi-fog-strong">
+            Periodo
+          </span>
+          <div className="estado-filter inline-flex flex-wrap items-center gap-1.5" role="group" aria-label="Periodo del historial">
             {CALENDAR_SCALE_OPTIONS.map((option) => (
               <button
                 key={option.id}
@@ -116,7 +118,7 @@ export default function TodayTasksView({ workshop, currentUser, appRole = 'aseso
             ))}
           </div>
         </div>
-        <div className="elevator-day-nav">
+        <div className="elevator-day-nav flex items-center gap-2">
           <button
             type="button"
             className="ghost-button calendar-nav"
@@ -137,36 +139,38 @@ export default function TodayTasksView({ workshop, currentUser, appRole = 'aseso
             <ChevronRight size={17} />
           </button>
         </div>
-        <p className="dash-period-label">{period.label}</p>
+        <p className="mb-0.5 ml-auto self-center text-sm font-semibold tracking-[-0.02em] text-avi-muted max-[900px]:ml-0 max-[900px]:w-full">
+          {period.label}
+        </p>
         <TeamFilter teams={visibleTeams} value={teamFilter} onChange={setTeamFilter} />
         <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Dueño" />
         <CitaLinkFilterControl value={citaLink} onChange={setCitaLink} />
         <EstadoDoneFilter value={estado} onChange={setEstado} label="Hechas o no" />
       </div>
 
-      <section className="ops-kpi-grid" aria-label="Historial de consultas">
-        <article className="metric glass glass-lite">
-          <span className="ops-kpi-label">Por hacer</span>
+      <section className="ops-kpi-grid grid grid-cols-1 gap-2.5 min-[561px]:grid-cols-3" aria-label="Historial de consultas">
+        <article className="metric glass glass-lite squircle">
+          <span className="ops-kpi-label block text-[11px] font-semibold uppercase tracking-[0.045em] text-avi-muted">Por hacer</span>
           <strong>{loading ? '—' : stats.porHacer}</strong>
-          <span className="ops-kpi-helper">En {period.label}</span>
+          <span className="ops-kpi-helper mt-1.5 block text-[10px] text-avi-muted">En {period.label}</span>
         </article>
-        <article className="metric glass glass-lite">
-          <span className="ops-kpi-label">Hechas</span>
+        <article className="metric glass glass-lite squircle">
+          <span className="ops-kpi-label block text-[11px] font-semibold uppercase tracking-[0.045em] text-avi-muted">Hechas</span>
           <strong>{loading ? '—' : stats.hechas}</strong>
-          <span className="ops-kpi-helper">Cerradas en el periodo</span>
+          <span className="ops-kpi-helper mt-1.5 block text-[10px] text-avi-muted">Cerradas en el periodo</span>
         </article>
-        <article className="metric glass glass-lite">
-          <span className="ops-kpi-label">Total</span>
+        <article className="metric glass glass-lite squircle">
+          <span className="ops-kpi-label block text-[11px] font-semibold uppercase tracking-[0.045em] text-avi-muted">Total</span>
           <strong>{loading ? '—' : stats.total}</strong>
-          <span className="ops-kpi-helper">Consultas de este periodo</span>
+          <span className="ops-kpi-helper mt-1.5 block text-[10px] text-avi-muted">Consultas de este periodo</span>
         </article>
       </section>
 
       <Card>
-        <div className="role-desk-heading">
+        <div className="role-desk-heading flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="section-eyebrow">Consultas</p>
-            <h2 className="ops-card-title">Historial</h2>
+            <h2 className="text-sm font-semibold tracking-[-0.015em] text-avi-fog-strong">Historial</h2>
             <p className="section-subtitle">
               {period.label}. Elige día, semana, mes o año. No cargamos todo el taller de golpe.
             </p>
@@ -204,20 +208,20 @@ export default function TodayTasksView({ workshop, currentUser, appRole = 'aseso
                   {pageRows.map((item) => {
                     const sla = !item.gestionado && (isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha))
                     return (
-                      <li key={item.idpeticion} className="role-task-row glass glass-lite">
-                        <button type="button" className="list-row-title" onClick={() => onOpenLead(item)}>
-                          <span className="ops-feed-identity">
+                      <li key={item.idpeticion} className="role-task-row glass glass-lite squircle flex flex-col gap-2 overflow-visible p-3">
+                        <button type="button" className="list-row-title flex min-w-0 items-center text-left" onClick={() => onOpenLead(item)}>
+                          <span className="ops-feed-identity flex min-w-0 flex-1 items-center gap-2.5 overflow-visible">
                             <TicketPlate peticion={item} />
                             <TicketClientBlock peticion={item} size="md" />
                           </span>
                         </button>
-                        <p className="list-row-meta">
+                        <p className="list-row-meta text-[12px] text-avi-muted">
                           {item.tipopeticion || 'Sin tipo'}
                           {` · ${formatFecha(item.fechainicio)}`}
                           {' '}
                           <TicketTeamBadge workspace={workspace} ticket={item} />
                         </p>
-                        <div className="role-task-actions">
+                        <div className="role-task-actions flex flex-wrap items-center gap-2">
                           <TicketOwnerPicker
                             workshop={workshop}
                             workspace={workspace}

@@ -207,16 +207,16 @@ export default function ViewPageHeader({
   }
 
   return (
-    <header className="view-page-header">
-      <div className="view-page-header-copy">
+    <header className="view-page-header flex flex-wrap items-start justify-between gap-4 px-5 pb-1 pt-[18px]">
+      <div className="min-w-[min(100%,280px)] flex-[1_1_320px]">
         <h1 className="section-title">{copy.title}</h1>
-        <div className="view-page-header-meta">
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           {workshop.groupName ? <span className="badge tone-neutral">{workshop.groupName}</span> : null}
           <span className="badge tone-neutral">{workshop.name}</span>
           {workshop.centerName ? <span className="badge tone-neutral">{workshop.centerName}</span> : null}
           <button
             type="button"
-            className={`badge ${slaCount > 0 ? 'tone-negative' : 'tone-positive'}`}
+            className={`badge cursor-pointer border-0 ${slaCount > 0 ? 'tone-negative' : 'tone-positive'}`}
             onClick={() => onOpenTriage({ slaOnly: slaCount > 0 })}
           >
             {loading ? '…' : slaCount} SLA crítico
@@ -225,7 +225,7 @@ export default function ViewPageHeader({
         <p className="section-subtitle mt-1">{copy.subtitle}</p>
       </div>
 
-      <div className="view-page-header-tools">
+      <div className="flex flex-[1_1_340px] flex-wrap items-center justify-end gap-2.5">
         <div className="view-page-search" ref={searchRef}>
           <form className="view-page-search-field" onSubmit={submitSearch}>
             <label className="sr-only" htmlFor="avi-ai-search">

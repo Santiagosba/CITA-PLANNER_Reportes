@@ -16,11 +16,13 @@ export default function TicketTeamPicker({ workspace, ticket, onAssign, disabled
 
   return (
     <label
-      className="ticket-team-picker"
+      className="ticket-team-picker flex min-w-0 flex-col gap-1"
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}
     >
-      <span className="filter-field-label">Equipo</span>
+      <span className="filter-field-label block min-h-[18px] text-[13px] font-semibold leading-tight text-avi-fog-strong">
+        Equipo
+      </span>
       <select
         className="field-select"
         value={assigned ?? ''}

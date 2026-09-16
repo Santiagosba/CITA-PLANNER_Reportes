@@ -46,10 +46,8 @@ export default function DateRangeFilter({
               key={opt.id}
               type="button"
               onClick={() => onPresetChange(opt.id)}
-              className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                preset === opt.id
-                  ? 'bg-white/90 text-slate-900 shadow-sm dark:bg-white/20 dark:text-white'
-                  : 'text-slate-600 hover:bg-white/10 dark:text-slate-300'
+              className={`preset-chip min-h-0 px-3 py-1.5 text-[13px] ${
+                preset === opt.id ? 'is-active' : ''
               }`}
             >
               {opt.label}

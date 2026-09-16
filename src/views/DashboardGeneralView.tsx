@@ -240,20 +240,26 @@ export default function DashboardGeneralView({
   const showRadar = scale !== 'dia' && radarAxes.length >= 3
 
   return (
-    <div className="dashboard-page operational-dashboard dash-ops">
+    <div className="dashboard-page operational-dashboard dash-ops flex min-w-0 flex-col gap-4">
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
       {citasError ? <ApiStatusBanner message={citasError} variant="error" /> : null}
       {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
 
-      <div className="elevator-filters glass glass-lite">
-        <div className="filter-field">
-          <span className="filter-field-label">Periodo</span>
-          <div className="estado-filter" role="group" aria-label="Periodo del dashboard">
+      <div className="elevator-filters glass glass-lite squircle flex flex-wrap items-end gap-x-5 gap-y-4 px-4 py-3.5 max-[900px]:items-stretch">
+        <div className="filter-field flex max-w-full flex-col justify-end gap-1.5 max-[900px]:min-w-0 max-[900px]:flex-[1_1_220px] max-[720px]:basis-full">
+          <span className="filter-field-label block min-h-[18px] text-[13px] font-semibold leading-tight text-avi-fog-strong">
+            Periodo
+          </span>
+          <div
+            className="estado-filter inline-flex flex-nowrap items-center gap-1.5 max-[900px]:flex-wrap max-[720px]:w-full"
+            role="group"
+            aria-label="Periodo del dashboard"
+          >
             {CALENDAR_SCALE_OPTIONS.map((option) => (
               <button
                 key={option.id}
                 type="button"
-                className={`preset-chip ${scale === option.id ? 'is-active' : ''}`}
+                className={`preset-chip min-h-tap max-[720px]:flex-1 ${scale === option.id ? 'is-active' : ''}`}
                 onClick={() => setScale(option.id)}
               >
                 {option.label}
@@ -264,28 +270,46 @@ export default function DashboardGeneralView({
         <TeamFilter teams={visibleTeams} value={teamFilter} onChange={setTeamFilter} />
         <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Dueño" />
         <CitaLinkFilterControl value={citaLink} onChange={setCitaLink} />
-        <p className="dash-period-label">{period.label}</p>
+        <p className="mb-0.5 ml-auto self-center text-sm font-semibold tracking-[-0.02em] text-avi-muted max-[900px]:ml-0 max-[900px]:w-full">
+          {period.label}
+        </p>
       </div>
 
       {!loading && slaCount > 0 ? (
-        <aside className="ops-sla-alert glass glass-lite" role="alert" aria-live="polite">
-          <div className="ops-sla-alert-icon" aria-hidden>
+        <aside
+          className="glass glass-lite squircle flex flex-wrap items-center gap-x-[18px] gap-y-3.5 border border-[rgba(180,100,10,0.28)] bg-[rgba(245,158,11,0.1)] px-[18px] py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_8px_24px_rgba(180,100,10,0.08)] dark:border-[rgba(240,166,46,0.35)] dark:bg-[rgba(240,166,46,0.12)]"
+          role="alert"
+          aria-live="polite"
+        >
+          <div
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center bg-[rgba(245,158,11,0.18)] text-avi-warning dark:bg-[rgba(240,166,46,0.16)] dark:text-[#ffc158] [border-radius:var(--radius-md)] [corner-shape:squircle]"
+            aria-hidden
+          >
             <AlertTriangle size={22} />
           </div>
-          <div className="ops-sla-alert-copy">
-            <strong>
+          <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-1.5">
+            <strong className="text-base font-bold leading-snug tracking-[-0.02em] text-[#92400e] dark:text-[#ffd78a]">
               {slaCount} consulta(s) de este periodo con SLA de contacto de menos de 15 min
             </strong>
-            <p>Hay que validarlas en persona o con peritaje. No las dejes en la cola.</p>
+            <p className="m-0 text-sm leading-normal text-[#a16207] dark:text-[#e0c08a]">
+              Hay que validarlas en persona o con peritaje. No las dejes en la cola.
+            </p>
           </div>
-          <button type="button" className="client-submit ops-sla-alert-action" onClick={onOpenTriage}>
+          <button
+            type="button"
+            className="client-submit ml-auto shrink-0 max-[720px]:ml-0 max-[720px]:w-full"
+            onClick={onOpenTriage}
+          >
             Ir al triage
             <ArrowRight size={16} />
           </button>
         </aside>
       ) : null}
 
-      <section className="dash-kpi-grid" aria-label="Indicadores del periodo">
+      <section
+        className="grid grid-cols-1 gap-2.5 min-[561px]:grid-cols-2 min-[901px]:grid-cols-4"
+        aria-label="Indicadores del periodo"
+      >
         <MetricCard
           icon={History}
           label="Historial"
@@ -333,36 +357,50 @@ export default function DashboardGeneralView({
       ) : null}
 
       {onOpenBoards ? (
-        <aside className="dash-boards-jump glass glass-lite">
-          <div className="dash-boards-jump-icon" aria-hidden>
+        <aside className="glass glass-lite squircle flex flex-wrap items-center gap-x-[18px] gap-y-3.5 px-[18px] py-4">
+          <div
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center bg-avi-brand-soft text-avi-brand [border-radius:var(--radius-md)] [corner-shape:squircle]"
+            aria-hidden
+          >
             <Columns3 size={22} />
           </div>
-          <div className="dash-boards-jump-copy">
+          <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-1.5">
             <p className="section-eyebrow">Herramienta principal</p>
-            <strong>Gestor de tableros</strong>
-            <p>El trabajo de hoy del taller, por tipo de consulta.</p>
+            <strong className="text-base font-bold leading-snug tracking-[-0.02em] text-avi-fog-strong">
+              Gestor de tableros
+            </strong>
+            <p className="m-0 text-sm leading-normal text-avi-muted">
+              El trabajo de hoy del taller, por tipo de consulta.
+            </p>
           </div>
-          <button type="button" className="client-submit dash-boards-jump-action" onClick={onOpenBoards}>
+          <button
+            type="button"
+            className="client-submit ml-auto shrink-0 max-[720px]:ml-0 max-[720px]:w-full"
+            onClick={onOpenBoards}
+          >
             Abrir tableros
             <ArrowRight size={16} />
           </button>
         </aside>
       ) : null}
 
-      <Card className="dash-today dash-history" padding="none">
-        <div className="ops-card-header">
+      <Card className="min-w-0 overflow-hidden" padding="none">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-avi-line px-4 py-3.5 max-[720px]:w-full">
           <div>
             <p className="section-eyebrow">Bandeja</p>
-            <h2 className="ops-card-title">Tickets</h2>
+            <h2 className="text-sm font-semibold tracking-[-0.015em] text-avi-fog-strong">Tickets</h2>
             <p className="section-subtitle">
               {appRole === 'asesor'
                 ? `Bandeja de ${period.label}: pendientes a la izquierda, resueltos a la derecha.`
                 : `Bandeja de ${period.label}: a la izquierda, tickets pendientes. A la derecha, los ya resueltos.`}
             </p>
           </div>
-          <div className="dash-history-live" aria-live="polite">
-            <span className="badge tone-neutral dash-live-badge">
-              <Radio size={14} aria-hidden />
+          <div
+            className="flex flex-wrap items-center justify-end gap-2 max-[720px]:w-full max-[720px]:justify-start"
+            aria-live="polite"
+          >
+            <span className="badge tone-neutral inline-flex items-center gap-1.5">
+              <Radio size={14} className="animate-live-pulse" aria-hidden />
               En vivo
             </span>
             <span className={`badge ${lifetimeStats.porHacer > 0 ? 'tone-warning' : 'tone-positive'}`}>
@@ -371,7 +409,7 @@ export default function DashboardGeneralView({
             <span className="badge tone-positive">{loading ? '—' : lifetimeStats.hechas} hechos</span>
           </div>
         </div>
-        <div className="dash-today-grid dash-ticket-cols dash-history-split">
+        <div className="grid h-auto grid-cols-1 items-stretch overflow-hidden min-[1101px]:h-[min(56vh,580px)] min-[1101px]:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
           <DashTicketColumn
             title="Por hacer"
             empty={
@@ -387,7 +425,6 @@ export default function DashboardGeneralView({
             }
             items={historyPendingTickets}
             loading={loading}
-            listClassName="dash-history-list"
             resetKey={`${workshopId}-hist-pend-${ownerScope}-${citaLink}-${teamFilter}`}
             {...ticketRow}
           />
@@ -405,7 +442,6 @@ export default function DashboardGeneralView({
             items={historyDoneTickets}
             loading={loading}
             done
-            listClassName="dash-history-list"
             resetKey={`${workshopId}-hist-hechos-${ownerScope}-${citaLink}-${teamFilter}`}
             {...ticketRow}
           />
@@ -428,7 +464,10 @@ export default function DashboardGeneralView({
         )}
       </Card>
 
-      <section className="laura-split" aria-label="Desglose del periodo">
+      <section
+        className="laura-split grid grid-cols-1 gap-3.5 min-[901px]:grid-cols-2"
+        aria-label="Desglose del periodo"
+      >
         <Card className="laura-panel" padding="md">
           <LauraChartCardHeader
             eyebrow={mixChartTitle(scale)}
@@ -577,8 +616,13 @@ type DashTicketColumnProps = Omit<DashTicketRowProps, 'item'> & {
   loading: boolean
   resetKey: string
   done?: boolean
-  listClassName?: string
 }
+
+const kpiIconTone = {
+  brand: 'bg-avi-brand-soft text-avi-brand',
+  warning: 'bg-[rgba(240,166,46,0.12)] text-avi-warning',
+  positive: 'bg-[rgba(49,196,141,0.12)] text-avi-success',
+} as const
 
 function DashTicketColumn({
   title,
@@ -587,26 +631,28 @@ function DashTicketColumn({
   loading,
   resetKey,
   done = false,
-  listClassName,
   ...rowProps
 }: DashTicketColumnProps) {
   return (
-    <section className={`dash-today-col ${done ? 'is-quiet' : 'is-priority'}`} aria-label={title}>
-      <div className="dash-today-col-head">
-        <h3 className="ops-card-title">{title}</h3>
+    <section
+      className="flex min-h-0 min-w-0 flex-col overflow-hidden border-avi-line max-[1100px]:h-[min(42vh,380px)] max-[1100px]:border-b max-[1100px]:border-r-0 max-[1100px]:last:border-b-0 min-[1101px]:border-r min-[1101px]:last:border-r-0"
+      aria-label={title}
+    >
+      <div className="flex min-h-tap flex-wrap items-center justify-between gap-2.5 border-b border-avi-line px-4 py-3">
+        <h3 className="min-w-0 text-sm font-semibold tracking-[-0.015em] text-avi-fog-strong">{title}</h3>
         <span className={`badge ${done ? 'tone-positive' : items.length > 0 ? 'tone-warning' : 'tone-positive'}`}>
           {items.length}
         </span>
       </div>
-      <div className="dash-today-col-body">
+      <div className="flex min-h-0 flex-1 flex-col [&>div]:flex [&>div]:min-h-0 [&>div]:flex-1 [&>div]:flex-col [&_.hex-loader-screen]:flex-1 [&_nav]:shrink-0">
         {loading ? (
           <HexLoaderScreen size="md" label="Cargando tickets…" />
         ) : items.length === 0 ? (
-          <p className="section-subtitle ops-empty">{empty}</p>
+          <p className="section-subtitle flex-1 px-4 py-7 text-center">{empty}</p>
         ) : (
           <PaginatedItems items={items} label={title} resetKey={resetKey}>
             {(visible) => (
-              <ul className={`ops-feed-list dash-today-tickets${listClassName ? ` ${listClassName}` : ''}`}>
+              <ul className="ops-feed-list flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
                 {visible.map((item) => (
                   <DashTicketRow key={item.idpeticion} item={item} {...rowProps} />
                 ))}
@@ -621,14 +667,22 @@ function DashTicketColumn({
 
 function MetricCard({ icon: Icon, label, value, helper, tone, onClick }: MetricProps) {
   return (
-    <button type="button" className={`ops-kpi glass glass-lite tone-${tone}`} onClick={onClick}>
-      <span className="ops-kpi-icon">
+    <button
+      type="button"
+      className={`ops-kpi glass glass-lite squircle relative min-h-[104px] px-[15px] py-3.5 text-left text-avi-fog-strong tone-${tone}`}
+      onClick={onClick}
+    >
+      <span className={`inline-flex h-[30px] w-[30px] items-center justify-center [border-radius:var(--radius-xs)] [corner-shape:squircle] ${kpiIconTone[tone]}`}>
         <Icon size={17} />
       </span>
-      <span className="ops-kpi-label">{label}</span>
-      <strong>{value}</strong>
-      <span className="ops-kpi-helper">{helper}</span>
-      <ArrowRight size={15} className="ops-kpi-arrow" />
+      <span className="mt-2.5 block text-[11px] font-semibold uppercase tracking-[0.045em] text-avi-muted">
+        {label}
+      </span>
+      <strong className="mt-1 block text-[25px] font-semibold leading-none tracking-[-0.03em] text-avi-fog-strong">
+        {value}
+      </strong>
+      <span className="mt-1.5 block text-[10px] text-avi-muted">{helper}</span>
+      <ArrowRight size={15} className="absolute bottom-3.5 right-3.5 text-avi-muted" />
     </button>
   )
 }
@@ -637,7 +691,7 @@ function DashTicketRow({ item, workshop, workspace, currentUser, appRole, onOpen
   const sla = !item.gestionado && (isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha))
   return (
     <li
-      className={`ops-feed-row dash-ticket-row${item.gestionado ? ' is-done' : ''}`}
+      className={`ops-feed-row flex shrink-0 flex-col gap-2 overflow-hidden border-b border-avi-line px-4 py-3 last:border-b-0${item.gestionado ? ' is-done' : ''}`}
       role={onOpenLead ? 'button' : undefined}
       tabIndex={onOpenLead ? 0 : undefined}
       onClick={() => onOpenLead?.(item)}
@@ -649,18 +703,18 @@ function DashTicketRow({ item, workshop, workspace, currentUser, appRole, onOpen
         }
       }}
     >
-      <div className="ops-feed-identity">
+      <div className="flex min-w-0 items-start gap-3">
         <TicketPlate peticion={item} />
-        <div>
+        <div className="ops-feed-identity min-w-0 flex-1">
           <TicketClientBlock peticion={item} size="sm" />
-          <span>
-            {item.tipopeticion || 'Sin tipo'}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="text-[12px] font-semibold text-avi-muted">{item.tipopeticion || 'Sin tipo'}</span>
             <TicketTeamBadge workspace={workspace} ticket={item} />
             {isDemoTicketId(item.idpeticion) ? <span className="badge tone-info">Prueba</span> : null}
-          </span>
+          </div>
         </div>
       </div>
-      <div className="dash-ticket-meta">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         <TicketOwnerPicker
           workshop={workshop}
           workspace={workspace}
@@ -673,7 +727,9 @@ function DashTicketRow({ item, workshop, workspace, currentUser, appRole, onOpen
         <span className={`badge ${item.gestionado ? 'tone-positive' : sla ? 'tone-negative' : 'tone-warning'}`}>
           {item.gestionado ? 'Hecho' : sla ? 'SLA' : 'No hecho'}
         </span>
-        <time>{formatFecha(item.fechainicio)}</time>
+        <time className="ml-auto whitespace-nowrap text-[12px] font-semibold text-avi-muted">
+          {formatFecha(item.fechainicio)}
+        </time>
       </div>
     </li>
   )

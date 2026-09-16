@@ -1,0 +1,29 @@
+---
+description: Layout y componentes con Tailwind; CSS solo tokens y recetas
+alwaysApply: true
+---
+
+# Tailwind en toda la app
+
+El layout vive en el JSX con utilidades Tailwind (`flex`, `gap-*`, `text-avi-*`, `min-h-tap`, `rounded-*` de tokens). No se añade CSS nuevo a `desks.css`, `lead-os.css`, `shell.css` ni otros archivos de miles de líneas.
+
+## Dónde va cada cosa
+
+- **Tokens y cristal:** `src/styles/avi-crm.css` (`:root`, `.glass`, squircle)
+- **Recetas cortas:** `src/styles/avi-tailwind.css` (`.badge`, `.client-submit`, `.ghost-button`)
+- **Tema:** `tailwind.config.js` (`avi.*`, radios, `min-h-tap`)
+- **Pantallas y componentes:** clases Tailwind en el TSX
+
+## Al implementar
+
+```tsx
+// ❌ BAD — layout en CSS de features
+<div className="ops-feed-row">
+
+// ✅ GOOD — layout en Tailwind; receta solo si hace falta
+<li className="flex shrink-0 flex-col gap-2 overflow-hidden border-b border-avi-line px-4 py-3">
+```
+
+- Colores y radios por tokens (`text-avi-muted`, `rounded-lg` = `--radius-lg`), no `slate-*` ni `rounded-lg` de 8px
+- `corner-shape: squircle` vía `.squircle` / `.glass`
+- Textos en español llano

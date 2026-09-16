@@ -8,7 +8,7 @@ type Props = {
 export default function ApiStatusBanner({ message, variant = 'error' }: Props) {
   const isError = variant === 'error'
   return (
-    <div className={`alert flex items-start gap-3 ${isError ? 'alert-error' : 'alert-warning'}`}>
+    <div className={`alert squircle flex items-start gap-3 ${isError ? 'alert-error' : 'alert-warning'}`}>
       <AlertCircle size={22} className="shrink-0" />
       <div>
         <p className="font-semibold">{isError ? 'Hay un problema de conexión' : 'Aviso'}</p>

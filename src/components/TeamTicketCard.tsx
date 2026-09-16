@@ -62,23 +62,23 @@ function TeamTicketCard({
   return (
     <article
       data-ticket-id={item.idpeticion}
-      className={`kanban-card glass glass-lite team-ticket-card${lite ? ' is-lite' : ''}${dragging ? ' is-dragging-source' : ''}${onPointerDown ? ' is-draggable' : ''}`}
+      className={`kanban-card glass glass-lite squircle team-ticket-card${lite ? ' is-lite' : ''}${dragging ? ' is-dragging-source' : ''}${onPointerDown ? ' is-draggable' : ''} flex flex-col gap-2 overflow-visible`}
       onPointerDown={onPointerDown}
     >
-      <div className="kanban-card-top">
+      <div className="kanban-card-top flex items-center gap-2 overflow-visible">
         {onPointerDown ? (
-          <span className="kanban-drag-handle" aria-hidden>
+          <span className="kanban-drag-handle inline-flex shrink-0 text-[#7a8491]" aria-hidden>
             <GripVertical size={16} />
           </span>
         ) : null}
         <TicketPlate peticion={item} />
-        <span className="kanban-day-chip">Hoy</span>
+        <span className="kanban-day-chip inline-flex items-center rounded-pill px-2.5 py-1 text-[11px] font-semibold text-avi-muted">Hoy</span>
       </div>
       <TicketClientBlock peticion={item} size="md" />
-      {item.tipopeticion ? <span className="kanban-card-meta">{item.tipopeticion}</span> : null}
-      {vehicle ? <span className="kanban-card-meta">{vehicle}</span> : null}
+      {item.tipopeticion ? <span className="kanban-card-meta text-[12px] text-avi-muted">{item.tipopeticion}</span> : null}
+      {vehicle ? <span className="kanban-card-meta text-[12px] text-avi-muted">{vehicle}</span> : null}
       {lite ? (
-        <p className="team-ticket-owner-line">{ownerLabel(workspace, item.gestionemail)}</p>
+        <p className="team-ticket-owner-line m-0 text-[13px] font-medium text-avi-muted">{ownerLabel(workspace, item.gestionemail)}</p>
       ) : null}
       {readOnly || lite || !showTeamPicker || !onAssignTeam ? null : (
         <TicketTeamPicker

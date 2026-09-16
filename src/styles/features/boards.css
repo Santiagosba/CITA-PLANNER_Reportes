@@ -1,0 +1,1099 @@
+/* Gestor de tableros. */
+
+/* ---- Gestor de tableros (departamentos + prioridad arrastrable) ---- */
+.boards-page {
+  min-height: 0;
+}
+
+.operation-tabs-rail {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+}
+
+.operation-tabs-arrows {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.operation-tabs-arrows > .ghost-button {
+  min-width: var(--tap-target);
+  min-height: var(--tap-target);
+}
+
+.department-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(200px, 1fr));
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  max-height: 332px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding: 2px 6px 8px 2px;
+  scrollbar-width: thin;
+}
+
+.department-tabs::-webkit-scrollbar {
+  width: 8px;
+}
+
+.department-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  gap: 10px;
+  min-height: 148px;
+  padding: 14px;
+  scroll-snap-align: start;
+  border-radius: var(--radius-lg);
+  color: var(--fog);
+  text-align: left;
+  border: 1px solid rgba(15, 17, 21, 0.09);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 1px 2px rgba(15, 17, 21, 0.04);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.department-tab.is-active {
+  border-color: rgba(11, 99, 214, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 0 1px rgba(11, 99, 214, 0.18);
+}
+
+.department-tab-count {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.department-tab-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  color: var(--color-brand);
+  background: var(--color-brand-soft);
+}
+
+.department-tab-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  width: 100%;
+}
+
+.department-tab-copy strong {
+  color: var(--fog-strong);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+
+.department-tab-copy small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.board-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: var(--radius-lg);
+}
+
+.board-heading-copy {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.board-heading-copy .section-subtitle {
+  margin-top: 4px;
+  max-width: 58ch;
+}
+
+.board-heading .client-submit {
+  margin-left: auto;
+}
+
+.board-new-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: var(--radius-lg);
+}
+
+.board-new-entry-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.board-new-entry-head h3 {
+  margin: 0;
+  color: var(--fog-strong);
+  font-size: 15px;
+}
+
+.board-new-entry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.board-new-entry .field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.board-new-entry .field-input,
+.board-new-entry .field-textarea {
+  max-width: none;
+  width: 100%;
+}
+
+.board-new-entry-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.kanban-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(220px, 1fr));
+  gap: 12px;
+  overflow-x: auto;
+  align-items: stretch;
+  padding-bottom: 4px;
+}
+
+.kanban-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  min-height: 420px;
+  padding: 14px 12px 16px;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(15, 17, 21, 0.07);
+  background: rgba(232, 236, 242, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.kanban-column.is-drop-target {
+  border-color: rgba(59, 130, 246, 0.42);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 0 0 3px rgba(59, 130, 246, 0.14);
+}
+
+.kanban-column.tone-danger.is-drop-target {
+  border-color: rgba(239, 91, 103, 0.45);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 0 0 3px rgba(239, 91, 103, 0.16);
+}
+
+.kanban-column.tone-warning.is-drop-target {
+  border-color: rgba(240, 166, 46, 0.45);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 0 0 3px rgba(240, 166, 46, 0.16);
+}
+
+.kanban-column.tone-positive.is-drop-target {
+  border-color: rgba(49, 196, 141, 0.45);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 0 0 3px rgba(49, 196, 141, 0.16);
+}
+
+.kanban-column > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 2px 12px;
+  border-bottom: 1px solid rgba(15, 17, 21, 0.08);
+  margin-bottom: 10px;
+}
+
+.kanban-column > header h3 {
+  margin: 0;
+  color: var(--fog-strong);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.kanban-column-hint {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.kanban-column > header span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding-inline: 8px;
+  border-radius: 999px;
+  color: var(--fog-strong);
+  background: rgba(15, 17, 21, 0.06);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.kanban-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+  min-height: 280px;
+  max-height: calc(100vh - 360px);
+  overflow-y: auto;
+  padding: 8px 6px 20px;
+}
+
+.kanban-empty {
+  padding: 24px 12px !important;
+  border: 1px dashed rgba(15, 17, 21, 0.14);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.kanban-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-radius: var(--radius-xl);
+  corner-shape: squircle;
+  cursor: default;
+  touch-action: none;
+  overflow: visible;
+  transition:
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.kanban-card.glass,
+.kanban-card.glass-lite {
+  border-radius: var(--radius-xl);
+  background: #fff;
+  border-color: rgba(15, 17, 21, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    0 2px 6px rgba(15, 17, 21, 0.05),
+    0 12px 28px rgba(15, 17, 21, 0.08),
+    0 28px 48px rgba(15, 17, 21, 0.06);
+}
+
+@media (hover: hover) {
+  .kanban-card:hover {
+    transform: translate3d(0, -3px, 0);
+  }
+
+  .kanban-card.glass:hover,
+  .kanban-card.glass-lite:hover {
+    box-shadow:
+      inset 0 1px 0 #fff,
+      0 6px 14px rgba(15, 17, 21, 0.06),
+      0 18px 36px rgba(15, 17, 21, 0.1);
+  }
+}
+
+.kanban-card.is-dragging-source {
+  display: none;
+}
+
+.kanban-card-slot {
+  flex-shrink: 0;
+  border-radius: var(--radius-xl);
+  border: 1.5px dashed rgba(11, 99, 214, 0.38);
+  background: rgba(11, 99, 214, 0.07);
+  pointer-events: none;
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.kanban-ghost-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 160;
+  margin: 0;
+  pointer-events: none;
+  will-change: transform;
+  transform: translate3d(-9999px, -9999px, 0);
+}
+
+.kanban-ghost-layer .kanban-card {
+  width: 100%;
+}
+
+.kanban-card.is-ghost {
+  margin: 0;
+  cursor: move;
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 14px 32px rgba(15, 23, 42, 0.22),
+    0 2px 8px rgba(15, 17, 21, 0.08);
+  transform: rotate(1.4deg) scale(1.03);
+  opacity: 1;
+  animation: kanban-ghost-in 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes kanban-ghost-in {
+  from {
+    opacity: 0.55;
+    transform: rotate(0deg) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(1.4deg) scale(1.03);
+  }
+}
+
+.kanban-grid.is-reordering .kanban-card {
+  pointer-events: none;
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.kanban-grid.is-reordering .kanban-empty {
+  display: none;
+}
+
+.kanban-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.kanban-drag-handle {
+  display: inline-flex;
+  color: #7a8491;
+  flex: 0 0 auto;
+}
+
+.kanban-card-top .badge {
+  flex-shrink: 0;
+}
+
+.kanban-card-top .badge:last-child {
+  margin-left: auto;
+}
+
+.kanban-day-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(15, 17, 21, 0.06);
+  color: var(--fog-strong);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.kanban-card > strong {
+  color: var(--fog-strong);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.kanban-card-meta {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.kanban-card footer {
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  color: #8b95a2;
+  font-size: 11px;
+}
+
+.kanban-card footer time {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1200px) {
+  .department-tabs {
+    grid-template-columns: repeat(3, minmax(180px, 1fr));
+  }
+
+  .kanban-grid {
+    grid-template-columns: repeat(5, minmax(240px, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .department-tabs {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .board-heading .client-submit {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .board-new-entry-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .ops-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ops-feed-row {
+    flex-direction: column;
+  }
+
+  .ops-feed-row time {
+    display: none;
+  }
+}
+
+/* El realce de fila expandida ven?a del acento azul antiguo; con la marca
+   turquesa del dashboard desentonaba contra el borde de la tarjeta. */
+.dashboard-shell .prow.is-expanded {
+  border-color: var(--color-brand-ring);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 0 0 1px var(--color-brand-soft),
+    0 16px 40px rgba(0, 0, 0, 0.22);
+}
+
+.dashboard-shell .dashboard-nav-item svg {
+  flex: 0 0 auto;
+}
+
+/* `tone-neutral` y `tone-muted` segu?an con el azul y el gris claros del tema
+   base, que en la plantilla oscura turquesa cantaban. */
+.dashboard-shell .badge.tone-neutral {
+  color: #8fb6ff;
+  background: rgba(96, 165, 250, 0.12);
+}
+
+.dashboard-shell .badge.tone-muted {
+  color: #a3adba;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* =========================================================
+   Modo claro del dashboard (AVI CRM light glass ? por defecto)
+   ========================================================= */
+.dashboard-shell.is-light {
+  --fog: #33383f;
+  --fog-strong: #0f1115;
+  --muted: #565c66;
+  --line: rgba(15, 17, 21, 0.1);
+  --page: #eef1f5;
+  --color-text: var(--fog);
+  --color-text-strong: var(--fog-strong);
+  --color-text-muted: var(--muted);
+  --color-brand: #0b63d6;
+  --color-brand-strong: #0a55b8;
+  --color-brand-soft: rgba(11, 99, 214, 0.12);
+  --color-brand-ring: rgba(11, 99, 214, 0.4);
+  --color-success: #1d8a4e;
+  --color-warning: #b4640a;
+  --color-danger: #c0342b;
+  --color-surface: rgba(255, 255, 255, 0.92);
+  --color-surface-solid: #ffffff;
+  --border-subtle: rgba(15, 17, 21, 0.1);
+  --glass-blur: 18px;
+  --glass-saturate: 140%;
+  --glass-fill-top: rgba(255, 255, 255, 0.94);
+  --glass-fill-bottom: rgba(255, 255, 255, 0.84);
+  --glass-border: rgba(15, 17, 21, 0.08);
+  --glass-highlight: rgba(255, 255, 255, 1);
+  --glass-sheen: 0.34;
+  --glass-shadow: 0 1px 1px rgba(15, 17, 21, 0.04), 0 8px 24px rgba(15, 17, 21, 0.07);
+  color-scheme: light;
+  background:
+    radial-gradient(1000px 700px at 82% -8%, rgba(11, 99, 214, 0.07), transparent 58%),
+    radial-gradient(760px 520px at 8% 108%, rgba(11, 99, 214, 0.05), transparent 62%),
+    radial-gradient(540px 360px at 48% 42%, rgba(255, 255, 255, 0.55), transparent 70%),
+    #eef1f5;
+}
+
+.dashboard-shell.is-light .glass {
+  background: linear-gradient(165deg, var(--glass-fill-top), var(--glass-fill-bottom));
+  border-color: var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 rgba(15, 17, 21, 0.03),
+    var(--glass-shadow);
+}
+
+.dashboard-shell.is-light .glass::after {
+  background:
+    linear-gradient(125deg, rgba(255, 255, 255, 0.55), transparent 34%),
+    radial-gradient(ellipse 70% 45% at 88% -10%, rgba(255, 255, 255, 0.45), transparent 55%);
+  opacity: var(--glass-sheen);
+}
+
+.dashboard-shell.is-light .glass-lite {
+  background: rgba(255, 255, 255, 0.97);
+  border-color: rgba(15, 17, 21, 0.09);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 1px 2px rgba(15, 17, 21, 0.04),
+    0 10px 28px rgba(15, 17, 21, 0.06);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.dashboard-shell.is-light .glass-inline {
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.9));
+  border-color: rgba(15, 17, 21, 0.07);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 1),
+    0 2px 10px rgba(15, 17, 21, 0.04);
+}
+
+.dashboard-shell.is-light .glass-inline::after {
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.4), transparent 32%);
+  opacity: 0.3;
+}
+
+.dashboard-shell.is-light .dashboard-sidebar,
+.dashboard-shell.is-light .dashboard-sidebar.glass,
+.dashboard-shell.is-light .dashboard-sidebar.glass-lite {
+  /* Pantone 282 C #041E42 */
+  background: linear-gradient(180deg, #0a2a56 0%, #041e42 58%, #03162f 100%);
+  border-right-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset -1px 0 0 rgba(255, 255, 255, 0.06),
+    18px 0 42px rgba(4, 30, 66, 0.28);
+}
+
+.dashboard-shell.is-light .dashboard-sidebar::after {
+  display: none;
+}
+
+.dashboard-shell.is-light .dashboard-sidebar .section-eyebrow {
+  color: #8fb0d9;
+}
+
+.dashboard-shell.is-light .dashboard-sidebar-workshop,
+.dashboard-shell.is-light .dashboard-sidebar-asesor strong {
+  color: #f4f7fb;
+}
+
+.dashboard-shell.is-light .dashboard-sidebar-asesor {
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+
+.dashboard-shell.is-light .dashboard-sidebar-asesor span {
+  color: #9eb0c8;
+}
+
+.dashboard-shell.is-light .dashboard-sidebar-asesor .dashboard-sidebar-team {
+  color: #9ecfff;
+}
+
+.dashboard-shell.is-light .dashboard-sidebar-asesor .dashboard-sidebar-team.is-empty {
+  color: #9eb0c8;
+}
+
+.dashboard-shell.is-light .dashboard-sidebar-footer {
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+
+.dashboard-shell.is-light .dashboard-nav-item {
+  color: #c5d2e4;
+}
+
+.dashboard-shell.is-light .dashboard-nav-item:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dashboard-shell.is-light .dashboard-nav-item-muted {
+  color: #8fa3bc;
+}
+
+.dashboard-shell.is-light .dashboard-nav-item.is-active {
+  color: #fff;
+  background: linear-gradient(135deg, #0b63d6, #0a55b8);
+  border-color: rgba(11, 99, 214, 0.45);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 8px 20px rgba(11, 99, 214, 0.22);
+}
+
+.dashboard-shell.is-light .section-eyebrow,
+.dashboard-shell.is-light .field-label,
+.dashboard-shell.is-light .metric > span {
+  color: #66737f;
+}
+
+.dashboard-shell.is-light .metric small {
+  color: #78848f;
+}
+
+.dashboard-shell.is-light .preset-chip {
+  color: #4d5a66;
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(13, 32, 48, 0.1);
+}
+
+.dashboard-shell.is-light .preset-chip:hover:not(:disabled) {
+  background: #fff;
+}
+
+.dashboard-shell.is-light .preset-chip.is-active,
+.dashboard-shell.is-light .preset-chip.is-active:hover:not(:disabled) {
+  color: #fff;
+  background: linear-gradient(135deg, #0b63d6, #0a55b8);
+  border-color: rgba(11, 99, 214, 0.4);
+}
+
+/* La etiqueta cruza el relleno y la pista, as? que necesita un color que
+   funcione sobre ambos. */
+
+.dashboard-shell.is-light .client-submit {
+  color: #fff;
+  background: linear-gradient(135deg, #0b63d6, #0a55b8);
+  border-color: rgba(11, 99, 214, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 6px 16px rgba(11, 99, 214, 0.2);
+}
+
+.dashboard-shell.is-light .ghost-button {
+  color: var(--fog-strong);
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(15, 17, 21, 0.12);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 1px 2px rgba(15, 17, 21, 0.04);
+}
+
+.dashboard-shell.is-light .confirm-action {
+  color: var(--color-brand);
+  background: rgba(11, 99, 214, 0.1);
+  border-color: rgba(11, 99, 214, 0.2);
+}
+
+.dashboard-shell.is-light .field-input,
+.dashboard-shell.is-light .field-select {
+  color: var(--fog-strong);
+  background: #fff;
+  border-color: rgba(15, 17, 21, 0.12);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 1px 2px rgba(15, 17, 21, 0.04);
+}
+
+.dashboard-shell.is-light .field-input:focus,
+.dashboard-shell.is-light .field-select:focus {
+  color: var(--fog-strong);
+  background: #fff;
+  border-color: var(--color-brand);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 0 0 3px var(--color-brand-soft);
+}
+
+.dashboard-shell.is-light .prow {
+  background: rgba(255, 255, 255, 0.97);
+  border-color: rgba(15, 17, 21, 0.1);
+  overflow: hidden !important;
+}
+
+.dashboard-shell.is-light .prow-toggle:hover {
+  background: rgba(13, 32, 48, 0.035);
+}
+
+.dashboard-shell.is-light .prow-name,
+.dashboard-shell.is-light .prow-detail dd {
+  color: #14222c;
+}
+
+.dashboard-shell.is-light .prow-fact-label,
+.dashboard-shell.is-light .prow-detail dt {
+  color: #7a8691;
+}
+
+.dashboard-shell.is-light .prow-fact-value,
+.dashboard-shell.is-light .prow-time {
+  color: #4d5a66;
+}
+
+.dashboard-shell.is-light .prow-body {
+  border-top-color: rgba(15, 17, 21, 0.08);
+  background: transparent;
+}
+
+.dashboard-shell.is-light .prow-detail {
+  border-color: rgba(15, 17, 21, 0.08);
+  background: #fff;
+}
+
+.dashboard-shell.is-light .badge.tone-warning {
+  color: #8a5504;
+  background: rgba(240, 166, 46, 0.16);
+}
+
+.dashboard-shell.is-light .badge.tone-positive {
+  color: #0c6a47;
+  background: rgba(49, 196, 141, 0.16);
+}
+
+.dashboard-shell.is-light .badge.tone-neutral {
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.12);
+}
+
+.dashboard-shell.is-light .badge.tone-muted {
+  color: #5b6875;
+  background: rgba(13, 32, 48, 0.06);
+}
+
+.dashboard-shell.is-light .prow.is-expanded {
+  border-color: var(--color-brand-ring);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 0 0 1px var(--color-brand-soft),
+    0 14px 34px rgba(18, 38, 63, 0.12);
+}
+
+.dashboard-shell.is-light .report-table th {
+  color: #5b6875;
+  background: rgba(13, 32, 48, 0.03);
+}
+
+.dashboard-shell.is-light .report-table td {
+  color: #35434f;
+  border-color: rgba(13, 32, 48, 0.07);
+}
+
+.dashboard-shell.is-light .report-table tbody tr:hover {
+  background: rgba(13, 32, 48, 0.025);
+}
+
+/* ---- Dashboard general (claro) ---- */
+.dashboard-shell.is-light .ops-kpi.tone-warning .ops-kpi-icon {
+  color: #9a6206;
+  background: rgba(240, 166, 46, 0.16);
+}
+
+.dashboard-shell.is-light .ops-kpi.tone-positive .ops-kpi-icon {
+  color: #0f7a52;
+  background: rgba(49, 196, 141, 0.16);
+}
+
+.dashboard-shell.is-light .ops-kpi-label {
+  color: #5b6875;
+}
+
+.dashboard-shell.is-light .ops-kpi > strong,
+.dashboard-shell.is-light .ops-card-title {
+  color: #0e1b24;
+}
+
+.dashboard-shell.is-light .ops-kpi-arrow {
+  color: #8b96a1;
+}
+
+.dashboard-shell.is-light .ops-card-header {
+  border-bottom-color: rgba(13, 32, 48, 0.08);
+}
+
+.dashboard-shell.is-light .ops-feed-row {
+  border-bottom-color: rgba(13, 32, 48, 0.06);
+}
+
+.dashboard-shell.is-light .ops-feed-identity > div > strong {
+  color: #1b2833;
+}
+
+.dashboard-shell.is-light .ops-feed-identity > div > span,
+.dashboard-shell.is-light .ops-feed-row time {
+  color: #6d7a86;
+}
+
+.dashboard-shell.is-light .ops-feed-placeholder {
+  color: #8b96a1;
+  border-color: rgba(13, 32, 48, 0.16);
+}
+
+/* ---- Calendario (claro) ---- */
+
+.dashboard-shell.is-light .calendar-event time {
+  color: #0a55b8;
+}
+
+.dashboard-shell.is-light .calendar-event {
+  border-color: rgba(11, 99, 214, 0.22);
+  background: rgba(11, 99, 214, 0.07);
+}
+
+.dashboard-shell.is-light .calendar-event strong {
+  color: #14222c;
+}
+
+.dashboard-shell.is-light .calendar-event > span {
+  color: #66737f;
+}
+
+/* ---- Tableros (claro) ---- */
+.dashboard-shell.is-light .department-tab {
+  border-color: rgba(13, 32, 48, 0.1);
+  color: #4d5a66;
+}
+
+.dashboard-shell.is-light .department-tab.is-active {
+  border-color: rgba(11, 99, 214, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0 0 1px rgba(11, 99, 214, 0.14);
+}
+
+.dashboard-shell.is-light .department-tab-count {
+  color: #6d7a86;
+}
+
+.dashboard-shell.is-light .department-tab-icon {
+  color: #0a55b8;
+  background: rgba(11, 99, 214, 0.1);
+}
+
+.dashboard-shell.is-light .department-tab-copy strong {
+  color: #14222c;
+}
+
+.dashboard-shell.is-light .department-tab-copy small {
+  color: #66737f;
+}
+
+.dashboard-shell.is-light .kanban-column {
+  background: rgba(228, 233, 240, 0.78);
+  border-color: rgba(13, 32, 48, 0.07);
+}
+
+.dashboard-shell.is-light .kanban-card.glass,
+.dashboard-shell.is-light .kanban-card.glass-lite {
+  background: #fff;
+  border-color: rgba(15, 17, 21, 0.06);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 2px 6px rgba(15, 17, 21, 0.05),
+    0 14px 30px rgba(15, 17, 21, 0.08),
+    0 28px 52px rgba(15, 17, 21, 0.06);
+}
+
+.dashboard-shell.is-light .kanban-column > header {
+  border-bottom-color: rgba(13, 32, 48, 0.08);
+}
+
+.dashboard-shell.is-light .kanban-column > header h3 {
+  color: #14222c;
+}
+
+.dashboard-shell.is-light .kanban-column-hint {
+  color: #6d7a86;
+}
+
+.dashboard-shell.is-light .kanban-column > header span {
+  color: #35434f;
+  background: rgba(13, 32, 48, 0.06);
+}
+
+.dashboard-shell.is-light .kanban-empty {
+  border-color: rgba(13, 32, 48, 0.14);
+}
+
+.dashboard-shell.is-light .kanban-day-chip {
+  background: rgba(13, 32, 48, 0.06);
+  color: #14222c;
+}
+
+.dashboard-shell.is-light .kanban-card > strong {
+  color: #14222c;
+}
+
+.dashboard-shell.is-light .kanban-card-meta,
+.dashboard-shell.is-light .kanban-card footer {
+  color: #6d7a86;
+}
+
+.dashboard-shell.is-light .kanban-day-chip {
+  background: rgba(13, 32, 48, 0.06);
+  color: #14222c;
+}
+
+.dashboard-shell:not(.is-light) .kanban-day-chip {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4f7fb;
+}
+
+.dashboard-shell.is-light .kanban-card footer {
+  border-top-color: rgba(13, 32, 48, 0.07);
+}
+
+.dashboard-shell.is-light .kanban-drag-handle {
+  color: #8b96a1;
+}
+
+
+/* =========================================================
+   Universal crisp surfaces ? dark dashboard (sin .is-light)
+   ========================================================= */
+.dashboard-shell:not(.is-light) .glass-lite {
+  background: rgba(26, 30, 37, 0.96);
+  border-color: rgba(255, 255, 255, 0.11);
+}
+
+.dashboard-shell:not(.is-light) .triage-view-switch,
+.dashboard-shell:not(.is-light) .preset-chip,
+.dashboard-shell:not(.is-light) .ghost-button,
+.dashboard-shell:not(.is-light) .nav-segment-btn,
+.dashboard-shell:not(.is-light) .list-row,
+.dashboard-shell:not(.is-light) .license-desk-card,
+.dashboard-shell:not(.is-light) .license-desk-step,
+.dashboard-shell:not(.is-light) .license-desk-check,
+.dashboard-shell:not(.is-light) .license-desk-admins li,
+.dashboard-shell:not(.is-light) .queue-row,
+.dashboard-shell:not(.is-light) .department-tab,
+.dashboard-shell:not(.is-light) .kanban-column {
+  background: rgba(28, 32, 40, 0.96);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.dashboard-shell:not(.is-light) .kanban-column {
+  background: rgba(16, 19, 25, 0.72);
+  border-color: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.dashboard-shell:not(.is-light) .kanban-card.glass,
+.dashboard-shell:not(.is-light) .kanban-card.glass-lite {
+  background: rgba(34, 38, 46, 0.98);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.28),
+    0 18px 40px rgba(0, 0, 0, 0.32);
+}
+
+.dashboard-shell:not(.is-light) .calendar-schedule th,
+.dashboard-shell:not(.is-light) .calendar-schedule td,
+.dashboard-shell:not(.is-light) .calendar-schedule th:first-child,
+.dashboard-shell:not(.is-light) .calendar-schedule td:first-child,
+.dashboard-shell:not(.is-light) .calendar-month-cell,
+.dashboard-shell:not(.is-light) .calendar-year-month,
+.dashboard-shell:not(.is-light) .calendar-year-day {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.dashboard-shell:not(.is-light) .calendar-schedule td .calendar-slot + .calendar-slot,
+.dashboard-shell:not(.is-light) .calendar-month-events {
+  border-top-color: rgba(255, 255, 255, 0.16);
+}
+
+.dashboard-shell:not(.is-light) .elevator-slot.is-free {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--muted);
+}
+
+.dashboard-shell:not(.is-light) .elevator-slot.is-busy {
+  background: rgba(11, 99, 214, 0.16);
+  border-color: rgba(96, 165, 250, 0.35);
+}
+
+.dashboard-shell:not(.is-light) .elevator-slot.is-busy strong,
+.dashboard-shell:not(.is-light) .calendar-event strong,
+.dashboard-shell:not(.is-light) .kanban-card > strong {
+  color: var(--fog-strong);
+}
+
+.dashboard-shell:not(.is-light) .kanban-empty,
+.dashboard-shell:not(.is-light) .ops-feed-placeholder {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.dashboard-shell:not(.is-light) .kanban-day-chip {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4f7fb;
+}
+
+.dashboard-shell:not(.is-light) .prow-detail,
+.dashboard-shell:not(.is-light) .todo-detail {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dashboard-shell:not(.is-light) .field-input,
+.dashboard-shell:not(.is-light) .field-select,
+.dashboard-shell:not(.is-light) .ticket-owner-select:not(.is-compact) .ticket-owner-select-trigger {
+  background: rgba(18, 21, 27, 0.96);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--fog-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.dashboard-shell.is-light .queue-filterbar,
+.dashboard-shell.is-light .metric,
+.dashboard-shell.is-light .ops-kpi {
+  border-color: rgba(15, 17, 21, 0.09);
+}

@@ -84,11 +84,11 @@ export default function BotIdentityView() {
   if (!selected || !active) return null
 
   return (
-    <div className="dashboard-page bot-id-page">
-      <header className="bot-id-hero glass glass-lite">
+    <div className="dashboard-page bot-id-page flex min-w-0 flex-col gap-4">
+      <header className="bot-id-hero glass glass-lite squircle flex flex-wrap items-center justify-between gap-4 p-5">
         <div className="bot-id-hero-copy">
           <p className="section-eyebrow">Configuración del Bot IA</p>
-          <h2 className="ops-card-title">Perfil activo</h2>
+          <h2 className="text-sm font-semibold tracking-[-0.015em] text-avi-fog-strong">Perfil activo</h2>
         </div>
         <div className="bot-id-active">
           <span className="bot-id-active-photo">
@@ -107,10 +107,10 @@ export default function BotIdentityView() {
       </header>
 
       <Card className="laura-panel" padding="md">
-        <div className="bot-id-list-head">
+        <div className="bot-id-list-head flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="section-eyebrow">Perfiles disponibles</p>
-            <h2 className="ops-card-title">Elige quién atiende las llamadas</h2>
+            <h2 className="text-sm font-semibold tracking-[-0.015em] text-avi-fog-strong">Elige quién atiende las llamadas</h2>
           </div>
           <span className="badge tone-neutral">
             {operadoras} operadoras · {operadores} operadores
@@ -160,7 +160,7 @@ export default function BotIdentityView() {
           </span>
           <div>
             <p className="section-eyebrow">Asistente de IA {selected.name}</p>
-            <h2 className="ops-card-title">Personalizar perfil</h2>
+            <h2 className="text-sm font-semibold tracking-[-0.015em] text-avi-fog-strong">Personalizar perfil</h2>
             <p className="section-subtitle">Asistente de IA · voz del concesionario</p>
           </div>
         </div>

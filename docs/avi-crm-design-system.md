@@ -1,9 +1,9 @@
 # Sistema de diseño — AVI CRM
 
-Documentación de la "capa" visual de esta app para reutilizarla en otro proyecto.
-Todo está basado en CSS puro con **custom properties** (variables), sin dependencias
-de UI. Para portarlo a otra app basta con copiar el bloque `:root`, la receta
-`.glass` y los patrones de componentes de este documento.
+Tokens en CSS (`:root` en `src/styles/avi-crm.css`). Layout y componentes en
+**Tailwind** (`tailwind.config.js` + clases en el JSX). Las recetas cortas
+(`.glass`, `.badge`, `.client-submit`) viven en `avi-crm.css` / `avi-tailwind.css`.
+No se añade CSS de pantalla a los archivos de `src/styles/features/`.
 
 ---
 

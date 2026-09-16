@@ -475,7 +475,7 @@ const WorkshopSelectorView: React.FC<WorkshopSelectorViewProps> = ({
 
       <div className="workshop-gate w-full max-w-md">
         <Card padding="lg" className="text-center">
-          <div className="workshop-gate-top">
+          <div className="workshop-gate-top mb-5 flex items-center justify-between gap-3">
             {headerLogoSrc ? (
               <div className="logo-slot logo-slot-sm">
                 <img
@@ -547,7 +547,7 @@ const WorkshopSelectorView: React.FC<WorkshopSelectorViewProps> = ({
               <HexLoaderScreen label="Cargando licencias…" />
             </div>
           ) : (
-            <ul className={`workshop-gate-list${showSearch ? '' : ' is-spaced'}`}>
+            <ul className={`workshop-gate-list mt-5 flex max-h-[min(52vh,480px)] list-none flex-col gap-2 overflow-auto p-0 text-left${showSearch ? '' : ' is-spaced mt-6'}`}>
               {step === 'group'
                 ? filteredContainers.map((row) => {
                     const name = row.nombre_personalizado || row.slug || row.idtaller
@@ -557,7 +557,7 @@ const WorkshopSelectorView: React.FC<WorkshopSelectorViewProps> = ({
                         <button
                           type="button"
                           onClick={() => handlePickContainer(row)}
-                          className="login-asesor-card"
+                          className="login-asesor-card squircle flex min-h-tap w-full items-center gap-3 px-3 py-2.5 text-left"
                         >
                           <span className="login-asesor-avatar" aria-hidden>
                             {initialsOf(name)}
@@ -582,7 +582,7 @@ const WorkshopSelectorView: React.FC<WorkshopSelectorViewProps> = ({
                         <button
                           type="button"
                           onClick={() => handlePickWorkshop(workshop)}
-                          className="login-asesor-card"
+                          className="login-asesor-card squircle flex min-h-tap w-full items-center gap-3 px-3 py-2.5 text-left"
                         >
                           {workshop.logo ? (
                             <img

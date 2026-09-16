@@ -89,10 +89,10 @@ export default function AiUsageView({ workshop }: Props) {
 
   if (!canSee) {
     return (
-      <div className="dashboard-page role-desk laura-costs">
+      <div className="dashboard-page role-desk laura-costs flex min-w-0 flex-col gap-4">
         <Card className="laura-panel" padding="md">
           <p className="section-eyebrow">Tokens</p>
-          <h2 className="ops-card-title">Gasto de IA</h2>
+          <h2 className="text-sm font-semibold tracking-[-0.015em] text-avi-fog-strong">Gasto de IA</h2>
           <p className="section-subtitle">Solo el admin del taller puede ver el dinero gastado en tokens.</p>
         </Card>
       </div>
@@ -100,46 +100,46 @@ export default function AiUsageView({ workshop }: Props) {
   }
 
   return (
-    <div className="dashboard-page role-desk laura-costs">
+    <div className="dashboard-page role-desk laura-costs flex min-w-0 flex-col gap-4">
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
 
-      <section className="laura-kpi-grid" aria-label="Gasto de tokens de IA">
-        <article className="metric glass glass-lite">
-          <span className="ops-kpi-label">Gastado</span>
+      <section className="laura-kpi-grid grid grid-cols-1 gap-2.5 min-[561px]:grid-cols-2 min-[901px]:grid-cols-4" aria-label="Gasto de tokens de IA">
+        <article className="metric glass glass-lite squircle">
+          <span className="ops-kpi-label block text-[11px] font-semibold uppercase tracking-[0.045em] text-avi-muted">Gastado</span>
           <strong>{report ? fmtMoney(report.kpis.estimatedCostUsd, 'USD') : '—'}</strong>
-          <span className="ops-kpi-helper">{window.label}</span>
+          <span className="ops-kpi-helper mt-1.5 block text-[10px] text-avi-muted">{window.label}</span>
         </article>
-        <article className="metric glass glass-lite">
-          <span className="ops-kpi-label">Tokens</span>
+        <article className="metric glass glass-lite squircle">
+          <span className="ops-kpi-label block text-[11px] font-semibold uppercase tracking-[0.045em] text-avi-muted">Tokens</span>
           <strong>{report ? fmtTokens(report.kpis.tokens) : '—'}</strong>
-          <span className="ops-kpi-helper">Entrada y salida de OpenAI</span>
+          <span className="ops-kpi-helper mt-1.5 block text-[10px] text-avi-muted">Entrada y salida de OpenAI</span>
         </article>
-        <article className="metric glass glass-lite">
-          <span className="ops-kpi-label">Peticiones</span>
+        <article className="metric glass glass-lite squircle">
+          <span className="ops-kpi-label block text-[11px] font-semibold uppercase tracking-[0.045em] text-avi-muted">Peticiones</span>
           <strong>{report ? fmtTokens(report.kpis.requests) : '—'}</strong>
-          <span className="ops-kpi-helper">
+          <span className="ops-kpi-helper mt-1.5 block text-[10px] text-avi-muted">
             {avgPerRequest != null ? `${fmtMoney(avgPerRequest, 'USD', { precise: true })} de media` : 'Llamadas al modelo'}
           </span>
         </article>
-        <article className="metric glass glass-lite">
-          <span className="ops-kpi-label">Errores</span>
+        <article className="metric glass glass-lite squircle">
+          <span className="ops-kpi-label block text-[11px] font-semibold uppercase tracking-[0.045em] text-avi-muted">Errores</span>
           <strong>{report ? report.kpis.errorCount : '—'}</strong>
-          <span className="ops-kpi-helper">Peticiones que fallaron</span>
+          <span className="ops-kpi-helper mt-1.5 block text-[10px] text-avi-muted">Peticiones que fallaron</span>
         </article>
       </section>
 
       <Card className="laura-panel" padding="md">
-        <div className="laura-costs-head">
+        <div className="laura-costs-head flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="section-eyebrow">Tokens</p>
-            <h2 className="ops-card-title">Dinero gastado en IA</h2>
+            <h2 className="text-sm font-semibold tracking-[-0.015em] text-avi-fog-strong">Dinero gastado en IA</h2>
             <p className="section-subtitle">
               Coste estimado de tokens OpenAI (resúmenes, búsquedas, sugerencias). No es el teléfono:
               las llamadas Telnyx están en Asistente de IA Laura, pestaña Costes.
               {report?.scope === 'taller' ? ' Solo este taller.' : ' Cuenta completa.'}
             </p>
           </div>
-          <div className="laura-costs-filters">
+          <div className="laura-costs-filters flex flex-wrap items-center gap-2">
             <button
               type="button"
               className={`triage-view-btn${range === 'month' ? ' is-active' : ''}`}
@@ -237,10 +237,10 @@ export default function AiUsageView({ workshop }: Props) {
         </ul>
       </Card>
 
-      <section className="laura-split" aria-label="Desglose del gasto">
+      <section className="laura-split grid grid-cols-1 gap-3.5 min-[901px]:grid-cols-2" aria-label="Desglose del gasto">
         <Card className="laura-panel" padding="md">
           <p className="section-eyebrow">Por función</p>
-          <h2 className="ops-card-title">En qué se gasta</h2>
+          <h2 className="text-sm font-semibold tracking-[-0.015em] text-avi-fog-strong">En qué se gasta</h2>
           {!report || report.byFeature.length === 0 ? (
             <p className="section-subtitle">Aún no hay desglose.</p>
           ) : (
@@ -273,7 +273,7 @@ export default function AiUsageView({ workshop }: Props) {
 
         <Card className="laura-panel" padding="md">
           <p className="section-eyebrow">Por modelo</p>
-          <h2 className="ops-card-title">Qué modelo se usa</h2>
+          <h2 className="text-sm font-semibold tracking-[-0.015em] text-avi-fog-strong">Qué modelo se usa</h2>
           {!report || report.byModel.length === 0 ? (
             <p className="section-subtitle">Aún no hay modelos.</p>
           ) : (

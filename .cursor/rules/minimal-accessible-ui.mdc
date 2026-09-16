@@ -5,13 +5,15 @@ alwaysApply: true
 
 # UX minimalista (AVI CRM)
 
-Fuente de verdad: `docs/avi-crm-design-system.md` + tokens/clases en `src/styles/avi-crm.css`.
+Fuente de verdad: tokens en `src/styles/avi-crm.css` + utilidades Tailwind en el JSX (`tailwind.config.js`).
+Las recetas cortas (`.glass`, `.badge`, `.client-submit`) están en `avi-crm.css` / `avi-tailwind.css`.
+No añadir CSS nuevo a `src/styles/features/` (desks, lead-os, shell…). El layout va en el componente.
 
 - **Light glass** por defecto: fondo `--page` `#eef1f5`, superficies `.glass`, marca azul `#0b63d6`
 - Tipografía **Inter**, texto base ≥16px, objetivos táctiles ≥48px (`--tap-target`)
 - Lenguaje llano en español: «Entrar», «Elige tu taller», «Ya está gestionado»
 - Una acción principal por pantalla (`.client-submit`); secundarios con `.ghost-button`
 - Badges con `.badge.tone-*`; KPIs con `.metric.glass`
-- Radios documentados: sm 12 / md 16 / lg 22 / xl 28 / pill 999
+- Radios documentados: xs 16 / sm 20 / md 26 / lg 32 / xl 40 / pill 999 + `corner-shape: squircle`
 - Componentes UI en `src/components/ui/`
 - Modo oscuro solo vía tokens (`html.dark` / `.dashboard-shell` sin `.is-light`); no inventar otra paleta de marca

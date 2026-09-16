@@ -15,7 +15,7 @@ export default function Input({ label, hint, id, className = '', ...rest }: Prop
         </label>
       ) : null}
       <input id={inputId} className={`field-input ${className}`.trim()} {...rest} />
-      {hint ? <p className="mt-1.5 text-[var(--font-sm)] text-[var(--muted)]">{hint}</p> : null}
+      {hint ? <p className="mt-1.5 text-sm text-[color:var(--muted)]">{hint}</p> : null}
     </div>
   )
 }

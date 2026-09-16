@@ -213,10 +213,10 @@ export default function CalendarTallerView({
 
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
 
-      <section className="calendar-agenda-head glass glass-lite">
+      <section className="calendar-agenda-head glass glass-lite squircle flex flex-wrap items-end justify-between gap-3 px-[18px] py-4">
         <div>
           <p className="section-eyebrow">{scaleHint}</p>
-          <h2 className="ops-card-title">Agenda</h2>
+          <h2 className="text-sm font-semibold tracking-[-0.015em] text-avi-fog-strong">Agenda</h2>
           <p className="section-subtitle">
             {loading ? 'Cargando citas…' : `${visibleCitas.length} cita${visibleCitas.length === 1 ? '' : 's'} en este periodo.`}
           </p>
@@ -244,7 +244,7 @@ export default function CalendarTallerView({
       </section>
 
       {scale === 'dia' || scale === 'semana' ? (
-        <div className="calendar-schedule-wrap glass glass-lite">
+        <div className="calendar-schedule-wrap glass glass-lite squircle">
           {loading ? (
             <HexLoaderScreen size="md" label="Cargando agenda del taller…" />
           ) : (
@@ -318,13 +318,13 @@ export default function CalendarTallerView({
       ) : null}
 
       {scale === 'mes' && loading ? (
-        <div className="calendar-month glass glass-lite">
+        <div className="calendar-month glass glass-lite squircle">
           <HexLoaderScreen size="md" label="Cargando agenda del taller…" />
         </div>
       ) : null}
 
       {scale === 'mes' && !loading ? (
-        <div className="calendar-month glass glass-lite">
+        <div className="calendar-month glass glass-lite squircle">
           <div className="calendar-month-board custom-scrollbar-light">
           <div className="calendar-month-weekdays">
             {WEEKDAY_LABELS.map((label) => (
@@ -359,13 +359,13 @@ export default function CalendarTallerView({
       ) : null}
 
       {scale === 'anio' && loading ? (
-        <div className="calendar-month glass glass-lite">
+        <div className="calendar-month glass glass-lite squircle">
           <HexLoaderScreen size="md" label="Cargando agenda del taller…" />
         </div>
       ) : null}
 
       {scale === 'anio' && !loading ? (
-        <div className="calendar-year glass glass-lite">
+        <div className="calendar-year glass glass-lite squircle">
           {yearMonths(day).map((monthDate) => {
             const month = monthDate.getMonth()
             const count = visibleCitas.filter((cita) => new Date(cita.fecha!).getMonth() === month).length

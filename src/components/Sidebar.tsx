@@ -49,12 +49,12 @@ function SidebarItem({
       type="button"
       onClick={onClick}
       title={collapsed ? label : undefined}
-      className={`group relative mb-1 flex h-11 w-full items-center rounded-lg transition-all duration-150 ${
+      className={`group relative mb-1 flex h-11 w-full items-center squircle [border-radius:var(--radius-md)] transition-all duration-150 ${
         collapsed ? 'justify-center px-0' : 'justify-start px-2'
       } ${
         active
-          ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'
-          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
+          ? 'bg-avi-brand text-white shadow-brand'
+          : 'text-avi-muted hover:bg-avi-brand-soft hover:text-avi-fog-strong'
       }`}
     >
       <div className={`flex items-center justify-center ${collapsed ? 'w-full' : 'w-8'}`}>

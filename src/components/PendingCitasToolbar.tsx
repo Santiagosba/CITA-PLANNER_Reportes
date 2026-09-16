@@ -105,13 +105,13 @@ export default function PendingCitasToolbar({
         </div>
       ) : null}
 
-      <div className="elevator-filters glass glass-lite">
+      <div className="elevator-filters glass glass-lite squircle flex flex-wrap items-end gap-x-5 gap-y-4 px-4 py-3.5">
         <EstadoDoneFilter value={estado} onChange={onEstadoChange} />
         <TeamFilter teams={teams} value={teamFilter} onChange={onTeamFilterChange} />
         <OwnerScopeFilter value={ownerScope} onChange={onOwnerScopeChange} label="Dueño" />
         <CitaLinkFilterControl value={citaLink} onChange={onCitaLinkChange} />
-        <label className="filter-field queue-filter-search">
-          <span className="filter-field-label">Buscar</span>
+        <label className="filter-field queue-filter-search flex max-w-full flex-col justify-end gap-1.5">
+          <span className="filter-field-label block min-h-[18px] text-[13px] font-semibold leading-tight text-avi-fog-strong">Buscar</span>
           <span className="relative">
             <Search size={16} className="field-input-icon" aria-hidden />
             <input
@@ -124,8 +124,8 @@ export default function PendingCitasToolbar({
             />
           </span>
         </label>
-        <label className="filter-field">
-          <span className="filter-field-label">Canal</span>
+        <label className="filter-field flex max-w-full flex-col justify-end gap-1.5">
+          <span className="filter-field-label block min-h-[18px] text-[13px] font-semibold leading-tight text-avi-fog-strong">Canal</span>
           <select className="field-select" value={channel} onChange={(e) => onChannelChange(e.target.value)}>
             {CHANNEL_OPTIONS.map((option) => (
               <option key={option.id} value={option.id}>{option.label}</option>
@@ -133,9 +133,9 @@ export default function PendingCitasToolbar({
           </select>
         </label>
         {view === 'calendario' ? (
-          <div className="filter-field">
-            <span className="filter-field-label">Ver agenda</span>
-            <div className="estado-filter" role="group" aria-label="Vista del calendario">
+          <div className="filter-field flex max-w-full flex-col justify-end gap-1.5">
+            <span className="filter-field-label block min-h-[18px] text-[13px] font-semibold leading-tight text-avi-fog-strong">Ver agenda</span>
+            <div className="estado-filter inline-flex flex-wrap items-center gap-1.5" role="group" aria-label="Vista del calendario">
               {CALENDAR_SCALE_OPTIONS.map((opt) => (
                 <button
                   key={opt.id}
@@ -149,9 +149,9 @@ export default function PendingCitasToolbar({
             </div>
           </div>
         ) : (
-          <div className="filter-field">
-            <span className="filter-field-label">Fechas · {dateRange.label}</span>
-            <div className="estado-filter" role="group" aria-label="Rango de fechas">
+          <div className="filter-field flex max-w-full flex-col justify-end gap-1.5">
+            <span className="filter-field-label block min-h-[18px] text-[13px] font-semibold leading-tight text-avi-fog-strong">Fechas · {dateRange.label}</span>
+            <div className="estado-filter inline-flex flex-wrap items-center gap-1.5" role="group" aria-label="Rango de fechas">
               {PERIOD_CHIPS.map((opt) => (
                 <button
                   key={opt.id}
@@ -181,9 +181,9 @@ export default function PendingCitasToolbar({
       </div>
 
       {preset === 'personalizada' ? (
-        <div className="period-custom glass glass-lite">
-          <label className="filter-field">
-            <span className="filter-field-label">Desde</span>
+        <div className="period-custom glass glass-lite squircle grid grid-cols-2 gap-3 px-4 py-3.5">
+          <label className="filter-field flex flex-col justify-end gap-1.5">
+            <span className="filter-field-label block min-h-[18px] text-[13px] font-semibold leading-tight text-avi-fog-strong">Desde</span>
             <input
               type="date"
               value={customFrom}
@@ -191,8 +191,8 @@ export default function PendingCitasToolbar({
               className="field-input"
             />
           </label>
-          <label className="filter-field">
-            <span className="filter-field-label">Hasta</span>
+          <label className="filter-field flex flex-col justify-end gap-1.5">
+            <span className="filter-field-label block min-h-[18px] text-[13px] font-semibold leading-tight text-avi-fog-strong">Hasta</span>
             <input
               type="date"
               value={customTo}

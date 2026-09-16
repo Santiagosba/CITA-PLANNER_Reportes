@@ -55,8 +55,8 @@ export default function AdvisorTicketList({
   const name = firstName(person.name)
 
   return (
-    <section className="advisor-ticket-list" aria-label={`Tickets de ${person.name}`}>
-      <div className="advisor-ticket-list-head">
+    <section className="advisor-ticket-list flex flex-col gap-3" aria-label={`Tickets de ${person.name}`}>
+      <div className="advisor-ticket-list-head flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="teams-guide-block-title">Tickets de {name}</h3>
           <p className="section-subtitle">
@@ -85,28 +85,28 @@ export default function AdvisorTicketList({
           </p>
         ) : null
       ) : (
-        <ul className="advisor-ticket-stack">
+        <ul className="advisor-ticket-stack flex flex-col gap-2">
           {rows.map((item) => {
             const sla = !item.gestionado && (isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha))
             return (
-              <li key={item.idpeticion} className="role-task-row glass glass-lite">
+              <li key={item.idpeticion} className="role-task-row glass glass-lite squircle flex flex-col gap-2 overflow-visible p-3">
                 <button
                   type="button"
-                  className="list-row-title"
+                  className="list-row-title flex min-w-0 items-center text-left"
                   disabled={!onOpenLead}
                   onClick={() => onOpenLead?.(item)}
                 >
-                  <span className="ops-feed-identity">
+                  <span className="ops-feed-identity flex min-w-0 flex-1 items-center gap-2.5 overflow-visible">
                     <TicketPlate peticion={item} />
                     <TicketClientBlock peticion={item} size="md" />
                   </span>
                 </button>
-                <p className="list-row-meta">
+                <p className="list-row-meta text-[12px] text-avi-muted">
                   {item.tipopeticion || 'Sin tipo'}
                   {` · ${formatFecha(item.fechainicio)}`}{' '}
                   <TicketTeamBadge workspace={workspace} ticket={item} />
                 </p>
-                <div className="role-task-actions">
+                <div className="role-task-actions flex flex-wrap items-center gap-2">
                   <TicketOwnerPicker
                     workshop={workshop}
                     workspace={workspace}

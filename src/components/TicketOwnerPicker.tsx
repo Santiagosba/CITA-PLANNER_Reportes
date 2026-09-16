@@ -52,6 +52,10 @@ function groupedTeammates(workspace: AdvisorWorkspace, people: AdvisorPerson[]):
   return loose.length > 0 ? [...groups, { team: null, members: loose }] : groups
 }
 
+function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] || name
+}
+
 function OwnerSelect({
   value,
   label,
@@ -59,6 +63,7 @@ function OwnerSelect({
   disabled,
   variant,
   suggested,
+  compact,
   groups,
   suggestedEmail,
   onChange,
@@ -69,6 +74,7 @@ function OwnerSelect({
   disabled?: boolean
   variant: 'field' | 'plain'
   suggested?: boolean
+  compact?: boolean
   groups: OwnerGroup[]
   suggestedEmail: string
   onChange: (next: string) => void
@@ -76,7 +82,7 @@ function OwnerSelect({
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 240 })
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 280, maxH: 280 })
 
   useEffect(() => {
     if (!open) return
@@ -84,13 +90,14 @@ function OwnerSelect({
       const trigger = triggerRef.current
       if (!trigger) return
       const rect = trigger.getBoundingClientRect()
-      const width = Math.max(rect.width, 240)
-      const maxH = Math.min(320, window.innerHeight - 24)
+      const width = Math.min(300, Math.max(260, window.innerWidth - 24))
       const below = window.innerHeight - rect.bottom - 12
-      const openUp = below < 160 && rect.top > below
+      const above = rect.top - 12
+      const openUp = below < 200 && above > below
+      const maxH = Math.min(360, Math.max(160, openUp ? above : below))
       const top = openUp ? Math.max(12, rect.top - maxH - 6) : rect.bottom + 6
       const left = Math.min(Math.max(12, rect.left), window.innerWidth - width - 12)
-      setPos({ top, left, width })
+      setPos({ top, left, width, maxH })
     }
     place()
     window.addEventListener('resize', place)
@@ -128,25 +135,30 @@ function OwnerSelect({
     ? createPortal(
         <div
           ref={menuRef}
-          className="ticket-owner-menu glass glass-lite"
+          className="ticket-owner-menu glass glass-lite squircle box-border flex flex-col overflow-x-hidden overflow-y-auto p-1.5"
           role="listbox"
           aria-label={label}
-          style={{ top: pos.top, left: pos.left, width: pos.width }}
+          style={{ top: pos.top, left: pos.left, width: pos.width, maxHeight: pos.maxH }}
           onClick={(event) => event.stopPropagation()}
           onPointerDown={(event) => event.stopPropagation()}
         >
           <button
             type="button"
             role="option"
-            className={`ticket-owner-menu-item${value === '' ? ' is-active' : ''}`}
+            className={`ticket-owner-menu-item flex h-10 min-h-10 w-full items-center px-2.5 text-left text-[14px] font-medium${value === '' ? ' is-active' : ''}`}
             aria-selected={value === ''}
             onClick={() => pick('')}
           >
             Sin dueño
           </button>
           {groups.map((group) => (
-            <div key={group.team?.id ?? 'loose'} className="ticket-owner-menu-group">
-              <p className="ticket-owner-menu-heading">{group.team?.name || 'Sin equipo'}</p>
+            <div key={group.team?.id ?? 'loose'} className="ticket-owner-menu-group flex min-w-0 flex-col">
+              <p
+                className="ticket-owner-menu-heading min-w-0 truncate px-2.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.04em] text-avi-muted"
+                title={group.team?.name || 'Sin equipo'}
+              >
+                {group.team?.name || 'Sin equipo'}
+              </p>
               {group.members.map((person) => {
                 const email = normalizeEmail(person.email)
                 const hint = suggestedEmail === email ? 'Le tocaría' : ''
@@ -155,12 +167,12 @@ function OwnerSelect({
                     key={`${group.team?.id ?? 'loose'}-${person.id}`}
                     type="button"
                     role="option"
-                    className={`ticket-owner-menu-item${value === email ? ' is-active' : ''}${hint ? ' is-suggested' : ''}`}
+                    className={`ticket-owner-menu-item flex h-10 min-h-10 w-full min-w-0 items-center gap-2 overflow-hidden px-2.5 text-left${value === email ? ' is-active' : ''}${hint ? ' is-suggested' : ''}`}
                     aria-selected={value === email}
                     onClick={() => pick(email)}
                   >
-                    <span>{person.name}</span>
-                    {hint ? <small>{hint}</small> : null}
+                    <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{person.name}</span>
+                    {hint ? <small className="shrink-0 text-[11px] font-semibold">Le tocaría</small> : null}
                   </button>
                 )
               })}
@@ -171,24 +183,31 @@ function OwnerSelect({
       )
     : null
 
+  const triggerName = compact ? firstName(currentName) : currentName
+
   return (
-    <div className={`ticket-owner-select is-${variant}${suggested ? ' is-suggested' : ''}`}>
+    <div className={`ticket-owner-select is-${variant}${compact ? ' is-compact' : ''}${suggested ? ' is-suggested' : ''} min-w-0`}>
       <button
         ref={triggerRef}
         type="button"
-        className={`ticket-owner-select-trigger${open ? ' is-open' : ''}`}
+        className={`ticket-owner-select-trigger${open ? ' is-open' : ''} ${
+          compact
+            ? 'inline-flex h-8 max-w-[9.5rem] items-center gap-1 rounded-full px-2.5 text-[13px] font-medium text-avi-muted'
+            : 'inline-flex min-h-tap w-full items-center justify-between gap-2'
+        }`}
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={label}
+        aria-label={`${label}: ${currentName}`}
+        title={currentName}
         onClick={(event) => {
           event.preventDefault()
           event.stopPropagation()
           setOpen((current) => !current)
         }}
       >
-        <span>{currentName}</span>
-        <ChevronDown size={16} aria-hidden />
+        <span className="min-w-0 truncate">{triggerName}</span>
+        <ChevronDown size={compact ? 14 : 16} className="shrink-0 opacity-60" aria-hidden />
       </button>
       {menu}
     </div>
@@ -286,6 +305,7 @@ export default function TicketOwnerPicker({
       disabled={busy}
       variant={layout === 'card' ? 'plain' : 'field'}
       suggested={showSuggest}
+      compact={compact}
       groups={grouped}
       suggestedEmail={suggestedEmail}
       onChange={(next) => void onChange(next)}
@@ -294,14 +314,24 @@ export default function TicketOwnerPicker({
 
   const actions =
     allowed && appRole === 'asesor' ? (
-      <div className="ticket-owner-actions">
+      <div className="ticket-owner-actions flex shrink-0 items-center gap-1">
         {empty ? (
-          <button type="button" className="ghost-button" disabled={busy} onClick={() => void onClaim()}>
+          <button
+            type="button"
+            className="ghost-button h-8 min-h-8 px-2 text-[12px] font-medium"
+            disabled={busy}
+            onClick={() => void onClaim()}
+          >
             Coger
           </button>
         ) : null}
         {mine || (!empty && value !== myEmail) ? (
-          <button type="button" className="ghost-button" disabled={busy} onClick={() => void onRelease()}>
+          <button
+            type="button"
+            className="ghost-button h-8 min-h-8 px-2 text-[12px] font-medium"
+            disabled={busy}
+            onClick={() => void onRelease()}
+          >
             No es mío
           </button>
         ) : null}
@@ -311,16 +341,16 @@ export default function TicketOwnerPicker({
   if (layout === 'card') {
     return (
       <div
-        className={`ticket-owner-card${allowed ? '' : ' is-readonly'}${showSuggest ? ' is-suggested' : ''}`}
+        className={`ticket-owner-card flex items-start gap-3${allowed ? '' : ' is-readonly'}${showSuggest ? ' is-suggested' : ''}`}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
       >
         <span className="ticket-owner-card-icon" aria-hidden>
           <UserRound size={18} />
         </span>
-        <div className="ticket-owner-card-body">
-          <span className="ticket-owner-card-label">{label}</span>
-          <div className="ticket-owner-card-row">
+        <div className="ticket-owner-card-body flex min-w-0 flex-1 flex-col gap-1">
+          <span className="ticket-owner-card-label text-[11px] font-semibold uppercase tracking-[0.04em] text-avi-muted">{label}</span>
+          <div className="ticket-owner-card-row flex min-w-0 flex-wrap items-center gap-2">
             {allowed ? select : <strong className="ticket-owner-card-name">{currentName}</strong>}
             {actions}
           </div>
@@ -336,7 +366,7 @@ export default function TicketOwnerPicker({
 
   if (!allowed) {
     return (
-      <span className={`ticket-owner-readonly${showSuggest ? ' is-suggested' : ''}`}>
+      <span className={`ticket-owner-readonly text-[13px] font-semibold text-avi-muted${showSuggest ? ' is-suggested' : ''}`}>
         {showSuggest && suggested
           ? `${suggested.person.name} · le tocaría`
           : currentName}
@@ -347,16 +377,16 @@ export default function TicketOwnerPicker({
 
   return (
     <div
-      className={`ticket-owner-picker${compact ? ' is-compact' : ''}${showSuggest ? ' is-suggested' : ''}`}
+      className={`ticket-owner-picker${compact ? ' is-compact w-auto max-w-none' : ''}${showSuggest ? ' is-suggested' : ''} flex min-w-0 flex-col gap-1`}
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
     >
       {compact ? null : <span className="filter-field-label">{label}</span>}
-      <div className="ticket-owner-main">
+      <div className="ticket-owner-main flex min-w-0 items-center gap-2">
         {select}
         {actions}
       </div>
-      {teamLine}
+      {compact ? null : teamLine}
       {error ? <span className="ticket-owner-error">{error}</span> : null}
     </div>
   )

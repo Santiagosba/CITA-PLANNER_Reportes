@@ -63,10 +63,10 @@ function PeticionRow({
 
   return (
     <li
-      className={`prow glass glass-lite${animateEntry ? ' triage-item-enter' : ''}${showBody ? ' is-expanded' : ''}${openInWindow ? ' is-windowed' : ''}`}
+      className={`prow glass glass-lite squircle${animateEntry ? ' triage-item-enter' : ''}${showBody ? ' is-expanded' : ''}${openInWindow ? ' is-windowed' : ''} overflow-visible`}
       style={animateEntry ? { animationDelay: `${revealIndex * 24}ms` } : undefined}
     >
-      <div className="prow-head">
+      <div className="prow-head flex min-w-0 items-start gap-2 overflow-visible">
         <button
           type="button"
           className="prow-toggle"
@@ -82,9 +82,9 @@ function PeticionRow({
         >
           <span className={`prow-marker ${pendiente ? 'is-pending' : 'is-done'}`} aria-hidden />
           <span className="prow-info">
-            <span className="prow-headline">
+            <span className="prow-headline flex flex-wrap items-center gap-2 overflow-visible">
               <TicketPlate peticion={p} />
-              <span className="prow-name">
+              <span className="prow-name min-w-0 flex-1">
                 <TicketClientBlock peticion={p} size="md" />
               </span>
               {isDemoTicketId(p.idpeticion) ? <span className="badge tone-info">Prueba</span> : null}

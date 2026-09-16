@@ -55,42 +55,42 @@ export default function EmployeeStatsView({ workshop, currentUser }: Props) {
   )
 
   return (
-    <div className="dashboard-page role-desk">
+    <div className="dashboard-page role-desk flex min-w-0 flex-col gap-4">
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
       {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
 
-      <section className="ops-kpi-grid" aria-label="Resumen del equipo">
-        <article className="metric glass glass-lite">
-          <span className="ops-kpi-icon">
+      <section className="ops-kpi-grid grid grid-cols-1 gap-2.5 min-[561px]:grid-cols-3" aria-label="Resumen del equipo">
+        <article className="metric glass glass-lite squircle">
+          <span className="ops-kpi-icon inline-flex h-[30px] w-[30px] items-center justify-center bg-avi-brand-soft text-avi-brand [border-radius:var(--radius-xs)] [corner-shape:squircle]">
             <Users size={17} />
           </span>
-          <span className="ops-kpi-label">Asesores</span>
+          <span className="ops-kpi-label mt-2.5 block text-[11px] font-semibold uppercase tracking-[0.045em] text-avi-muted">Asesores</span>
           <strong>{workspace.people.length}</strong>
-          <span className="ops-kpi-helper">En este taller</span>
+          <span className="ops-kpi-helper mt-1.5 block text-[10px] text-avi-muted">En este taller</span>
         </article>
-        <article className="metric glass glass-lite">
-          <span className="ops-kpi-icon">
+        <article className="metric glass glass-lite squircle">
+          <span className="ops-kpi-icon inline-flex h-[30px] w-[30px] items-center justify-center bg-avi-brand-soft text-avi-brand [border-radius:var(--radius-xs)] [corner-shape:squircle]">
             <ClipboardList size={17} />
           </span>
-          <span className="ops-kpi-label">Tareas del mes</span>
+          <span className="ops-kpi-label mt-2.5 block text-[11px] font-semibold uppercase tracking-[0.045em] text-avi-muted">Tareas del mes</span>
           <strong>{loading ? '—' : totals.assigned}</strong>
-          <span className="ops-kpi-helper">{totals.pending} pendientes</span>
+          <span className="ops-kpi-helper mt-1.5 block text-[10px] text-avi-muted">{totals.pending} pendientes</span>
         </article>
-        <article className="metric glass glass-lite">
-          <span className="ops-kpi-icon">
+        <article className="metric glass glass-lite squircle">
+          <span className="ops-kpi-icon inline-flex h-[30px] w-[30px] items-center justify-center bg-[rgba(49,196,141,0.12)] text-avi-success [border-radius:var(--radius-xs)] [corner-shape:squircle]">
             <CheckCircle2 size={17} />
           </span>
-          <span className="ops-kpi-label">Hechas</span>
+          <span className="ops-kpi-label mt-2.5 block text-[11px] font-semibold uppercase tracking-[0.045em] text-avi-muted">Hechas</span>
           <strong>{loading ? '—' : totals.done}</strong>
-          <span className="ops-kpi-helper">{totals.peticiones} consultas gestionadas</span>
+          <span className="ops-kpi-helper mt-1.5 block text-[10px] text-avi-muted">{totals.peticiones} consultas gestionadas</span>
         </article>
       </section>
 
       <Card>
-        <div className="role-desk-heading">
+        <div className="role-desk-heading flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="section-eyebrow">Mes en curso</p>
-            <h2 className="ops-card-title">Trabajo por asesor</h2>
+            <h2 className="text-sm font-semibold tracking-[-0.015em] text-avi-fog-strong">Trabajo por asesor</h2>
           </div>
           <BarChart3 size={20} aria-hidden style={{ color: 'var(--color-brand)' }} />
         </div>

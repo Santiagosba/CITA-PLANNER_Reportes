@@ -9,10 +9,10 @@ type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
 }
 
 const variants: Record<Variant, string> = {
-  primary: 'client-submit',
-  secondary: 'ghost-button',
-  ghost: 'ghost-action is-neutral',
-  danger: 'ghost-action',
+  primary: 'client-submit inline-flex min-h-tap items-center justify-center gap-2',
+  secondary: 'ghost-button inline-flex min-h-tap items-center justify-center gap-2',
+  ghost: 'ghost-action is-neutral inline-flex min-h-tap items-center justify-center gap-2',
+  danger: 'ghost-action inline-flex min-h-tap items-center justify-center gap-2',
 }
 
 export default function Button({
@@ -23,7 +23,7 @@ export default function Button({
   ...rest
 }: Props) {
   return (
-    <button type="button" className={`${variants[variant]} ${fullWidth ? 'w-full-btn' : ''} ${className}`.trim()} {...rest}>
+    <button type="button" className={`${variants[variant]} squircle ${fullWidth ? 'w-full-btn' : ''} ${className}`.trim()} {...rest}>
       {children}
     </button>
   )

@@ -1,5 +1,5 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import "@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "@supabase/supabase-js";
 
 const SUPER_EMAILS = new Set(["santy@gmail.com", "noel.ponce@avicrm.es"]);
 const UUID_RE =
@@ -48,7 +48,10 @@ function isSuperCaller(email: string, appRole: string): boolean {
 }
 
 async function fetchAll<T>(
-  loadPage: (from: number, to: number) => Promise<{ data: T[] | null; error: { message: string } | null }>,
+  loadPage: (
+    from: number,
+    to: number,
+  ) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
 ): Promise<T[]> {
   const all: T[] = [];
   let from = 0;
@@ -83,7 +86,7 @@ function idList(raw: unknown): string[] {
 }
 
 async function findUserIdByEmail(
-  auth: ReturnType<typeof createClient>,
+  auth: ReturnType<typeof createClient<any>>,
   email: string,
 ): Promise<string | null> {
   let page = 1;

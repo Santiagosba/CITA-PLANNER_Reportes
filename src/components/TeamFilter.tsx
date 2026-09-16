@@ -23,12 +23,14 @@ export default function TeamFilter({
   if (teams.length === 0 && !alwaysShow) return null
 
   return (
-    <div className="filter-field team-filter">
-      <span className="filter-field-label">{label}</span>
+    <div className="filter-field team-filter flex max-w-full flex-col justify-end gap-1.5">
+      <span className="filter-field-label block min-h-[18px] text-[13px] font-semibold leading-tight text-avi-fog-strong">
+        {label}
+      </span>
       {teams.length === 0 ? (
         <p className="section-subtitle">{emptyHint}</p>
       ) : (
-      <div className="estado-filter" role="group" aria-label={label}>
+      <div className="estado-filter inline-flex flex-wrap items-center gap-1.5" role="group" aria-label={label}>
         <button
           type="button"
           className={`preset-chip ${value === TEAM_FILTER_ALL ? 'is-active' : ''}`}

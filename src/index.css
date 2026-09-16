@@ -1,4 +1,10 @@
 @import './styles/avi-crm.css';
+@import './styles/features/shell.css';
+@import './styles/features/ops.css';
+@import './styles/features/boards.css';
+@import './styles/features/lead-os.css';
+@import './styles/features/desks.css';
+@import './styles/avi-tailwind.css';
 
 @tailwind base;
 @tailwind components;

@@ -120,10 +120,10 @@ export default function TeamAssignPanel({
   const canSubmit = Boolean(title.trim() && assigneeId && typeId && dueDate && members.length > 0)
 
   return (
-    <Card className="dash-assign-panel" padding="sm">
-      <form className="dash-assign-form" onSubmit={(event) => void onSubmit(event)}>
-        <div className="dash-assign-head">
-          <h2 className="ops-card-title">Asignar a un equipo</h2>
+    <Card className="dash-assign-panel flex flex-col" padding="sm">
+      <form className="dash-assign-form flex flex-col gap-3" onSubmit={(event) => void onSubmit(event)}>
+        <div className="dash-assign-head flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-avi-fog-strong">Asignar a un equipo</h2>
           {onOpenAssign ? (
             <button type="button" className="ghost-button" onClick={() => onOpenAssign(teamId)}>
               Más opciones
@@ -131,7 +131,7 @@ export default function TeamAssignPanel({
           ) : null}
         </div>
 
-        <div className="dash-assign-grid">
+        <div className="dash-assign-grid grid items-end gap-3 max-[980px]:grid-cols-2 min-[981px]:grid-cols-[minmax(140px,1fr)_minmax(140px,1fr)_minmax(200px,1.4fr)_minmax(140px,0.8fr)]">
           <label className="field-label" htmlFor="dash-assign-team">
             Equipo
             <select
@@ -170,7 +170,7 @@ export default function TeamAssignPanel({
               ))}
             </select>
           </label>
-          <label className="field-label dash-assign-ticket" htmlFor="dash-assign-ticket">
+          <label className="field-label dash-assign-ticket max-[980px]:col-span-full" htmlFor="dash-assign-ticket">
             Ticket suelto
             <select
               id="dash-assign-ticket"
@@ -206,7 +206,7 @@ export default function TeamAssignPanel({
               required
             />
           </label>
-          <label className="field-label dash-assign-task" htmlFor="dash-assign-title">
+          <label className="field-label dash-assign-task col-span-full min-[981px]:col-span-3" htmlFor="dash-assign-title">
             Qué hay que hacer
             <input
               id="dash-assign-title"
@@ -217,7 +217,7 @@ export default function TeamAssignPanel({
               required
             />
           </label>
-          <button type="submit" className="client-submit dash-assign-submit" disabled={!canSubmit}>
+          <button type="submit" className="client-submit dash-assign-submit min-h-tap max-[980px]:col-span-full" disabled={!canSubmit}>
             <UserPlus size={16} aria-hidden />
             Asignar
           </button>
@@ -227,13 +227,13 @@ export default function TeamAssignPanel({
           <p className="section-subtitle">Marca asesores en Equipos para este grupo.</p>
         ) : null}
         {linked ? (
-          <p className="dash-assign-preview">
+          <p className="dash-assign-preview m-0 text-sm text-avi-muted">
             {ticketClientLabel(linked)}
             {linked.tipopeticion ? ` · ${linked.tipopeticion}` : ''}
             {ticketClientPhone(linked) ? ` · ${ticketClientPhone(linked)}` : ''}
           </p>
         ) : null}
-        {notice ? <p className="dash-assign-notice">{notice}</p> : null}
+        {notice ? <p className="dash-assign-notice m-0 text-sm font-semibold text-avi-success">{notice}</p> : null}
       </form>
     </Card>
   )

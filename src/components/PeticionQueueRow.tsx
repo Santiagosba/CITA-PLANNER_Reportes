@@ -17,15 +17,15 @@ export default function PeticionQueueRow({ peticion: p, active, onSelect }: Prop
 
   return (
     <li>
-      <div className={`queue-row ${active ? 'is-active' : ''}`}>
-        <button type="button" className="queue-row-main" onClick={onSelect}>
-          <span className="queue-row-marker" aria-hidden />
-          <span className="queue-row-body">
-            <span className="queue-row-top">
-              <span className="queue-row-title">{titulo}</span>
-              <span className="queue-row-time">{formatAgendaTime(p.fechainicio)}</span>
+      <div className={`queue-row flex min-w-0 items-center gap-2 ${active ? 'is-active' : ''}`}>
+        <button type="button" className="queue-row-main flex min-w-0 flex-1 items-center gap-2 text-left" onClick={onSelect}>
+          <span className="queue-row-marker shrink-0" aria-hidden />
+          <span className="queue-row-body flex min-w-0 flex-1 flex-col">
+            <span className="queue-row-top flex min-w-0 items-center justify-between gap-2">
+              <span className="queue-row-title truncate font-semibold text-avi-fog-strong">{titulo}</span>
+              <span className="queue-row-time shrink-0 text-[12px] text-avi-muted">{formatAgendaTime(p.fechainicio)}</span>
             </span>
-            <span className="queue-row-meta">{p.tipopeticion ?? 'Consulta general'}</span>
+            <span className="queue-row-meta truncate text-[12px] text-avi-muted">{p.tipopeticion ?? 'Consulta general'}</span>
           </span>
           <span className={`badge ${pendiente ? 'tone-warning' : 'tone-positive'}`}>
             {pendiente ? 'Sin cita' : 'Con cita'}

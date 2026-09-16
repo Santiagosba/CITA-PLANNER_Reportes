@@ -101,12 +101,12 @@ export default function LoginView({
           </p>
 
           {onLocalPreview ? (
-            <div className="login-asesor-list" role="group" aria-label="Prueba en local">
+            <div className="login-asesor-list mt-5 flex flex-col gap-2 text-left" role="group" aria-label="Prueba en local">
               <p className="field-label">Probar en este ordenador</p>
               <p className="section-subtitle" style={{ marginTop: 0 }}>
                 Solo con <code>npm run dev</code>. No usa el deploy.
               </p>
-              <button type="button" className="login-asesor-card" onClick={() => onLocalPreview('admin')}>
+              <button type="button" className="login-asesor-card squircle flex min-h-tap w-full items-center gap-3 px-3 py-2.5 text-left" onClick={() => onLocalPreview('admin')}>
                 <span className="login-asesor-avatar" aria-hidden>
                   AD
                 </span>
@@ -117,7 +117,7 @@ export default function LoginView({
               </button>
               <button
                 type="button"
-                className="login-asesor-card"
+                className="login-asesor-card squircle flex min-h-tap w-full items-center gap-3 px-3 py-2.5 text-left"
                 onClick={() => onLocalPreview('asesor', 'demo-asesor-ana')}
               >
                 <span className="login-asesor-avatar" aria-hidden>
@@ -130,7 +130,7 @@ export default function LoginView({
               </button>
               <button
                 type="button"
-                className="login-asesor-card"
+                className="login-asesor-card squircle flex min-h-tap w-full items-center gap-3 px-3 py-2.5 text-left"
                 onClick={() => onLocalPreview('asesor', 'demo-asesor-luis')}
               >
                 <span className="login-asesor-avatar" aria-hidden>
@@ -145,13 +145,13 @@ export default function LoginView({
           ) : null}
 
           {onDemoLogin ? (
-            <div className="login-asesor-list" role="list">
+            <div className="login-asesor-list mt-5 flex flex-col gap-2 text-left" role="list">
               <p className="field-label">Asesores de prueba</p>
               {DEMO_ASESORES.map((asesor) => (
                 <button
                   key={asesor.id}
                   type="button"
-                  className="login-asesor-card"
+                  className="login-asesor-card squircle flex min-h-tap w-full items-center gap-3 px-3 py-2.5 text-left"
                   onClick={() => void handleDemoClick(asesor)}
                   disabled={demoBusyId !== null}
                   aria-busy={demoBusyId === asesor.id}

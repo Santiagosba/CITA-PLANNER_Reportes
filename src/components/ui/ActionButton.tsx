@@ -38,7 +38,7 @@ export default function ActionButton({
       disabled={disabled || isBusy}
       aria-busy={status === 'loading'}
       aria-live="polite"
-      className={`${variantClass[variant]} ${fullWidth ? 'w-full-btn' : ''} ${showSuccess ? 'is-success' : ''} ${status === 'loading' ? 'is-loading' : ''} ${className}`.trim()}
+      className={`${variantClass[variant]} inline-flex items-center justify-center gap-2 ${fullWidth ? 'w-full-btn w-full' : ''} ${showSuccess ? 'is-success' : ''} ${status === 'loading' ? 'is-loading' : ''} ${className}`.trim()}
       {...rest}
     >
       <span className="action-btn-icon" aria-hidden>
