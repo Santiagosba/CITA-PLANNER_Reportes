@@ -10,6 +10,13 @@ export interface Workshop {
   containerIdTaller?: string
   /** `hub_webs.id` del contenedor (JWT connect_site_ids). */
   hubWebId?: string
+  /** Grupo al que pertenece esta licencia (`licencias_grupo`). */
+  groupName?: string
+  /** Centro de la licencia (`aviold.centros`). Una licencia tiene varios. */
+  centerId?: string
+  centerName?: string
+  /** Centros de la licencia con los que entra la sesión. */
+  centers?: { id: string; name: string }[]
 }
 
 /** Campos derivados de `session.user` para la barra lateral (estilo CRM). */

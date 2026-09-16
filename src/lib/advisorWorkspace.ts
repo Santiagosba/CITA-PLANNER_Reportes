@@ -12,9 +12,14 @@ export type AdvisorPerson = {
   name: string
   email: string
   role?: AdvisorAccountRole
+  photoUrl?: string
+  phone?: string
+  jobTitle?: string
   deletedAt?: string
   purgeAt?: string
 }
+
+export type AdvisorPersonPatch = Partial<Pick<AdvisorPerson, 'name' | 'photoUrl' | 'phone' | 'jobTitle'>>
 
 export const ACCOUNT_PURGE_DAYS = 15
 
@@ -46,7 +51,7 @@ export function personMatchesQuery(person: AdvisorPerson, query: string): boolea
   const needle = foldText(query.trim())
   if (!needle) return true
   const role = person.role === 'taller_admin' ? 'admin' : person.role === 'asesor' ? 'asesor' : ''
-  return foldText(`${person.name} ${person.email} ${role}`).includes(needle)
+  return foldText(`${person.name} ${person.email} ${role} ${person.phone || ''} ${person.jobTitle || ''}`).includes(needle)
 }
 
 export type AdvisorTeam = {
@@ -921,6 +926,41 @@ export function setPersonRole(
   return {
     ...workspace,
     people: workspace.people.map((person) => (person.id === personId ? { ...person, role } : person)),
+  }
+}
+
+export function patchPerson(
+  workspace: AdvisorWorkspace,
+  personId: string,
+  patch: AdvisorPersonPatch,
+): AdvisorWorkspace {
+  if (!workspace.people.some((person) => person.id === personId)) return workspace
+  return {
+    ...workspace,
+    people: workspace.people.map((person) => {
+      if (person.id !== personId) return person
+      const next = { ...person }
+      if (patch.name != null) {
+        const name = patch.name.trim()
+        if (name) next.name = name
+      }
+      if (patch.phone != null) {
+        const phone = patch.phone.trim()
+        if (phone) next.phone = phone
+        else delete next.phone
+      }
+      if (patch.jobTitle != null) {
+        const jobTitle = patch.jobTitle.trim()
+        if (jobTitle) next.jobTitle = jobTitle
+        else delete next.jobTitle
+      }
+      if (patch.photoUrl != null) {
+        const photoUrl = patch.photoUrl.trim()
+        if (photoUrl) next.photoUrl = photoUrl
+        else delete next.photoUrl
+      }
+      return next
+    }),
   }
 }
 

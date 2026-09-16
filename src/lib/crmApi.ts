@@ -6,8 +6,12 @@
  * compartido (si está configurado en el servidor).
  */
 
+import { fetchAiUsageReportFromSupabase, type AiUsageReport, type AiUsageScope } from './aiUsageReport'
+import { isSuperAdminUser, isTallerAdminUser } from './crmAccess'
 import { supabase } from './supabase'
 import { handleExpiredSession } from './sessionGuard'
+
+export type { AiUsageReport, AiUsageScope }
 
 export class CrmApiError extends Error {
   status: number
@@ -389,23 +393,6 @@ export type CallCostStats = {
   series: CallCostDay[]
 }
 
-export type AiUsageReport = {
-  from: string
-  to: string
-  kpis: {
-    requests: number
-    tokens: number
-    estimatedCostUsd: number
-    errorCount: number
-  }
-  series: Array<{ date: string; requests: number; tokens: number; costUsd: number }>
-  byFeature: Array<{ feature: string; label: string; requests: number; tokens: number; costUsd: number }>
-  byModel: Array<{ model: string; requests: number; tokens: number; costUsd: number }>
-  features: Array<{ feature: string; label: string }>
-}
-
-export type AiUsageScope = 'taller' | 'cuenta'
-
 /** Uso y coste estimado de tokens OpenAI. */
 export async function fetchAiUsageReport(opts: {
   from: string
@@ -413,39 +400,82 @@ export async function fetchAiUsageReport(opts: {
   idtaller?: string | null
   feature?: string | null
 }): Promise<AiUsageReport & { scope: AiUsageScope }> {
-  const qs = new URLSearchParams()
-  qs.set('from', opts.from)
-  qs.set('to', opts.to)
-  if (opts.feature) qs.set('feature', opts.feature)
-  if (opts.idtaller) qs.set('idtaller', opts.idtaller)
-
-  if (opts.idtaller) {
-    try {
-      const report = await crmFetch<AiUsageReport>(`/api/consumo/ia-taller?${qs}`, {
-        endpointKey: 'GET /api/consumo/ia-taller',
-      })
-      return { ...report, scope: 'taller' }
-    } catch (error) {
-      const staleApi =
-        error instanceof CrmApiError &&
-        (error.status === 403 || error.status === 404 || error.endpointMissing)
-      if (!staleApi) throw error
-    }
+  try {
+    return await fetchAiUsageReportFromSupabase(opts)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'No se pudo cargar el gasto de IA de este taller.'
+    throw new CrmApiError(message, 0)
   }
-
-  const report = await crmFetch<AiUsageReport>(`/api/admin/ai-usage?${qs}`, {
-    endpointKey: 'GET /api/admin/ai-usage',
-  })
-  return { ...report, scope: 'cuenta' }
 }
 
-/** Totales y serie diaria de costes del softphone (`GET /api/calls/cost-stats`). */
-export function fetchCallCostStats(range?: { from?: string; to?: string }): Promise<CallCostStats> {
-  const qs = new URLSearchParams()
-  if (range?.from) qs.set('from', range.from)
-  if (range?.to) qs.set('to', range.to)
-  const suffix = qs.toString() ? `?${qs.toString()}` : ''
-  return crmFetch<CallCostStats>(`/api/calls/cost-stats${suffix}`, { endpointKey: 'GET /api/calls/cost-stats' })
+function emptyCallCostStats(from: string, to: string): CallCostStats {
+  return {
+    from,
+    to,
+    currency: 'USD',
+    calls: 0,
+    answered: 0,
+    duration_sec: 0,
+    cost: 0,
+    with_cost: 0,
+    with_recording: 0,
+    with_transcript: 0,
+    series: [],
+  }
+}
+
+async function functionErrorMessage(error: unknown, data: unknown): Promise<string | null> {
+  if (data && typeof data === 'object' && data !== null && 'error' in data) {
+    const message = String((data as { error?: unknown }).error || '').trim()
+    if (message) return message
+  }
+  const context =
+    error && typeof error === 'object' && error !== null && 'context' in error
+      ? (error as { context?: unknown }).context
+      : null
+  if (context && typeof context === 'object' && context !== null && 'json' in context) {
+    try {
+      const body = await (context as Response).clone().json()
+      const message = String((body as { error?: unknown } | null)?.error || '').trim()
+      if (message) return message
+    } catch {
+      /* el cuerpo no era JSON */
+    }
+  }
+  return null
+}
+
+/** Totales y serie diaria de costes del softphone (función `crm-call-costs`). */
+export async function fetchCallCostStats(range?: {
+  from?: string
+  to?: string
+  idtaller?: string | null
+  idtalleres?: string[]
+}): Promise<CallCostStats> {
+  const from = range?.from || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const to = range?.to || new Date().toISOString()
+  const { data: sessionData } = await supabase.auth.getSession()
+  const user = sessionData?.session?.user
+  const token = sessionData?.session?.access_token
+  if (!user || !token || token.startsWith('demo-')) return emptyCallCostStats(from, to)
+  // «Ver como admin» local no cambia el JWT: un asesor no puede leer Telnyx.
+  if (!isTallerAdminUser(user) && !isSuperAdminUser(user)) return emptyCallCostStats(from, to)
+
+  const { data, error } = await supabase.functions.invoke('crm-call-costs', {
+    body: {
+      from,
+      to,
+      idtaller: range?.idtaller || null,
+      idtalleres: range?.idtalleres || [],
+    },
+  })
+  const payload = data as (CallCostStats & { error?: string }) | null
+  const functionMessage = await functionErrorMessage(error, payload)
+  if (error || payload?.error) {
+    throw new CrmApiError(functionMessage || error?.message || 'No se pudieron cargar los costes Telnyx.', 0)
+  }
+  if (!payload) return emptyCallCostStats(from, to)
+  return payload
 }
 
 export type TallerAccountRole = 'asesor' | 'taller_admin'
@@ -460,6 +490,7 @@ export async function crmUpdateAccountPassword(
     role?: TallerAccountRole
     hubWebId?: string | null
     crmIdtaller?: string
+    crmIdtalleres?: string[]
   },
 ): Promise<{ created?: boolean; role?: TallerAccountRole }> {
   return crmFetch<{ ok: boolean; created?: boolean; role?: TallerAccountRole }>('/api/taller/cuentas/password', {
@@ -473,6 +504,7 @@ export async function crmUpdateAccountPassword(
       ...(opts?.role ? { role: opts.role } : {}),
       ...(opts?.hubWebId ? { hubWebId: opts.hubWebId } : {}),
       ...(opts?.crmIdtaller ? { crmIdtaller: opts.crmIdtaller } : {}),
+      ...(opts?.crmIdtalleres?.length ? { crmIdtalleres: opts.crmIdtalleres } : {}),
     }),
   })
 }

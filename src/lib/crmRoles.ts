@@ -6,6 +6,7 @@
 
 import { isDemoAsesor } from './demoAsesores'
 import { isSuperAdminUser, isTallerAdminUser } from './crmAccess'
+import { licenseViewEnabled, type LicenseViewId } from './crmViews'
 import { readLocalPreview } from './localPreview'
 import type { DashboardShellRoute } from '../components/Sidebar'
 
@@ -70,12 +71,31 @@ export const ASESOR_SHELL_ROUTES: DashboardShellRoute[] = [
   'configuration',
 ]
 
-export function defaultRouteForRole(_role: CrmAppRole): DashboardShellRoute {
-  return 'boards'
+export function defaultRouteForRole(
+  role: CrmAppRole,
+  opts?: { superAdmin?: boolean; enabledViews?: LicenseViewId[] | null },
+): DashboardShellRoute {
+  const preferred: DashboardShellRoute[] =
+    role === 'admin'
+      ? ['boards', 'dashboard-general', 'pending-citas', 'equipos', 'stats-equipo']
+      : ['boards', 'dashboard-general', 'pending-citas', 'tareas-hoy', 'equipos']
+  for (const route of preferred) {
+    if (routeAllowedForRole(route, role, opts)) return route
+  }
+  return 'configuration'
 }
 
-export function routeAllowedForRole(route: DashboardShellRoute, role: CrmAppRole): boolean {
-  return role === 'admin' ? ADMIN_SHELL_ROUTES.includes(route) : ASESOR_SHELL_ROUTES.includes(route)
+export function routeAllowedForRole(
+  route: DashboardShellRoute,
+  role: CrmAppRole,
+  opts?: { superAdmin?: boolean; enabledViews?: LicenseViewId[] | null },
+): boolean {
+  if (route === 'licencias') return Boolean(opts?.superAdmin)
+  if (route === 'configuration') return true
+  const byRole = role === 'admin' ? ADMIN_SHELL_ROUTES.includes(route) : ASESOR_SHELL_ROUTES.includes(route)
+  if (!byRole) return false
+  if (opts?.superAdmin) return true
+  return licenseViewEnabled(opts?.enabledViews, route)
 }
 
 /** Rol activo en el escritorio; el teléfono lo usa para ocultar costes Telnyx. */

@@ -6,7 +6,6 @@ import { HexLoaderScreen } from '../components/ui/HexLoader'
 import {
   CrmApiError,
   fetchAiUsageReport,
-  isCrmApiConfigured,
   type AiUsageReport,
   type AiUsageScope,
 } from '../lib/crmApi'
@@ -47,7 +46,7 @@ export default function AiUsageView({ workshop }: Props) {
   const [range, setRange] = useState<RangeKey>('month')
   const [feature, setFeature] = useState('all')
   const [report, setReport] = useState<(AiUsageReport & { scope: AiUsageScope }) | null>(null)
-  const [loading, setLoading] = useState(canSee && isCrmApiConfigured())
+  const [loading, setLoading] = useState(canSee)
   const [error, setError] = useState<string | null>(null)
 
   const window = useMemo(() => rangeWindow(range), [range])
@@ -57,11 +56,6 @@ export default function AiUsageView({ workshop }: Props) {
       setLoading(false)
       setError(null)
       setReport(null)
-      return
-    }
-    if (!isCrmApiConfigured()) {
-      setLoading(false)
-      setError('Falta VITE_CRM_API_URL para leer el gasto de IA.')
       return
     }
     let cancelled = false
@@ -140,10 +134,9 @@ export default function AiUsageView({ workshop }: Props) {
             <p className="section-eyebrow">Tokens</p>
             <h2 className="ops-card-title">Dinero gastado en IA</h2>
             <p className="section-subtitle">
-              Coste estimado según las tarifas de OpenAI y el uso que registra api-crm.
-              {report?.scope === 'taller'
-                ? ' Solo este taller.'
-                : ' Cuenta completa: aún no está acotado a este taller en el api-crm desplegado.'}
+              Coste estimado de tokens OpenAI (resúmenes, búsquedas, sugerencias). No es el teléfono:
+              las llamadas Telnyx están en Asistente de IA Laura, pestaña Costes.
+              {report?.scope === 'taller' ? ' Solo este taller.' : ' Cuenta completa.'}
             </p>
           </div>
           <div className="laura-costs-filters">

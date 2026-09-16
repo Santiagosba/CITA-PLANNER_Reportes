@@ -1,9 +1,10 @@
 /**
- * Modelo licencia/contenedor Hub Connect (UUID web + taller_web_activo + RPC talleres).
+ * Modelo grupo → licencias → centros (en datos, las licencias siguen en tablas de taller).
  */
 
 import { filterCrmUuids, isCrmUuid } from './crmUuid'
-import { supabaseOperations } from './supabase'
+import { supabaseAviOld, supabaseOperations } from './supabase'
+import { fetchAllSupabasePages } from './supabaseFetchAll'
 import { getCrmHubWebIdFromEnv } from './hubWebEnv'
 import { isGlobalAviAdmin } from './operationsConnect'
 import { parseConnectSiteIds, scopedSitesEmptyDenied, sessionAllowsThisHubWeb } from './connectSiteScope'
@@ -141,44 +142,117 @@ export async function fetchLicenciaModuleTalleres(idlicenciagrupo: string, webId
   }
 }
 
+export type TallerCentro = {
+  idcentro: string
+  idtaller: string
+  nombre: string
+  direccion?: string | null
+  poblacion?: string | null
+}
+
+function mapCentroRow(row: Record<string, unknown>): TallerCentro | null {
+  const idcentro = String(row.idcentro ?? '').trim()
+  const idtaller = String(row.idtaller ?? '').trim().toLowerCase()
+  if (!idcentro || !idtaller) return null
+  return {
+    idcentro,
+    idtaller,
+    nombre: String(row.nombre ?? 'Centro').trim() || 'Centro',
+    direccion: (row.direccion ?? null) as string | null,
+    poblacion: (row.poblacion ?? null) as string | null,
+  }
+}
+
+/** Centros de las licencias de un grupo. RPC: el admin del grupo no lee aviold.centros a pelo. */
+export async function fetchCentrosForGrupo(
+  idlicenciagrupo: string,
+  webId?: string | null,
+): Promise<TallerCentro[]> {
+  if (!idlicenciagrupo) return []
+  const wid = webId?.trim() || getCrmHubWebIdFromEnv()
+  if (!wid) return []
+  try {
+    const { data, error } = await supabaseOperations.rpc('licencia_module_centros_list', {
+      p_idlicenciagrupo: idlicenciagrupo,
+      p_web_id: wid,
+    })
+    if (error || !Array.isArray(data)) return []
+    return (data as Record<string, unknown>[])
+      .filter((row) => row.activo !== false)
+      .map((row) => mapCentroRow(row))
+      .filter((row): row is TallerCentro => row !== null)
+  } catch {
+    return []
+  }
+}
+
+export async function fetchCentrosForTalleres(idtalleres: string[]): Promise<TallerCentro[]> {
+  const ids = filterCrmUuids(idtalleres)
+  if (ids.length === 0) return []
+  try {
+    const mapped: TallerCentro[] = []
+    for (let i = 0; i < ids.length; i += 80) {
+      const chunk = ids.slice(i, i + 80)
+      const data = await fetchAllSupabasePages<Record<string, unknown>>(() =>
+        supabaseAviOld
+          .from('centros')
+          .select('idcentro, idtaller, nombre, direccion, poblacion')
+          .in('idtaller', chunk)
+          .is('fechabaja', null)
+          .order('nombre', { ascending: true }),
+      )
+      for (const row of data) {
+        const mappedRow = mapCentroRow(row)
+        if (mappedRow) mapped.push(mappedRow)
+      }
+    }
+    return mapped
+  } catch {
+    return []
+  }
+}
+
 export type NonAdminBaseRoute = {
   containerIdTaller: string
   slug: string | null
+  /** Varios grupos activos: el usuario elige grupo, luego licencia y centro. */
+  mustPickLicense: boolean
 }
 
-export async function resolveNonAdminBaseRoute(session: { user?: any } | null | undefined): Promise<NonAdminBaseRoute | null> {
+export async function listUserActiveContainers(
+  session: { user?: any } | null | undefined,
+): Promise<ContainerRow[]> {
   const user = session?.user
-  if (!user) return null
+  if (!user) return []
   const crmWebId = getCrmHubWebIdFromEnv()
-  if (!crmWebId) return null
+  if (!crmWebId) return []
 
   const userId = user.id ?? null
   const legacyId = user.user_metadata?.legacy_id ?? null
   const parse = parseConnectSiteIds(user)
   const isAdmin = isGlobalAviAdmin(session)
 
-  if (!isAdmin && scopedSitesEmptyDenied(parse)) return null
-  if (!isAdmin && !sessionAllowsThisHubWeb(parse, crmWebId, false)) return null
+  if (!isAdmin && scopedSitesEmptyDenied(parse)) return []
+  if (!isAdmin && !sessionAllowsThisHubWeb(parse, crmWebId, false)) return []
 
   const ids = await fetchUserContainerIds(userId, legacyId)
-  if (ids.length === 0) return null
+  if (ids.length === 0) return []
   const containers = await fetchContainersByIds(ids)
-  const visible = containers.filter((c) => c.isModuleActive)
-  if (visible.length === 0) return null
+  return containers.filter((c) => c.isModuleActive)
+}
 
-  const withSlug = visible.filter((c) => c.slug && String(c.slug).trim() !== '')
-  let pick: ContainerRow
-  if (withSlug.length > 0) {
-    withSlug.sort((a, b) => String(a.slug).localeCompare(String(b.slug), 'es', { sensitivity: 'base', numeric: true }))
-    pick = withSlug[0]
-  } else {
-    visible.sort((a, b) => a.idtaller.localeCompare(b.idtaller))
-    pick = visible[0]
+export async function resolveNonAdminBaseRoute(session: { user?: any } | null | undefined): Promise<NonAdminBaseRoute | null> {
+  const visible = await listUserActiveContainers(session)
+  if (visible.length === 0) return null
+  if (visible.length > 1) {
+    return { containerIdTaller: '', slug: null, mustPickLicense: true }
   }
 
+  const pick = visible[0]
   const slugRaw = pick.slug != null ? String(pick.slug).trim() : ''
   return {
     containerIdTaller: pick.idtaller,
     slug: slugRaw !== '' ? slugRaw : null,
+    mustPickLicense: false,
   }
 }

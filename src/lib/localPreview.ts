@@ -32,7 +32,7 @@ export const LOCAL_PREVIEW_ASESORES = [
 
 export const LOCAL_PREVIEW_WORKSHOP: Workshop = {
   id: LOCAL_PREVIEW_ID,
-  name: 'Taller local',
+  name: 'Licencia local',
   city: 'Madrid',
   source: 'demo',
   originalId: LOCAL_PREVIEW_ID,

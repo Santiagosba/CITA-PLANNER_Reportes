@@ -21,7 +21,8 @@ import LauraIntelligenceView from './LauraIntelligenceView'
 import BotIdentityView from './BotIdentityView'
 import TeamsManagerView from './TeamsManagerView'
 import AssignTaskView from './AssignTaskView'
-import EmployeeStatsView from './EmployeeStatsView'
+import OperatorsDeskView from './OperatorsDeskView'
+import LicensesDeskView from './LicensesDeskView'
 import AiUsageView from './AiUsageView'
 import TodayTasksView from './TodayTasksView'
 import { mapSessionUserToCrmUser, type Workshop } from '../types'
@@ -46,6 +47,7 @@ import { callNoteLine, useSoftphone } from '../lib/softphone'
 import { findCachedPeticion } from '../hooks/useOperationalData'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
 import { teamLabelForEmail } from '../lib/advisorWorkspace'
+import { fetchLicenseViews, type LicenseViewId } from '../lib/crmViews'
 import { isDemoTicketId } from '../lib/demoTickets'
 import { applyPeticionPatch, PETICIONES_PATCHED_EVENT } from '../lib/ticketOps'
 import { isIdleDeskClick } from '../lib/osDeskClick'
@@ -192,7 +194,7 @@ export default function DashboardShell({
   previewAdvisorId,
 }: Props) {
   const appRole = resolveCrmAppRole(sessionUser)
-  const [shellRoute, setShellRoute] = useState<DashboardShellRoute>(() => defaultRouteForRole(appRole))
+  const [shellRoute, setShellRoute] = useState<DashboardShellRoute>(() => defaultRouteForRole(appRole, { superAdmin: isSuperAdminUser(sessionUser) }))
   const asesor = mapSessionUserToCrmUser(sessionUser)
   const currentUser = { name: asesor.displayName, email: asesor.email }
   const workshopId = workshop.containerIdTaller || workshop.id
@@ -223,8 +225,24 @@ export default function DashboardShell({
   const [agendaZ, setAgendaZ] = useState(99)
   const isSuperAdmin = isSuperAdminUser(sessionUser) || isSuperAdminEmail(asesor.email)
   const canEditHubBranding = isSuperAdmin || isGlobalAviAdmin({ user: sessionUser })
+  const [enabledViews, setEnabledViews] = useState<LicenseViewId[] | null>(null)
   bindCrmAppRole(appRole)
   const showCallCosts = canSeeTelnyxCosts(appRole)
+
+  useEffect(() => {
+    let cancelled = false
+    const containerId = workshop.containerIdTaller || String(workshop.originalId || '')
+    if (isSuperAdmin || !containerId) {
+      setEnabledViews(null)
+      return
+    }
+    void fetchLicenseViews(containerId).then((views) => {
+      if (!cancelled) setEnabledViews(views)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [isSuperAdmin, workshop.containerIdTaller, workshop.originalId])
 
   useEffect(() => {
     bindCrmAppRole(appRole)
@@ -236,10 +254,10 @@ export default function DashboardShell({
       setShellRoute('equipos')
       return
     }
-    if (!routeAllowedForRole(shellRoute, appRole)) {
-      setShellRoute(defaultRouteForRole(appRole))
+    if (!routeAllowedForRole(shellRoute, appRole, { superAdmin: isSuperAdmin, enabledViews })) {
+      setShellRoute(defaultRouteForRole(appRole, { superAdmin: isSuperAdmin, enabledViews }))
     }
-  }, [appRole, shellRoute])
+  }, [appRole, shellRoute, isSuperAdmin, enabledViews])
 
   useEffect(() => {
     const sync = () => setBotName(loadActiveBotProfile().name)
@@ -751,6 +769,8 @@ export default function DashboardShell({
     <>
     <AppShell
       workshopName={workshop.name}
+      groupName={workshop.groupName}
+      centerName={workshop.centerName}
       workshopLogoUrl={workshop.logo}
       licenseLogoUrl={licenseLogoUrl}
       productName={getAppProductName()}
@@ -765,6 +785,8 @@ export default function DashboardShell({
       asesorRole={crmAppRoleLabel(appRole, { superAdmin: isSuperAdmin })}
       asesorTeam={appRole === 'asesor' ? asesorTeam : null}
       appRole={appRole}
+      isSuperAdmin={isSuperAdmin}
+      enabledViews={enabledViews}
       onLocalPreviewRole={onLocalPreviewRole}
       previewAdvisorId={previewAdvisorId}
     >
@@ -835,7 +857,14 @@ export default function DashboardShell({
           }}
         />
       ) : shellRoute === 'stats-equipo' ? (
-        <EmployeeStatsView workshop={workshop} currentUser={currentUser} />
+        <OperatorsDeskView
+          workshop={workshop}
+          currentUser={currentUser}
+          readOnly={appRole === 'asesor'}
+          onOpenLead={openLead}
+        />
+      ) : shellRoute === 'licencias' ? (
+        <LicensesDeskView workshop={workshop} />
       ) : shellRoute === 'gasto-ia' ? (
         <AiUsageView workshop={workshop} />
       ) : shellRoute === 'tareas-hoy' ? (
@@ -849,7 +878,12 @@ export default function DashboardShell({
           refreshToken={gestionBump}
         />
       ) : shellRoute === 'laura' ? (
-        <LauraIntelligenceView workshopName={workshop.name} showCallCosts={showCallCosts} />
+        <LauraIntelligenceView
+          workshopName={workshop.name}
+          idtaller={workshop.containerIdTaller || String(workshop.id || '')}
+          idtalleres={[workshop.containerIdTaller, workshop.id, workshop.originalId].map((item) => String(item || ''))}
+          showCallCosts={showCallCosts}
+        />
       ) : shellRoute === 'bot-identity' ? (
         <BotIdentityView />
       ) : shellRoute === 'configuration' ? (

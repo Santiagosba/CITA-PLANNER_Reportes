@@ -1,0 +1,28 @@
+---
+description: Jerarquía grupo → licencias → centros
+alwaysApply: true
+---
+
+# Grupo, licencia y centro
+
+Un **grupo** tiene **varias licencias**. Cada **licencia** tiene **varios centros**.
+
+En datos antiguos la licencia aparece como «taller». En la app no se llama taller.
+
+No mezclar los tres:
+
+- **Grupo** = el cliente / holding (p. ej. Grupo Gamboa)
+- **Licencia** = cada unidad del grupo (p. ej. Supra Gamboa). En tablas sigue siendo `talleres`
+- **Centro** = un punto de esa licencia (recepción, chapa, ventas…)
+
+## Al entrar
+
+El admin elige **grupo → licencia**. Los **centros de esa licencia entran ya listos** con la sesión. No hay un tercer paso para elegir un solo centro.
+
+## En Grupos y licencias
+
+Al activar un cliente se ven las **licencias** del grupo y, debajo de cada licencia, sus **centros**.
+
+En **Usuarios** se asignan a cada cuenta: grupos, licencias y centros.
+
+Textos en español llano: «Elige tu grupo», «Elige tu licencia», «Usuarios».

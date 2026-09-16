@@ -23,6 +23,7 @@ type Props = {
   readOnly?: boolean
   onAssignTeam: (peticionId: string, teamId: string | null) => void
   onOpenLead?: (peticion: PeticionPendiente) => void
+  showOpenButton?: boolean
 }
 
 function firstName(name: string): string {
@@ -39,6 +40,7 @@ export default function AdvisorTicketList({
   readOnly = false,
   onAssignTeam,
   onOpenLead,
+  showOpenButton = true,
 }: Props) {
   const [estado, setEstado] = useState<EstadoFilter>('todas')
   const owned = useMemo(
@@ -124,7 +126,7 @@ export default function AdvisorTicketList({
                   <span className={`badge ${item.gestionado ? 'tone-positive' : sla ? 'tone-negative' : 'tone-warning'}`}>
                     {item.gestionado ? 'Hecho' : sla ? 'SLA' : 'Por hacer'}
                   </span>
-                  {onOpenLead ? (
+                  {showOpenButton && onOpenLead ? (
                     <button type="button" className="ghost-button" onClick={() => onOpenLead(item)}>
                       Abrir ficha
                     </button>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowLeft, ChevronRight, Eye, EyeOff, KeyRound, Plus, RotateCcw, Search, Trash2, Users } from 'lucide-react'
+import OperatorAvatar from '../components/OperatorAvatar'
 import AccountPasswordFields, { type AccountPasswordForm } from '../components/AccountPasswordFields'
 import ApiStatusBanner from '../components/ApiStatusBanner'
 import ActionButton, { type ActionStatus } from '../components/ui/ActionButton'
@@ -616,9 +617,7 @@ export default function TeamsManagerView({
           className={`teams-guide-pick-card teams-guide-person-row${waitingDelete ? ' is-pending' : ''}`}
           onClick={() => openPerson(person.id, opts?.from ?? 'list')}
         >
-          <span className={`teams-guide-avatar${waitingDelete ? ' is-muted' : ''}`} aria-hidden>
-            {initials(person.name)}
-          </span>
+          <OperatorAvatar name={person.name} photoUrl={person.photoUrl} muted={waitingDelete} />
           <span className="teams-guide-person-copy">
             <strong>
               {person.name}
@@ -1038,12 +1037,12 @@ export default function TeamsManagerView({
             Volver
           </button>
           <div className="teams-guide-ficha-head">
-            <span
-              className={`teams-guide-avatar${isPersonPendingDelete(selectedPerson) ? ' is-muted' : ''}`}
-              aria-hidden
-            >
-              {initials(selectedPerson.name)}
-            </span>
+            <OperatorAvatar
+              name={selectedPerson.name}
+              photoUrl={selectedPerson.photoUrl}
+              muted={isPersonPendingDelete(selectedPerson)}
+              size="lg"
+            />
             <div>
               <h2 className="ops-card-title">
                 {selectedPerson.name}
@@ -1139,9 +1138,7 @@ export default function TeamsManagerView({
                         className="teams-guide-person-open"
                         onClick={() => openPerson(person.id, 'team')}
                       >
-                        <span className="teams-guide-avatar" aria-hidden>
-                          {initials(person.name)}
-                        </span>
+                        <OperatorAvatar name={person.name} photoUrl={person.photoUrl} />
                         <span className="teams-guide-person-copy">
                           <strong>
                             {person.name}
@@ -1194,9 +1191,7 @@ export default function TeamsManagerView({
                   <ul className="teams-guide-people">
                     {outsiders.map((person) => (
                       <li key={person.id} className="teams-guide-person">
-                        <span className="teams-guide-avatar is-muted" aria-hidden>
-                          {initials(person.name)}
-                        </span>
+                        <OperatorAvatar name={person.name} photoUrl={person.photoUrl} muted />
                         <span className="teams-guide-person-copy">
                           <strong>{person.name}</strong>
                           <small>{person.email}</small>

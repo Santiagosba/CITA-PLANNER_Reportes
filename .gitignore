@@ -9,3 +9,4 @@ server/.env
 
 .vercel
 .env*
+supabase/.temp/

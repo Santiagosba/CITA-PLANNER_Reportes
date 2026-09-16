@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import HexLoader from './components/ui/HexLoader'
 import { supabase } from './lib/supabase'
 import { CRM_FAVICON_FALLBACK_HREF, fetchCrmHubWebBranding, type CrmHubWebBranding } from './lib/crmHubWebBranding'
@@ -22,7 +22,6 @@ import {
 import { clearLegacyDemoSession, demoAsesoresEnabled, signInAsDemoAsesor, type DemoAsesor } from './lib/demoAsesores'
 import {
   LOCAL_PREVIEW_ENABLED,
-  LOCAL_PREVIEW_WORKSHOP,
   buildLocalPreviewUser,
   clearLocalPreview,
   readLocalPreview,
@@ -72,6 +71,17 @@ async function redirectNonAdminUserToBaseUrl(
     setLoginNotice({
       kind: 'error',
       message: 'Tu usuario no tiene un taller asignado en esta web.',
+    })
+    return
+  }
+
+  if (base.mustPickLicense) {
+    replaceStateToRoot(null)
+    setSlugBranding(null)
+    setPreferredWorkshopIdTaller(null)
+    setLoginNotice({
+      kind: 'info',
+      message: 'Elige tu licencia y luego el taller.',
     })
     return
   }
@@ -363,6 +373,12 @@ export default function App() {
 
       const base = await resolveNonAdminBaseRoute(session as any)
       if (cancelled) return
+      if (base?.mustPickLicense) {
+        replaceStateToRoot(null)
+        setSlugBranding(null)
+        setPreferredWorkshopIdTaller(null)
+        return
+      }
       if (!base) {
         try {
           await signOut()
@@ -534,22 +550,11 @@ export default function App() {
 
     void (async () => {
       if (!selectedWorkshop) {
-        const s = slugBranding?.slug?.trim()
-        if (s) {
-          replaceStateToRoot(s)
-          return
-        }
-        const pathSlug = parseWorkshopSlugFromPathname(
-          typeof window !== 'undefined' ? window.location.pathname : urlPathname,
-        )
-        if ((session as any)?.user && pathSlug) {
-          return
-        }
-        replaceStateToRoot(null)
         return
       }
       const idtaller = String(selectedWorkshop.originalId || '')
-      if (!idtaller) {
+      const containerId = String(selectedWorkshop.containerIdTaller || '').trim()
+      if (!idtaller && !containerId) {
         replaceStateToRoot(slugBranding?.slug?.trim() || null)
         return
       }
@@ -558,7 +563,7 @@ export default function App() {
         replaceStateToRoot(containerSlug)
         return
       }
-      const slug = await fetchSlugForTaller(idtaller)
+      const slug = await fetchSlugForTaller(containerId || idtaller)
       if (cancelled) return
       if (slug?.trim()) {
         replaceStateToRoot(slug.trim())
@@ -632,10 +637,12 @@ export default function App() {
     // Con éxito, `onAuthStateChange` fija la sesión real (JWT) como en cualquier login.
   }, [])
 
-  const previewUser = localPreview ? buildLocalPreviewUser(localPreview.role, localPreview.advisorId) : null
+  const previewUser = useMemo(
+    () => (localPreview ? buildLocalPreviewUser(localPreview.role, localPreview.advisorId) : null),
+    [localPreview],
+  )
   const effectiveUser = previewUser ?? (session as { user?: unknown } | null)?.user
-  const previewOnly = Boolean(localPreview && !(session as { user?: unknown } | null)?.user)
-  const effectiveWorkshop = selectedWorkshop ?? (localPreview ? LOCAL_PREVIEW_WORKSHOP : null)
+  const effectiveWorkshop = selectedWorkshop
 
   const rootClass = isDarkMode ? 'dark' : ''
 
@@ -666,7 +673,7 @@ export default function App() {
     return (
       <div className={rootClass}>
         <WorkshopSelectorView
-          user={(session as any).user}
+          user={effectiveUser}
           onSelect={setSelectedWorkshop}
           isDarkMode={isDarkMode}
           preferredWorkshopIdTaller={preferredWorkshopIdTaller}
@@ -691,8 +698,10 @@ export default function App() {
         licenseLogoUrl={mergedSidebarLogo}
         onLogout={() => void handleLogout()}
         onClearWorkshop={() => {
-          if (previewOnly) return
           setSelectedWorkshop(null)
+          setPreferredWorkshopIdTaller(null)
+          setSlugBranding(null)
+          replaceStateToRoot(null)
         }}
         isDarkMode={isDarkMode}
         onToggleTheme={() => setIsDarkMode((prev) => !prev)}

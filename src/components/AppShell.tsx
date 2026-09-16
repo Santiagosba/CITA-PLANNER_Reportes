@@ -1,10 +1,11 @@
 import {
   BadgeCheck,
-  BarChart3,
+  Building2,
   Coins,
   History,
   ClipboardList,
   Columns3,
+  ContactRound,
   LayoutDashboard,
   LogOut,
   Moon,
@@ -23,6 +24,7 @@ import type { DashboardShellRoute } from './Sidebar'
 import { SoftphoneStatusChip } from './SoftphoneDock'
 import { BOT_CONFIG_EVENT, loadActiveBotProfile } from '../lib/botProfiles'
 import type { CrmAppRole } from '../lib/crmRoles'
+import { licenseViewEnabled, type LicenseViewId } from '../lib/crmViews'
 import { LOCAL_PREVIEW_ASESORES } from '../lib/localPreview'
 
 const ADMIN_NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] = [
@@ -32,7 +34,7 @@ const ADMIN_NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] 
   { id: 'equipos', label: 'Cuentas y equipos', icon: Users },
   { id: 'asignar-tarea', label: 'Asignar tarea', icon: UserPlus },
   { id: 'tareas-hoy', label: 'Historial', icon: History },
-  { id: 'stats-equipo', label: 'Estadísticas', icon: BarChart3 },
+  { id: 'stats-equipo', label: 'Operadores', icon: ContactRound },
   { id: 'gasto-ia', label: 'Gasto IA', icon: Coins },
   { id: 'laura', label: 'Asistente de IA Laura', icon: Sparkles },
   { id: 'bot-identity', label: 'Identidad del bot', icon: BadgeCheck },
@@ -118,9 +120,11 @@ function DealerMark({ name, logoUrl }: { name: string; logoUrl?: string | null }
 
 type Props = {
   workshopName: string
-  /** Logo propio del taller (`licencia_module_talleres.logo`). */
+  groupName?: string | null
+  centerName?: string | null
+  /** Logo de la licencia (`licencia_module_talleres.logo`). */
   workshopLogoUrl?: string | null
-  /** Logo de la licencia (`crm_config.ui_branding.logo_url`), respaldo del anterior. */
+  /** Logo del grupo (`crm_config.ui_branding.logo_url`), respaldo del anterior. */
   licenseLogoUrl?: string | null
   productName: string
   activeRoute: DashboardShellRoute
@@ -134,6 +138,8 @@ type Props = {
   asesorRole?: string | null
   asesorTeam?: string | null
   appRole?: CrmAppRole
+  isSuperAdmin?: boolean
+  enabledViews?: LicenseViewId[] | null
   onLocalPreviewRole?: (role: CrmAppRole, advisorId?: string) => void
   previewAdvisorId?: string
   children: ReactNode
@@ -141,6 +147,8 @@ type Props = {
 
 export default function AppShell({
   workshopName,
+  groupName = null,
+  centerName = null,
   workshopLogoUrl,
   licenseLogoUrl,
   productName,
@@ -155,11 +163,17 @@ export default function AppShell({
   asesorRole,
   asesorTeam,
   appRole = 'asesor',
+  isSuperAdmin = false,
+  enabledViews = null,
   onLocalPreviewRole,
   previewAdvisorId,
   children,
 }: Props) {
-  const navItems = appRole === 'admin' ? ADMIN_NAV : ASESOR_NAV
+  const baseNav = appRole === 'admin' ? ADMIN_NAV : ASESOR_NAV
+  const navItems = [
+    ...baseNav.filter((item) => isSuperAdmin || licenseViewEnabled(enabledViews, item.id)),
+    ...(isSuperAdmin ? [{ id: 'licencias' as const, label: 'Grupos y licencias', icon: Building2 }] : []),
+  ]
   const [botName, setBotName] = useState(() => loadActiveBotProfile().name)
   useEffect(() => {
     const sync = () => setBotName(loadActiveBotProfile().name)
@@ -228,8 +242,9 @@ export default function AppShell({
           <div className="dashboard-sidebar-dealer">
             <DealerMark name={workshopName} logoUrl={workshopLogoUrl || licenseLogoUrl} />
             <div className="dashboard-sidebar-dealer-copy">
-              <p className="section-eyebrow">Centro</p>
+              <p className="section-eyebrow">{groupName || 'Licencia'}</p>
               <p className="dashboard-sidebar-workshop">{workshopName}</p>
+              {centerName ? <p className="dashboard-sidebar-center">{centerName}</p> : null}
             </div>
           </div>
           {asesorName ? (
@@ -345,7 +360,7 @@ export default function AppShell({
           </button>
           <button type="button" className="dashboard-nav-item" onClick={onChangeWorkshop}>
             <RefreshCw size={18} aria-hidden />
-            Cambiar taller
+            Cambiar grupo
           </button>
           <button type="button" className="dashboard-nav-item dashboard-nav-item-muted" onClick={onLogout}>
             <LogOut size={18} aria-hidden />

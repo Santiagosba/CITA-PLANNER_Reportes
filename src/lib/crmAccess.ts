@@ -57,10 +57,28 @@ export function isTallerAdminUser(user: unknown): boolean {
   return TALLER_ADMIN_APP_ROLES.has(appRole(user))
 }
 
-/** Talleres operativos (p. ej. Supra Gamboa) firmados en `app_metadata.crm_idtalleres`. */
+/** Admin de un grupo: elige licencia. Los centros entran con ella. No es el super admin. */
+export function isLicenseAdminUser(user: unknown): boolean {
+  return isTallerAdminUser(user) && !isSuperAdminUser(user)
+}
+
+/** Licencias operativas (p. ej. Supra Gamboa) firmadas en `app_metadata.crm_idtalleres`. */
 export function assignedOperationalTallerIds(user: unknown): Set<string> {
   const raw = appMetadata(user).crm_idtalleres
   return new Set(rawClaimToUuidList(raw).map(normalizeUuid).filter((id) => UUID_RE.test(id)))
+}
+
+/** Centros firmados en `app_metadata.crm_idcentros`. Vacío = todos los de la licencia. */
+export function assignedOperationalCenterIds(user: unknown): Set<string> {
+  return new Set(rawClaimToUuidList(appMetadata(user).crm_idcentros).map(normalizeUuid).filter(Boolean))
+}
+
+export function filterCentersForUser<T extends { idcentro: string }>(centers: T[], user: unknown): T[] {
+  if (isSuperAdminUser(user) || isLicenseAdminUser(user)) return centers
+  const assigned = assignedOperationalCenterIds(user)
+  if (assigned.size === 0) return centers
+  const filtered = centers.filter((center) => assigned.has(normalizeUuid(center.idcentro)))
+  return filtered.length > 0 ? filtered : centers
 }
 
 export function filterWorkshopsForUser(
@@ -68,7 +86,7 @@ export function filterWorkshopsForUser(
   user: unknown,
   isSuper = isSuperAdminUser(user),
 ): Workshop[] {
-  if (isSuper) return workshops
+  if (isSuper || isLicenseAdminUser(user)) return workshops
   const assigned = assignedOperationalTallerIds(user)
   if (assigned.size === 0) return workshops
   const filtered = workshops.filter((workshop) => {

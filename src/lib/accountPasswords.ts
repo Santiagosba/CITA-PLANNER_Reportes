@@ -64,6 +64,7 @@ export async function updateAccountPassword(
     role?: TallerAccountRole
     hubWebId?: string | null
     crmIdtaller?: string
+    crmIdtalleres?: string[]
   },
 ): Promise<{ created?: boolean; role?: TallerAccountRole }> {
   try {
@@ -76,10 +77,14 @@ export async function updateAccountPassword(
       ...(opts?.role ? { role: opts.role } : {}),
       ...(opts?.hubWebId ? { hubWebId: opts.hubWebId } : {}),
       ...(opts?.crmIdtaller ? { crmIdtaller: opts.crmIdtaller } : {}),
+      ...(opts?.crmIdtalleres?.length ? { crmIdtalleres: opts.crmIdtalleres } : {}),
     })
   } catch (error) {
     try {
-      return await crmUpdateAccountPassword(normalizeEmail(email), nextPassword, opts)
+      return await crmUpdateAccountPassword(normalizeEmail(email), nextPassword, {
+        ...opts,
+        crmIdtalleres: opts?.crmIdtalleres,
+      })
     } catch {
       throw error
     }

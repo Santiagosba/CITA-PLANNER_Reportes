@@ -61,6 +61,13 @@ function mergeIds(existing: unknown, nextId: string | null): string[] {
   return [...ids];
 }
 
+function mergeIdList(existing: unknown, extra: unknown): string[] {
+  let ids = mergeIds(existing, isUuid(extra) ? String(extra) : null);
+  const raw = Array.isArray(extra) ? extra : [];
+  for (const item of raw) ids = mergeIds(ids, isUuid(item) ? String(item) : null);
+  return ids;
+}
+
 function mergeConnectSites(
   appMeta: Record<string, unknown>,
   userMeta: Record<string, unknown>,
@@ -151,6 +158,7 @@ Deno.serve(async (req) => {
   const email = normEmail(body.email);
   const idtaller = isUuid(body.idtaller) ? String(body.idtaller).toLowerCase() : null;
   const crmIdtaller = isUuid(body.crmIdtaller) ? String(body.crmIdtaller).toLowerCase() : idtaller;
+  const crmIdtalleres = mergeIdList(body.crmIdtalleres, crmIdtaller);
   const hubWebId = isUuid(body.hubWebId) ? String(body.hubWebId).toLowerCase() : null;
   const hasRole = body.role != null && String(body.role).trim() !== "";
   const requestedRole = String(body.role || "asesor").trim().toLowerCase() === "taller_admin"
@@ -200,7 +208,7 @@ Deno.serve(async (req) => {
           email_confirm: true,
           app_metadata: {
             role: requestedRole,
-            ...(crmIdtaller ? { crm_idtalleres: [crmIdtaller] } : {}),
+            ...(crmIdtalleres.length ? { crm_idtalleres: crmIdtalleres } : {}),
             ...(connectSites.length ? { connect_site_ids: connectSites } : {}),
           },
           user_metadata: displayName ? { full_name: displayName } : {},
@@ -229,7 +237,7 @@ Deno.serve(async (req) => {
           app_metadata: {
             ...currentApp,
             role: nextRole,
-            crm_idtalleres: mergeIds(currentApp.crm_idtalleres, crmIdtaller),
+            crm_idtalleres: mergeIdList(currentApp.crm_idtalleres, crmIdtalleres),
             ...(connectSites.length ? { connect_site_ids: connectSites } : {}),
           },
           user_metadata: {
@@ -272,7 +280,7 @@ Deno.serve(async (req) => {
         app_metadata: {
           ...currentApp,
           role: requestedRole,
-          crm_idtalleres: mergeIds(currentApp.crm_idtalleres, crmIdtaller),
+          crm_idtalleres: mergeIdList(currentApp.crm_idtalleres, crmIdtalleres),
           ...(connectSites.length ? { connect_site_ids: connectSites } : {}),
         },
         user_metadata: {

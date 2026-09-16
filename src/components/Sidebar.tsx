@@ -17,6 +17,7 @@ export type DashboardShellRoute =
   | 'reportes'
   | 'laura'
   | 'bot-identity'
+  | 'licencias'
   | 'configuration'
 
 type Props = {
@@ -180,6 +181,9 @@ export default function Sidebar({
                   {productName}
                 </span>
                 <span className="truncate text-[10px] text-slate-400 dark:text-slate-500">{workshop.name}</span>
+                {workshop.centerName ? (
+                  <span className="truncate text-[10px] text-slate-400 dark:text-slate-500">{workshop.centerName}</span>
+                ) : null}
               </div>
             )}
           </div>

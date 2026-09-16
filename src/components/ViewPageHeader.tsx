@@ -75,17 +75,22 @@ function pageCopy(
     case 'asignar-tarea':
       return {
         title: 'Asignar tarea',
-        subtitle: 'Elige asesor, tipo y día. La tarea aparece en su bandeja.',
+        subtitle: 'A quién, qué hay que hacer y para qué día.',
       }
     case 'stats-equipo':
       return {
-        title: 'Estadísticas',
-        subtitle: 'Trabajo de cada asesor: tareas asignadas y consultas cerradas.',
+        title: 'Operadores',
+        subtitle: 'Foto, datos, tickets y rendimiento de cada persona.',
+      }
+    case 'licencias':
+      return {
+        title: 'Grupos y licencias',
+        subtitle: 'Primero las personas. Dentro, los grupos, licencias y centros que tienen activos.',
       }
     case 'gasto-ia':
       return {
         title: 'Gasto de IA',
-        subtitle: 'Tokens y coste estimado de OpenAI en este taller.',
+        subtitle: 'Tokens de OpenAI. El teléfono Telnyx está en Laura → Costes.',
       }
     case 'tareas-hoy':
       return {
@@ -206,7 +211,9 @@ export default function ViewPageHeader({
       <div className="view-page-header-copy">
         <h1 className="section-title">{copy.title}</h1>
         <div className="view-page-header-meta">
+          {workshop.groupName ? <span className="badge tone-neutral">{workshop.groupName}</span> : null}
           <span className="badge tone-neutral">{workshop.name}</span>
+          {workshop.centerName ? <span className="badge tone-neutral">{workshop.centerName}</span> : null}
           <button
             type="button"
             className={`badge ${slaCount > 0 ? 'tone-negative' : 'tone-positive'}`}

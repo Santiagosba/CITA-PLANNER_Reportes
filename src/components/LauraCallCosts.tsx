@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Coins, FileText, Mic, Phone, RefreshCw, Timer } from 'lucide-react'
 import Card from './ui/Card'
-import { CrmApiError, fetchCallCostStats, isCrmApiConfigured, type CallCostStats } from '../lib/crmApi'
+import { CrmApiError, fetchCallCostStats, type CallCostStats } from '../lib/crmApi'
 import { canSeeTelnyxCosts } from '../lib/crmRoles'
+import { filterCrmUuids } from '../lib/crmUuid'
 import { fmtMoney, fmtSeconds } from '../lib/callFormat'
 
 function monthRange(): { from: string; to: string; label: string } {
@@ -21,11 +22,18 @@ function last30(): { from: string; to: string; label: string } {
 
 type RangeKey = 'month' | '30d'
 
-export default function LauraCallCosts() {
+type Props = {
+  idtaller?: string | null
+  idtalleres?: string[]
+}
+
+export default function LauraCallCosts({ idtaller = null, idtalleres = [] }: Props) {
   const [range, setRange] = useState<RangeKey>('month')
   const [stats, setStats] = useState<CallCostStats | null>(null)
-  const [loading, setLoading] = useState(isCrmApiConfigured())
+  const [loading, setLoading] = useState(canSeeTelnyxCosts())
   const [error, setError] = useState<string | null>(null)
+  const tallerKey = filterCrmUuids([idtaller, ...idtalleres]).join(',')
+  const tallerIds = useMemo(() => (tallerKey ? tallerKey.split(',') : []), [tallerKey])
 
   const window = useMemo(() => (range === 'month' ? monthRange() : last30()), [range])
 
@@ -36,15 +44,15 @@ export default function LauraCallCosts() {
       setStats(null)
       return
     }
-    if (!isCrmApiConfigured()) {
-      setLoading(false)
-      setError('Falta VITE_CRM_API_URL para leer los costes de api-crm.')
-      return
-    }
     let cancelled = false
     setLoading(true)
     setError(null)
-    void fetchCallCostStats({ from: window.from, to: window.to })
+    void fetchCallCostStats({
+      from: window.from,
+      to: window.to,
+      idtaller: tallerIds[0] || null,
+      idtalleres: tallerIds,
+    })
       .then((next) => {
         if (!cancelled) setStats(next)
       })
@@ -59,7 +67,7 @@ export default function LauraCallCosts() {
     return () => {
       cancelled = true
     }
-  }, [window.from, window.to])
+  }, [window.from, window.to, tallerIds])
 
   const currency = stats?.currency || 'USD'
   const maxDay = Math.max(0.0001, ...(stats?.series.map((d) => d.cost) ?? [0]))
@@ -101,7 +109,7 @@ export default function LauraCallCosts() {
             <p className="section-eyebrow">Consumo de voz</p>
             <h2 className="ops-card-title">Coste real de las llamadas del CRM</h2>
             <p className="section-subtitle mt-1">
-              Suma de los Detail Records de Telnyx (pata PSTN + WebRTC + grabación) que api-crm guarda al
+              Suma de los Detail Records de Telnyx (pata PSTN + WebRTC + grabación) que se guardan al
               colgar. {window.label}.
             </p>
           </div>

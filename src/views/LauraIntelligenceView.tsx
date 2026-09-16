@@ -64,10 +64,17 @@ const PRECISION = [
 
 type Props = {
   workshopName: string
+  idtaller?: string | null
+  idtalleres?: string[]
   showCallCosts?: boolean
 }
 
-export default function LauraIntelligenceView({ workshopName, showCallCosts = false }: Props) {
+export default function LauraIntelligenceView({
+  workshopName,
+  idtaller = null,
+  idtalleres = [],
+  showCallCosts = false,
+}: Props) {
   const [tab, setTab] = useState<LauraTab>('rendimiento')
 
   useEffect(() => {
@@ -225,7 +232,9 @@ export default function LauraIntelligenceView({ workshopName, showCallCosts = fa
         </>
       ) : null}
 
-      {tab === 'costes' && showCallCosts ? <LauraCallCosts /> : null}
+      {tab === 'costes' && showCallCosts ? (
+        <LauraCallCosts idtaller={idtaller} idtalleres={idtalleres} />
+      ) : null}
 
       {tab === 'sla' ? (
         <>

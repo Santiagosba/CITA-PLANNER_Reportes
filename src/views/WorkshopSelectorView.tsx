@@ -1,62 +1,104 @@
 /**
- * WorkshopSelector — modelo Hub Connect (contenedor + RPC de talleres reales).
- * Ajusta copys en `src/lib/appIdentity.ts` o vía `VITE_APP_*`.
+ * Elige grupo, licencia y centro. Misma capa visual que el login (Card, pasos, tarjetas).
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
-import type { Workshop } from '../types';
-import {
-  LogOut, Search as SearchIcon, ArrowRight, ChevronLeft, Building2,
-} from 'lucide-react';
-import { HexLoaderScreen } from '../components/ui/HexLoader';
-import { filterWorkshopsForUser } from '../lib/crmAccess';
-import { canBrowseAllWorkshops } from '../lib/operationsConnect';
+import React, { useEffect, useMemo, useState } from 'react'
+import type { Workshop } from '../types'
+import { ArrowRight, Building2, ChevronLeft, LogOut, Search as SearchIcon } from 'lucide-react'
+import { HexLoaderScreen } from '../components/ui/HexLoader'
+import { filterCentersForUser, filterWorkshopsForUser } from '../lib/crmAccess'
+import { canBrowseAllWorkshops } from '../lib/operationsConnect'
 import {
   parseConnectSiteIds,
   scopedSitesEmptyDenied,
   sessionAllowsThisHubWeb,
-} from '../lib/connectSiteScope';
-import { getCrmHubWebIdFromEnv, MISSING_VITE_HUB_WEB_ID_MESSAGE } from '../lib/hubWebEnv';
+} from '../lib/connectSiteScope'
+import { getCrmHubWebIdFromEnv, MISSING_VITE_HUB_WEB_ID_MESSAGE } from '../lib/hubWebEnv'
 import {
   fetchAllActiveContainers,
-  fetchContainerRow,
+  fetchCentrosForGrupo,
+  fetchCentrosForTalleres,
   fetchContainersByIds,
   fetchLicenciaModuleTalleres,
   fetchUserContainerIds,
   type ContainerRow,
   type LicenciaTaller,
-} from '../lib/licenciaGrupo';
-import { signOut } from '../utils/auth';
-import {
-  getAppProductName,
-} from '../lib/appIdentity';
-import type { TallerBranding } from '../lib/tallerBranding';
-import Card from '../components/ui/Card';
+  type TallerCentro,
+} from '../lib/licenciaGrupo'
+import { signOut } from '../utils/auth'
+import { getAppProductName } from '../lib/appIdentity'
+import { LOCAL_PREVIEW_WORKSHOP, readLocalPreview } from '../lib/localPreview'
+import type { TallerBranding } from '../lib/tallerBranding'
+import Card from '../components/ui/Card'
+
+const LOCAL_PREVIEW_CONTAINERS: ContainerRow[] = [
+  {
+    idtaller: 'local-preview',
+    hubWebId: null,
+    idlicenciagrupo: '1',
+    nombre_personalizado: 'Grupo local',
+    slug: 'local',
+    data_schema: 'demo',
+    isModuleActive: true,
+  },
+]
+
+const LOCAL_PREVIEW_SHOPS: Workshop[] = [
+  LOCAL_PREVIEW_WORKSHOP,
+  {
+    id: 'local-preview-2',
+    name: 'Licencia norte',
+    city: 'Bilbao',
+    source: 'demo',
+    originalId: 'local-preview-2',
+    containerIdTaller: 'local-preview',
+  },
+]
+
+const LOCAL_PREVIEW_CENTERS: TallerCentro[] = [
+  { idcentro: 'local-center-1', idtaller: 'local-preview', nombre: 'Recepción Madrid', poblacion: 'Madrid' },
+  { idcentro: 'local-center-2', idtaller: 'local-preview', nombre: 'Chapa Madrid', poblacion: 'Madrid' },
+  { idcentro: 'local-center-3', idtaller: 'local-preview-2', nombre: 'Recepción Bilbao', poblacion: 'Bilbao' },
+]
 
 interface WorkshopSelectorViewProps {
-  user: unknown;
-  onSelect: (workshop: Workshop) => void;
-  isDarkMode?: boolean;
-  onLogout?: () => void | Promise<void>;
-  preferredWorkshopIdTaller?: string | null;
-  /**
-   * Branding cuando la URL lleva slug de taller (misma fuente que el login:
-   * `crm_config.ui_branding` para ese contenedor).
-   */
-  licenseBranding?: TallerBranding | null;
-  /** Icono de la web Hub (`VITE_HUB_WEB_ICON_URL` o `hub_webs.icon_image_url`) si no hay `logo_url` de licencia. */
-  hubWebIconUrl?: string | null;
-  /** Nombre mostrado del taller/licencia vía slug (subtítulo de cabecera, alineado al login). */
-  licenseDisplayName?: string | null;
+  user: unknown
+  onSelect: (workshop: Workshop) => void
+  isDarkMode?: boolean
+  onLogout?: () => void | Promise<void>
+  preferredWorkshopIdTaller?: string | null
+  licenseBranding?: TallerBranding | null
+  hubWebIconUrl?: string | null
+  licenseDisplayName?: string | null
 }
 
-const RECENT_STORAGE_KEY = 'crm_last_workshop';
+const RECENT_WORKSHOP_KEY = 'crm_last_workshop'
+const RECENT_LICENSE_KEY = 'crm_last_license'
 
 function dataSchemaToSource(dataSchema: string | null | undefined): Workshop['source'] {
-  const s = String(dataSchema || '').trim().toLowerCase();
-  if (s === 'main' || s === 'public') return 'main';
-  if (s === 'starmadrid' || s === 'star') return 'starmadrid';
-  return 'aviold';
+  const s = String(dataSchema || '').trim().toLowerCase()
+  if (s === 'main' || s === 'public') return 'main'
+  if (s === 'starmadrid' || s === 'star') return 'starmadrid'
+  return 'aviold'
+}
+
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2)
+  const letters = parts.map((part) => part[0] || '').join('')
+  return (letters || 'L').toUpperCase()
+}
+
+function shopCountLabel(count: number | undefined): string {
+  if (count == null) return 'Elige la licencia después'
+  if (count === 1) return '1 licencia'
+  return `${count} licencias`
+}
+
+function centerCountLabel(count: number | undefined): string {
+  if (count == null) return 'Elige el centro después'
+  if (count === 0) return 'Sin centros'
+  if (count === 1) return '1 centro'
+  return `${count} centros`
 }
 
 function buildWorkshopFromLicenciaTaller(
@@ -64,320 +106,357 @@ function buildWorkshopFromLicenciaTaller(
   hubWebId?: string | null,
   containerIdtaller?: string | null,
 ): Workshop {
-  const source = dataSchemaToSource(t.data_schema);
-  const hid = hubWebId != null && String(hubWebId).trim() !== '' ? String(hubWebId).trim() : undefined;
+  const source = dataSchemaToSource(t.data_schema)
+  const hid = hubWebId != null && String(hubWebId).trim() !== '' ? String(hubWebId).trim() : undefined
   const cid =
     containerIdtaller != null && String(containerIdtaller).trim() !== ''
       ? String(containerIdtaller).trim()
-      : undefined;
+      : undefined
   return {
     id: `${source}-${t.idtaller}`,
     originalId: t.idtaller,
-    name: (t.nombre || 'Taller').trim() || 'Taller',
+    name: (t.nombre || 'Licencia').trim() || 'Licencia',
     address: t.direccion || undefined,
     city: t.poblacion || undefined,
     logo: t.logo || undefined,
     source,
     ...(hid ? { hubWebId: hid } : {}),
     ...(cid ? { containerIdTaller: cid } : {}),
-  } as Workshop;
+  } as Workshop
 }
 
 function buildWorkshopFromContainer(c: ContainerRow): Workshop {
-  const source = dataSchemaToSource(c.data_schema);
+  const source = dataSchemaToSource(c.data_schema)
   const hid =
-    c.hubWebId != null && String(c.hubWebId).trim() !== '' ? String(c.hubWebId).trim() : undefined;
+    c.hubWebId != null && String(c.hubWebId).trim() !== '' ? String(c.hubWebId).trim() : undefined
   return {
     id: `${source}-${c.idtaller}`,
     originalId: c.idtaller,
     containerIdTaller: c.idtaller,
-    name: (c.nombre_personalizado || 'Taller').trim() || 'Taller',
+    name: (c.nombre_personalizado || 'Licencia').trim() || 'Licencia',
     source,
     ...(hid ? { hubWebId: hid } : {}),
-  } as Workshop;
-}
-
-async function mergeAllWorkshopsFromContainers(containers: ContainerRow[]): Promise<Workshop[]> {
-  const merged: Workshop[] = [];
-  const seen = new Set<string>();
-  for (const c of containers) {
-    if (!c.isModuleActive) continue;
-    if (!c.idlicenciagrupo) {
-      const w = buildWorkshopFromContainer(c);
-      const k = `${w.source}:${String(w.originalId).toLowerCase()}`;
-      if (!seen.has(k)) {
-        seen.add(k);
-        merged.push(w);
-      }
-      continue;
-    }
-    const rows = await fetchLicenciaModuleTalleres(c.idlicenciagrupo, c.hubWebId);
-    for (const t of rows) {
-      const w = buildWorkshopFromLicenciaTaller(t, c.hubWebId, c.idtaller);
-      const k = `${w.source}:${String(w.originalId).toLowerCase()}`;
-      if (!seen.has(k)) {
-        seen.add(k);
-        merged.push(w);
-      }
-    }
-  }
-  merged.sort((a, b) =>
-    (a.name || '').localeCompare(b.name || '', 'es', { numeric: true, sensitivity: 'base' }),
-  );
-  return merged;
+  } as Workshop
 }
 
 const WorkshopSelectorView: React.FC<WorkshopSelectorViewProps> = ({
   user,
   onSelect,
-  isDarkMode = true,
   onLogout,
-  preferredWorkshopIdTaller = null,
+  preferredWorkshopIdTaller: _preferredWorkshopIdTaller = null,
   licenseBranding = null,
   hubWebIconUrl = null,
   licenseDisplayName = null,
 }) => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [scanning, setScanning] = useState(false);
-  const [lastWorkshopId, setLastWorkshopId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [scanning, setScanning] = useState(false)
+  const [lastWorkshopId, setLastWorkshopId] = useState<string | null>(null)
+  const [lastLicenseId, setLastLicenseId] = useState<string | null>(null)
 
-  const [containers, setContainers] = useState<ContainerRow[]>([]);
-  const [activeContainer, setActiveContainer] = useState<ContainerRow | null>(null);
-  const [workshops, setWorkshops] = useState<Workshop[]>([]);
+  const [containers, setContainers] = useState<ContainerRow[]>([])
+  const [shopCounts, setShopCounts] = useState<Record<string, number>>({})
+  const [centerCounts, setCenterCounts] = useState<Record<string, number>>({})
+  const [activeContainer, setActiveContainer] = useState<ContainerRow | null>(null)
+  const [workshops, setWorkshops] = useState<Workshop[]>([])
+  const [groupCenters, setGroupCenters] = useState<TallerCentro[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const isSuperUser = useMemo(() => canBrowseAllWorkshops({ user }), [user])
+  const headerLogoSrc = (licenseBranding?.logo_url ?? '').trim() || (hubWebIconUrl ?? '').trim() || ''
+  const step: 'group' | 'license' = !activeContainer ? 'group' : 'license'
+  const groupName =
+    activeContainer?.nombre_personalizado ||
+    activeContainer?.slug ||
+    licenseDisplayName ||
+    ''
 
-  const isSuperUser = useMemo(() => canBrowseAllWorkshops({ user }), [user]);
-
-  const headerLogoSrc = (licenseBranding?.logo_url ?? '').trim() || (hubWebIconUrl ?? '').trim() || '';
+  const userId = (user as { id?: string } | null)?.id ?? ''
+  const userRole = String((user as { app_metadata?: { role?: string } } | null)?.app_metadata?.role ?? '')
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
+    let cancelled = false
+    setLoading(true)
+    setError(null)
 
-    (async () => {
+    void (async () => {
       try {
-        const saved = localStorage.getItem(RECENT_STORAGE_KEY);
-        if (saved) setLastWorkshopId(saved);
-
-        const crmWebId = getCrmHubWebIdFromEnv();
-        if (!crmWebId) {
-          setError(MISSING_VITE_HUB_WEB_ID_MESSAGE);
-          setLoading(false);
-          return;
+        try {
+          setLastWorkshopId(localStorage.getItem(RECENT_WORKSHOP_KEY))
+          setLastLicenseId(localStorage.getItem(RECENT_LICENSE_KEY))
+        } catch {
+          /* ignore */
         }
 
-        const parse = parseConnectSiteIds(user);
+        if (readLocalPreview()) {
+          setContainers(LOCAL_PREVIEW_CONTAINERS)
+          setShopCounts({ 'local-preview': LOCAL_PREVIEW_SHOPS.length })
+          setLoading(false)
+          return
+        }
+
+        const crmWebId = getCrmHubWebIdFromEnv()
+        if (!crmWebId) {
+          setError(MISSING_VITE_HUB_WEB_ID_MESSAGE)
+          setLoading(false)
+          return
+        }
+
+        const parse = parseConnectSiteIds(user)
         if (!isSuperUser && scopedSitesEmptyDenied(parse)) {
           setError(
             'Tu cuenta no tiene webs asignadas en Hub Connect (connect_site_ids vacío). Solicita acceso desde el panel Hub.',
-          );
-          setLoading(false);
-          return;
+          )
+          setLoading(false)
+          return
         }
         if (!isSuperUser && !sessionAllowsThisHubWeb(parse, crmWebId, false)) {
           setError(
             'Tu sesión no incluye esta instalación en Hub Connect (UUID de web ausente o no permitido en connect_site_ids).',
-          );
-          setLoading(false);
-          return;
+          )
+          setLoading(false)
+          return
         }
 
-        if (preferredWorkshopIdTaller) {
-          const row = await fetchContainerRow(preferredWorkshopIdTaller);
-          if (cancelled) return;
-          if (!row) {
-            setError('La URL del taller no existe o ha sido desactivada.');
-            setLoading(false);
-            return;
-          }
-          setContainers([row]);
-          setActiveContainer(row);
-          return;
-        }
-
+        let visible: ContainerRow[] = []
         if (isSuperUser) {
-          const allContainers = await fetchAllActiveContainers();
-          if (cancelled) return;
-          const visible = allContainers.filter((r) => r.isModuleActive);
-          if (visible.length === 0) {
-            setError('No hay licencias activas para este módulo.');
-            setLoading(false);
-            return;
+          visible = (await fetchAllActiveContainers()).filter((row) => row.isModuleActive)
+        } else {
+          const userId = (user as { id?: string } | null)?.id ?? null
+          const legacyId = (user as { user_metadata?: { legacy_id?: string } } | null)?.user_metadata?.legacy_id ?? null
+          const ownIds = await fetchUserContainerIds(userId, legacyId)
+          if (cancelled) return
+          if (ownIds.length === 0) {
+            setError('Tu usuario no tiene grupos asignados en esta web. Contacta con el administrador.')
+            setLoading(false)
+            return
           }
-          const merged = filterWorkshopsForUser(await mergeAllWorkshopsFromContainers(visible), user, true);
-          if (cancelled) return;
-          if (merged.length === 0) {
-            setError('No hay talleres activos en las licencias de este módulo.');
-            setLoading(false);
-            return;
-          }
-          setWorkshops(merged);
-          setContainers([]);
-          setActiveContainer(null);
-          if (merged.length === 1) {
-            try { localStorage.setItem(RECENT_STORAGE_KEY, merged[0].id); } catch { /* ignore */ }
-            onSelect(merged[0]);
-            return;
-          }
-          setLoading(false);
-          return;
+          visible = (await fetchContainersByIds(ownIds)).filter((row) => row.isModuleActive)
         }
+        if (cancelled) return
 
-        const userId = (user as any)?.id ?? null;
-        const legacyId = (user as any)?.user_metadata?.legacy_id ?? null;
-        let ownContainerIds: string[] = [];
-        if (!isSuperUser) {
-          ownContainerIds = await fetchUserContainerIds(userId, legacyId);
-          if (cancelled) return;
-          if (ownContainerIds.length === 0) {
-            setError('Tu usuario no tiene talleres asignados en esta web. Contacta con el administrador.');
-            setLoading(false);
-            return;
-          }
-        }
-
-        const rows = await fetchContainersByIds(ownContainerIds);
-        if (cancelled) return;
-
-        const visible = rows.filter((r) => r.isModuleActive);
         if (visible.length === 0) {
           setError(
-            'Tus talleres no tienen esta web activa en Hub (tabla taller_web_activo) para este despliegue.',
-          );
-          setLoading(false);
-          return;
+            isSuperUser
+              ? 'No hay grupos activos para este módulo.'
+              : 'Tus grupos no tienen esta web activa en Hub para este despliegue.',
+          )
+          setLoading(false)
+          return
         }
 
-        setContainers(visible);
-        if (visible.length === 1) setActiveContainer(visible[0]);
-        else setLoading(false);
-      } catch {
-        if (!cancelled) setError('Error de conexión al cargar el listado de talleres.');
-        if (!cancelled) setLoading(false);
-      }
-    })();
+        visible.sort((a, b) =>
+          String(a.nombre_personalizado || a.slug || a.idtaller).localeCompare(
+            String(b.nombre_personalizado || b.slug || b.idtaller),
+            'es',
+            { numeric: true, sensitivity: 'base' },
+          ),
+        )
+        setContainers(visible)
+        setLoading(false)
 
-    return () => { cancelled = true; };
-  }, [user, isSuperUser, preferredWorkshopIdTaller, onSelect]);
+        const counts: Record<string, number> = {}
+        await Promise.all(
+          visible.map(async (row) => {
+            if (!row.idlicenciagrupo) {
+              counts[row.idtaller] = 1
+              return
+            }
+            const shops = await fetchLicenciaModuleTalleres(row.idlicenciagrupo, row.hubWebId)
+            counts[row.idtaller] = shops.length
+          }),
+        )
+        if (!cancelled) setShopCounts(counts)
+      } catch {
+        if (!cancelled) {
+          setError('Error de conexión al cargar el listado de grupos.')
+          setLoading(false)
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [userId, userRole, isSuperUser])
 
   useEffect(() => {
-    if (!activeContainer) return;
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
+    if (!activeContainer) return
+    let cancelled = false
+    setLoading(true)
+    setError(null)
 
-    (async () => {
+    void (async () => {
       try {
-        if (!activeContainer.isModuleActive) {
-          setError('Esta licencia no tiene activada esta web. Contacta con el administrador.');
-          setLoading(false);
-          return;
+        if (readLocalPreview()) {
+          setWorkshops(LOCAL_PREVIEW_SHOPS)
+          setGroupCenters(LOCAL_PREVIEW_CENTERS)
+          const counts: Record<string, number> = {}
+          for (const shop of LOCAL_PREVIEW_SHOPS) {
+            counts[shop.id] = LOCAL_PREVIEW_CENTERS.filter((item) => item.idtaller === shop.originalId).length
+          }
+          setCenterCounts(counts)
+          setLoading(false)
+          return
         }
 
-        let real: Workshop[] = [];
+        if (!activeContainer.isModuleActive) {
+          setError('Este grupo no tiene activada esta web. Contacta con el administrador.')
+          setLoading(false)
+          return
+        }
 
+        let real: Workshop[] = []
         if (!activeContainer.idlicenciagrupo) {
-          real = [buildWorkshopFromContainer(activeContainer)];
+          real = [buildWorkshopFromContainer(activeContainer)]
         } else {
-          const rows = await fetchLicenciaModuleTalleres(activeContainer.idlicenciagrupo);
-          if (cancelled) return;
-          real = rows.map((t) =>
+          const rows = await fetchLicenciaModuleTalleres(
+            activeContainer.idlicenciagrupo,
+            activeContainer.hubWebId,
+          )
+          if (cancelled) return
+          real = rows.map((item) =>
             buildWorkshopFromLicenciaTaller(
-              t,
+              item,
               activeContainer.hubWebId ?? getCrmHubWebIdFromEnv(),
               activeContainer.idtaller,
             ),
-          );
+          )
           if (real.length === 0) {
-            setError('La licencia no tiene talleres activos para esta web.');
-            setLoading(false);
-            return;
+            setError('Este grupo no tiene licencias activas para esta web.')
+            setLoading(false)
+            return
           }
         }
 
-        const scoped = filterWorkshopsForUser(real, user, isSuperUser);
-        setWorkshops(scoped);
-
-        if (scoped.length === 1) {
-          try { localStorage.setItem(RECENT_STORAGE_KEY, scoped[0].id); } catch { /* ignore */ }
-          onSelect(scoped[0]);
-          return;
+        const scoped = filterWorkshopsForUser(real, user, isSuperUser)
+        if (cancelled) return
+        setWorkshops(scoped)
+        const centroRows = activeContainer.idlicenciagrupo
+          ? await fetchCentrosForGrupo(activeContainer.idlicenciagrupo, activeContainer.hubWebId)
+          : await fetchCentrosForTalleres(scoped.map((item) => String(item.originalId || '')))
+        if (cancelled) return
+        setGroupCenters(centroRows)
+        const counts: Record<string, number> = {}
+        for (const shop of scoped) {
+          const id = String(shop.originalId || '').trim().toLowerCase()
+          counts[shop.id] = centroRows.filter((item) => item.idtaller === id).length
         }
-
-        setLoading(false);
+        setCenterCounts(counts)
+        setLoading(false)
       } catch {
-        if (!cancelled) setError('Error consultando los talleres de la licencia.');
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setError('Error consultando las licencias del grupo.')
+          setLoading(false)
+        }
       }
-    })();
+    })()
 
-    return () => { cancelled = true; };
-  }, [activeContainer, onSelect, user, isSuperUser]);
+    return () => {
+      cancelled = true
+    }
+  }, [activeContainer, user, isSuperUser])
 
-  const handleSelect = (w: Workshop) => {
-    setScanning(true);
+  const handleLogout = async () => {
+    try {
+      if (onLogout) await onLogout()
+      else await signOut()
+    } catch (err) {
+      console.error('Error al cerrar sesión:', err)
+    }
+  }
+
+  const enterWorkshop = (workshop: Workshop) => {
+    setScanning(true)
     setTimeout(() => {
-      try { localStorage.setItem(RECENT_STORAGE_KEY, w.id); } catch { /* ignore */ }
-      onSelect(w);
-    }, 600);
-  };
+      try {
+        localStorage.setItem(RECENT_WORKSHOP_KEY, workshop.id)
+        if (activeContainer) localStorage.setItem(RECENT_LICENSE_KEY, activeContainer.idtaller)
+      } catch {
+        /* ignore */
+      }
+      onSelect(workshop)
+    }, 400)
+  }
 
-  const handlePickContainer = (c: ContainerRow) => {
-    setActiveContainer(c);
-  };
+  const handlePickWorkshop = (workshop: Workshop) => {
+    const shopId = String(workshop.originalId || '').trim().toLowerCase()
+    const rows = filterCentersForUser(
+      (readLocalPreview() ? LOCAL_PREVIEW_CENTERS : groupCenters).filter((item) => item.idtaller === shopId),
+      user,
+    )
+    enterWorkshop({
+      ...workshop,
+      groupName: workshop.groupName || groupName || undefined,
+      centers: rows.map((item) => ({ id: item.idcentro, name: item.nombre })),
+      centerId: rows.length === 1 ? rows[0].idcentro : undefined,
+      centerName: rows.length === 1 ? rows[0].nombre : rows.length ? `${rows.length} centros` : undefined,
+    })
+  }
 
-  const handleBackToContainers = () => {
-    setActiveContainer(null);
-    setWorkshops([]);
-  };
+  const handlePickContainer = (row: ContainerRow) => {
+    setSearchQuery('')
+    setError(null)
+    setGroupCenters([])
+    setLoading(true)
+    setActiveContainer(row)
+    if (readLocalPreview()) {
+      setWorkshops(LOCAL_PREVIEW_SHOPS)
+      setGroupCenters(LOCAL_PREVIEW_CENTERS)
+      const counts: Record<string, number> = {}
+      for (const shop of LOCAL_PREVIEW_SHOPS) {
+        counts[shop.id] = LOCAL_PREVIEW_CENTERS.filter((item) => item.idtaller === shop.originalId).length
+      }
+      setCenterCounts(counts)
+      setLoading(false)
+    }
+  }
+
+  const handleBackToLicenses = () => {
+    setSearchQuery('')
+    setActiveContainer(null)
+    setWorkshops([])
+    setGroupCenters([])
+    setError(null)
+  }
 
   const filteredWorkshops = useMemo(() => {
-    const searchLower = (searchQuery || '').toLowerCase();
-    return workshops.filter((w) => {
-      const nameMatch = (w.name || '').toLowerCase().includes(searchLower);
-      const cityMatch = (w.city || '').toLowerCase().includes(searchLower);
-      return nameMatch || cityMatch;
-    });
-  }, [workshops, searchQuery]);
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return workshops
+    return workshops.filter((workshop) => {
+      const nameMatch = (workshop.name || '').toLowerCase().includes(q)
+      const cityMatch = (workshop.city || '').toLowerCase().includes(q)
+      return nameMatch || cityMatch
+    })
+  }, [workshops, searchQuery])
 
   const filteredContainers = useMemo(() => {
-    const q = (searchQuery || '').toLowerCase();
-    return containers.filter((c) => {
-      const name = (c.nombre_personalizado || c.slug || c.idtaller).toLowerCase();
-      return name.includes(q);
-    });
-  }, [containers, searchQuery]);
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return containers
+    return containers.filter((row) => {
+      const name = (row.nombre_personalizado || row.slug || row.idtaller).toLowerCase()
+      return name.includes(q)
+    })
+  }, [containers, searchQuery])
 
+  const showSearch = step === 'group' ? containers.length > 6 : workshops.length > 6
+  const empty = step === 'group' ? filteredContainers.length === 0 : filteredWorkshops.length === 0
 
-  if (loading) {
+  if (loading && step === 'group') {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center px-4">
-        <HexLoaderScreen label="Cargando talleres…" />
+        <HexLoaderScreen label="Cargando grupos…" />
       </div>
     )
   }
 
-  if (error) {
+  if (error && step === 'group') {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4">
+      <div className="flex min-h-screen items-center justify-center px-4 py-10">
         <Card padding="lg" className="w-full max-w-md text-center">
           <h2 className="section-title">No se puede continuar</h2>
           <p className="section-subtitle mt-3">{error}</p>
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                if (onLogout) await onLogout()
-                else await signOut()
-              } catch (e) {
-                console.error('Error al cerrar sesión:', e)
-              }
-            }}
-            className="ghost-button mt-6 w-full"
-          >
+          <button type="button" onClick={() => void handleLogout()} className="ghost-button mt-6 w-full">
             <LogOut size={18} />
             Cerrar sesión
           </button>
@@ -386,143 +465,176 @@ const WorkshopSelectorView: React.FC<WorkshopSelectorViewProps> = ({
     )
   }
 
-  const showContainerPicker = !activeContainer && containers.length > 1
-
   return (
-    <div className="min-h-screen">
-      <header className="glass glass-lite" style={{ borderRadius: 0, borderTop: 0, borderLeft: 0, borderRight: 0 }}>
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            {headerLogoSrc ? (
-              <img
-                src={headerLogoSrc}
-                alt=""
-                className="h-10 w-auto max-w-[140px] object-contain"
-                referrerPolicy="no-referrer"
-              />
-            ) : null}
-            <div className="min-w-0">
-              <p className="section-eyebrow">{getAppProductName()}</p>
-              {licenseDisplayName ? <p className="section-subtitle">{licenseDisplayName}</p> : null}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                if (onLogout) await onLogout()
-                else await signOut()
-              } catch (e) {
-                console.error('Error al cerrar sesión:', e)
-              }
-            }}
-            className="ghost-action is-neutral"
-          >
-            <LogOut size={16} className="inline" />
-            {' '}Salir
-          </button>
-        </div>
-      </header>
-
+    <div className="flex min-h-screen items-center justify-center px-4 py-10">
       {scanning ? (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center" style={{ background: 'rgba(238,241,245,0.92)' }}>
-          <HexLoaderScreen label="Abriendo taller…" />
+          <HexLoaderScreen label="Abriendo licencia…" />
         </div>
       ) : null}
 
-      <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6 panel-stack">
-        <div>
-          <p className="section-eyebrow">{showContainerPicker ? 'Licencias' : 'Talleres'}</p>
-          <h1 className="section-title">
-            {showContainerPicker ? 'Elige tu licencia' : 'Elige tu taller'}
-          </h1>
+      <div className="workshop-gate w-full max-w-md">
+        <Card padding="lg" className="text-center">
+          <div className="workshop-gate-top">
+            {headerLogoSrc ? (
+              <div className="logo-slot logo-slot-sm">
+                <img
+                  src={headerLogoSrc}
+                  alt=""
+                  className="logo-slot-img"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            ) : (
+              <span />
+            )}
+            <button type="button" onClick={() => void handleLogout()} className="ghost-action is-neutral">
+              <LogOut size={16} />
+              Salir
+            </button>
+          </div>
+
+          <p className="section-eyebrow">{getAppProductName()}</p>
+          <h1 className="section-title mt-1">{step === 'group' ? 'Elige tu grupo' : 'Elige tu licencia'}</h1>
           <p className="section-subtitle mt-2">
-            {showContainerPicker
-              ? 'Toca la licencia con la que quieres trabajar.'
-              : 'Toca el taller que quieres gestionar hoy.'}
+            {step === 'group'
+              ? 'Primero el grupo. Luego la licencia, ya con sus centros.'
+              : groupName
+                ? `Licencias de ${groupName}. Al entrar, los centros ya van listos.`
+                : 'Toca la licencia. Entras con todos sus centros.'}
           </p>
-        </div>
 
-        {!showContainerPicker && activeContainer && containers.length > 1 ? (
-          <button type="button" onClick={handleBackToContainers} className="ghost-button w-fit">
-            <ChevronLeft size={18} />
-            Volver a licencias
-          </button>
-        ) : null}
+          <nav className="wizard-steps wizard-steps-compact mt-4" aria-label="Pasos para entrar">
+            <span className={`wizard-step ${step === 'group' ? 'is-current' : 'is-done'}`}>
+              <span className="wizard-step-num">{step === 'group' ? '1' : '✓'}</span>
+              Grupo
+            </span>
+            <span className={`wizard-step ${step === 'license' ? 'is-current' : ''}`}>
+              <span className="wizard-step-num">2</span>
+              Licencia
+            </span>
+          </nav>
 
-        <div className="relative">
-          <SearchIcon className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={20} />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={showContainerPicker ? 'Buscar licencia…' : 'Buscar taller…'}
-            className="field-input pl-12"
-          />
-        </div>
+          {step === 'license' ? (
+            <button type="button" onClick={handleBackToLicenses} className="ghost-button mt-6 w-full">
+              <ChevronLeft size={18} />
+              Volver a grupos
+            </button>
+          ) : null}
 
-        <ul className="panel-stack list-none p-0">
-          {showContainerPicker
-            ? filteredContainers.map((c) => (
-                <li key={c.idtaller}>
-                  <button
-                    type="button"
-                    onClick={() => handlePickContainer(c)}
-                    className="list-row flex w-full items-center justify-between gap-3"
-                  >
-                    <span className="list-row-title">
-                      {c.nombre_personalizado || c.slug || c.idtaller}
-                    </span>
-                    <ArrowRight size={22} className="shrink-0" style={{ color: 'var(--color-brand)' }} />
-                  </button>
-                </li>
-              ))
-            : filteredWorkshops.map((workshop) => {
-                const isRecent = workshop.id === lastWorkshopId
-                return (
-                  <li key={workshop.id}>
-                    <button
-                      type="button"
-                      onClick={() => handleSelect(workshop)}
-                      className={`list-row flex w-full items-center justify-between gap-3 ${isRecent ? 'is-active' : ''}`}
-                    >
-                      <div className="min-w-0 text-left">
-                        <p className="list-row-title">{workshop.name}</p>
-                        {(workshop.city || workshop.address) && (
-                          <p className="list-row-meta mt-1">
-                            {[workshop.city, workshop.address].filter(Boolean).join(' · ')}
-                          </p>
-                        )}
-                        {isRecent ? (
-                          <p className="list-row-meta mt-1" style={{ color: 'var(--color-brand)' }}>
-                            Usado la última vez
-                          </p>
-                        ) : null}
-                      </div>
-                      <ArrowRight size={22} className="shrink-0" style={{ color: 'var(--color-brand)' }} />
-                    </button>
-                  </li>
-                )
-              })}
-        </ul>
+          {error && step !== 'group' ? (
+            <div className="alert alert-error mt-6" role="alert">
+              {error}
+            </div>
+          ) : null}
 
-        {(showContainerPicker ? filteredContainers.length === 0 : filteredWorkshops.length === 0) && (
-          <EmptyState onClear={() => setSearchQuery('')} />
-        )}
-      </main>
+          {showSearch ? (
+            <div className="relative mt-6 text-left">
+              <SearchIcon className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted)]" size={20} />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder={step === 'group' ? 'Buscar grupo…' : 'Buscar licencia…'}
+                className="field-input pl-12"
+                aria-label={step === 'group' ? 'Buscar grupo' : 'Buscar licencia'}
+              />
+            </div>
+          ) : null}
+
+          {loading && step !== 'group' ? (
+            <div className="mt-8">
+              <HexLoaderScreen label="Cargando licencias…" />
+            </div>
+          ) : (
+            <ul className={`workshop-gate-list${showSearch ? '' : ' is-spaced'}`}>
+              {step === 'group'
+                ? filteredContainers.map((row) => {
+                    const name = row.nombre_personalizado || row.slug || row.idtaller
+                    const recent = row.idtaller === lastLicenseId
+                    return (
+                      <li key={row.idtaller}>
+                        <button
+                          type="button"
+                          onClick={() => handlePickContainer(row)}
+                          className="login-asesor-card"
+                        >
+                          <span className="login-asesor-avatar" aria-hidden>
+                            {initialsOf(name)}
+                          </span>
+                          <span className="login-asesor-copy">
+                            <strong>{name}</strong>
+                            <small>
+                              {row.slug ? `/${row.slug} · ` : ''}
+                              {shopCountLabel(shopCounts[row.idtaller])}
+                            </small>
+                          </span>
+                          {recent ? <span className="badge tone-neutral">Última</span> : null}
+                          <ArrowRight size={18} className="workshop-gate-arrow" />
+                        </button>
+                      </li>
+                    )
+                  })
+                : filteredWorkshops.map((workshop) => {
+                    const recent = workshop.id === lastWorkshopId
+                    return (
+                      <li key={workshop.id}>
+                        <button
+                          type="button"
+                          onClick={() => handlePickWorkshop(workshop)}
+                          className="login-asesor-card"
+                        >
+                          {workshop.logo ? (
+                            <img
+                              src={workshop.logo}
+                              alt=""
+                              className="workshop-gate-logo"
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : (
+                            <span className="login-asesor-avatar" aria-hidden>
+                              {initialsOf(workshop.name)}
+                            </span>
+                          )}
+                          <span className="login-asesor-copy">
+                            <strong>{workshop.name}</strong>
+                            <small>
+                              {[workshop.city, centerCountLabel(centerCounts[workshop.id])]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </small>
+                          </span>
+                          {recent ? <span className="badge tone-neutral">Última</span> : null}
+                          <ArrowRight size={18} className="workshop-gate-arrow" />
+                        </button>
+                      </li>
+                    )
+                  })}
+            </ul>
+          )}
+
+          {empty && !loading ? (
+            <div className="mt-6">
+              <Building2 size={36} className="mx-auto mb-3 text-[var(--muted)]" />
+              <h3 className="section-title">No hay resultados</h3>
+              <p className="section-subtitle mt-2">
+                {searchQuery.trim()
+                  ? 'Prueba con otro nombre o borra la búsqueda.'
+                  : step === 'group'
+                    ? 'No hay grupos activos para esta cuenta.'
+                    : 'Este grupo no tiene licencias.'}
+              </p>
+              {searchQuery.trim() ? (
+                <button type="button" onClick={() => setSearchQuery('')} className="ghost-button mt-6">
+                  Borrar búsqueda
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </Card>
+      </div>
     </div>
   )
 }
-
-const EmptyState: React.FC<{ onClear: () => void }> = ({ onClear }) => (
-  <Card padding="lg" className="text-center">
-    <Building2 size={36} className="mx-auto mb-4 text-[var(--muted)]" />
-    <h3 className="section-title">No hay resultados</h3>
-    <p className="section-subtitle mt-2">Prueba con otro nombre o borra la búsqueda.</p>
-    <button type="button" onClick={onClear} className="ghost-button mt-6">
-      Borrar búsqueda
-    </button>
-  </Card>
-)
 
 export default WorkshopSelectorView

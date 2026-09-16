@@ -16,10 +16,12 @@ import {
   setAssignedTaskAssignee,
   setAssignedTaskStatus,
   setPersonRole,
+  patchPerson,
   placeTicketInOrder,
   setTicketTeam,
   setTicketTeams,
   togglePersonOnTeam,
+  type AdvisorPersonPatch,
   type AdvisorTeam,
   type AdvisorWorkspace,
   type AssignedTask,
@@ -128,6 +130,8 @@ export function useAdvisorWorkspace(
         commit((latest) => addPerson(latest, name, email, teamId, role)),
       setAdvisorRole: (personId: string, role: 'asesor' | 'taller_admin') =>
         commit((latest) => setPersonRole(latest, personId, role)),
+      updateAdvisor: (personId: string, patch: AdvisorPersonPatch) =>
+        commit((latest) => patchPerson(latest, personId, patch)),
       scheduleAdvisorDelete: (personId: string) => commit((latest) => schedulePersonDelete(latest, personId)),
       restoreAdvisor: (personId: string) => commit((latest) => restorePerson(latest, personId)),
       removeAdvisor: (personId: string) => commit((latest) => removePerson(latest, personId)),

@@ -82,3 +82,20 @@ test('an advisor only keeps the assigned operational workshop', () => {
   assert.equal(scoped.length, 1)
   assert.equal(scoped[0].name, 'Supra Gamboa')
 })
+
+test('a license admin keeps every workshop of the group', () => {
+  const user = {
+    email: 'carlos@gmail.com',
+    app_metadata: {
+      role: 'taller_admin',
+      crm_idtalleres: ['95e412d7-08b3-46f8-8128-0a52bf409bc3'],
+    },
+  }
+  assert.equal(access.isLicenseAdminUser(user), true)
+  const workshops = [
+    { id: 'supra', originalId: '95e412d7-08b3-46f8-8128-0a52bf409bc3', containerIdTaller: 'e6f001b2-2501-42f7-888c-bd96a02d4ee1', name: 'Supra Gamboa', source: 'aviold' },
+    { id: 'kia', originalId: '7980cd72-d2bb-493f-ace5-0b3210843ae2', containerIdTaller: 'e6f001b2-2501-42f7-888c-bd96a02d4ee1', name: 'Gamboa Ventas KIA', source: 'aviold' },
+  ]
+  const scoped = access.filterWorkshopsForUser(workshops, user)
+  assert.equal(scoped.length, 2)
+})
