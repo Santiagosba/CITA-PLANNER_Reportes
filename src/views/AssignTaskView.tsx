@@ -132,6 +132,7 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
   const [dueDate, setDueDate] = useState(localTodayIso())
   const [peticionId, setPeticionId] = useState('')
   const [ticketQuery, setTicketQuery] = useState('')
+  const [consultationOpen, setConsultationOpen] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
 
   const today = localTodayIso()
@@ -252,7 +253,11 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
   const pickTicket = (nextId: string) => {
     setPeticionId(nextId)
     setNotice(null)
-    if (!nextId) return
+    if (!nextId) {
+      setConsultationOpen(false)
+      setTicketQuery('')
+      return
+    }
     const item = pendingPeticiones.find((row) => row.idpeticion === nextId)
     if (!item) return
     if (!title.trim()) {
@@ -333,7 +338,7 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
             <div className="min-w-0 flex-1">
               <h2 className="text-lg font-bold tracking-[-0.02em] text-avi-fog-strong">Nueva tarea</h2>
               <p className="m-0 text-sm text-avi-muted">
-                Puedes empezar buscando la consulta o ir directamente al responsable.
+                Elige quién la hará, explica el trabajo y confirma la fecha.
               </p>
             </div>
           </div>
@@ -363,21 +368,43 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                 </div>
               ) : null}
 
-              <fieldset className="m-0 min-w-0 rounded-md border border-avi-line bg-avi-surface p-4">
-                <legend className="float-none flex items-center gap-2 px-1 text-base font-bold text-avi-fog-strong">
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-pill bg-avi-brand text-sm text-white">
-                    1
+              <section className="min-w-0 rounded-md border border-avi-line bg-avi-surface p-3 sm:p-4">
+                <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3 sm:flex sm:items-center">
+                  <span
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-avi-brand-soft font-bold text-avi-brand"
+                    aria-hidden
+                  >
+                    {linked ? <Check size={17} /> : 1}
                   </span>
-                  <Link2 size={18} className="text-avi-brand" aria-hidden />
-                  Consulta relacionada
-                  <span className="text-sm font-normal text-avi-muted">(opcional)</span>
-                </legend>
-                <p className="mb-3 mt-1 text-sm text-avi-muted">
-                  Al elegir una consulta proponemos el equipo y la persona que le tocaría.
-                </p>
+                  <span className="min-w-0 flex-1">
+                    <strong className="flex flex-wrap items-center gap-2 text-base text-avi-fog-strong">
+                      Consulta relacionada
+                      <span className="badge">Opcional</span>
+                    </strong>
+                    <small className="block text-sm text-avi-muted">
+                      Si eliges una, proponemos automáticamente quién debería atenderla.
+                    </small>
+                  </span>
+                  {!linked ? (
+                    <button
+                      type="button"
+                      className="ghost-button col-span-2 w-full shrink-0 sm:w-auto"
+                      aria-expanded={consultationOpen}
+                      onClick={() => {
+                        setConsultationOpen((value) => !value)
+                        setNotice(null)
+                      }}
+                    >
+                      <Search size={17} aria-hidden />
+                      <span className="hidden sm:inline">{consultationOpen ? 'Cerrar' : 'Buscar consulta'}</span>
+                      <span className="sm:hidden">{consultationOpen ? 'Cerrar' : 'Buscar'}</span>
+                    </button>
+                  ) : null}
+                </div>
 
                 {linked ? (
-                  <div className="flex min-w-0 flex-wrap items-center gap-3 rounded-md border border-avi-brand bg-avi-brand-soft p-3">
+                  <div className="mt-3 flex min-w-0 flex-wrap items-center gap-3 rounded-sm border border-avi-brand bg-avi-brand-soft p-3">
+                    <Link2 size={18} className="shrink-0 text-avi-brand" aria-hidden />
                     <span className="min-w-0 flex-1">
                       <strong className="block truncate text-base text-avi-fog-strong">{ticketClientLabel(linked)}</strong>
                       <small className="block truncate text-sm text-avi-muted">
@@ -390,105 +417,125 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                       Quitar
                     </button>
                   </div>
-                ) : loading ? (
-                  <HexLoaderScreen size="sm" label="Cargando consultas…" />
-                ) : (
-                  <>
-                    <label className="relative block" htmlFor="assign-ticket-q">
-                      <Search
-                        size={19}
-                        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-avi-muted"
-                        aria-hidden
-                      />
-                      <input
-                        id="assign-ticket-q"
-                        className="field-input min-h-tap max-w-none pl-12 pr-12"
-                        value={ticketQuery}
-                        onChange={(event) => setTicketQuery(event.target.value)}
-                        placeholder="Busca por cliente, teléfono o tipo de consulta"
-                      />
-                      {ticketQuery ? (
-                        <button
-                          type="button"
-                          className="absolute right-1 top-1/2 inline-flex min-h-tap min-w-tap -translate-y-1/2 items-center justify-center rounded-pill text-avi-muted hover:bg-avi-brand-soft hover:text-avi-brand"
-                          onClick={() => setTicketQuery('')}
-                          aria-label="Borrar búsqueda"
-                        >
-                          <X size={17} aria-hidden />
-                        </button>
-                      ) : null}
-                    </label>
-                    {pendingPeticiones.length === 0 ? (
-                      <p className="mb-0 mt-3 text-sm text-avi-muted">No hay consultas abiertas para vincular.</p>
-                    ) : fold(ticketQuery).length < 2 ? (
-                      <p className="mb-0 mt-3 text-sm text-avi-muted">
-                        Si la tarea no viene de una consulta, deja este campo vacío.
-                      </p>
-                    ) : filteredTickets.length === 0 ? (
-                      <p className="mb-0 mt-3 text-sm text-avi-muted">No encontramos ninguna consulta con esos datos.</p>
+                ) : consultationOpen ? (
+                  <div className="mt-3 border-t border-avi-line pt-3">
+                    {loading ? (
+                      <HexLoaderScreen size="sm" label="Cargando consultas…" />
                     ) : (
-                      <ul className="mt-3 flex max-h-[22rem] flex-col gap-2 overflow-y-auto pr-1">
-                        {filteredTickets.map((item: PeticionPendiente) => (
-                          <li key={item.idpeticion}>
+                      <>
+                        <label className="relative block" htmlFor="assign-ticket-q">
+                          <span className="sr-only">Buscar consulta</span>
+                          <Search
+                            size={19}
+                            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-avi-muted"
+                            aria-hidden
+                          />
+                          <input
+                            id="assign-ticket-q"
+                            className="field-input min-h-tap max-w-none pl-12 pr-12"
+                            value={ticketQuery}
+                            onChange={(event) => setTicketQuery(event.target.value)}
+                            placeholder="Nombre, teléfono o tipo de consulta"
+                            autoFocus
+                          />
+                          {ticketQuery ? (
                             <button
                               type="button"
-                              className="flex min-h-tap w-full min-w-0 flex-col items-start rounded-sm border border-avi-line bg-avi-surface-solid px-3 py-2 text-left transition-colors hover:border-avi-brand hover:bg-avi-brand-soft focus-visible:outline-none focus-visible:shadow-focus"
-                              onClick={() => pickTicket(item.idpeticion)}
+                              className="absolute right-1 top-1/2 inline-flex min-h-tap min-w-tap -translate-y-1/2 items-center justify-center rounded-pill text-avi-muted hover:bg-avi-brand-soft hover:text-avi-brand"
+                              onClick={() => setTicketQuery('')}
+                              aria-label="Borrar búsqueda"
                             >
-                              <strong className="w-full truncate text-base text-avi-fog-strong">
-                                {ticketClientLabel(item)}
-                              </strong>
-                              <small className="w-full truncate text-sm text-avi-muted">
-                                {ticketNeedLabel(item)} · {formatFecha(item.fechainicio)}
-                              </small>
+                              <X size={17} aria-hidden />
                             </button>
-                          </li>
-                        ))}
-                      </ul>
+                          ) : null}
+                        </label>
+                        {pendingPeticiones.length === 0 ? (
+                          <p className="mb-0 mt-3 text-sm text-avi-muted">No hay consultas abiertas para vincular.</p>
+                        ) : fold(ticketQuery).length < 2 ? (
+                          <p className="mb-0 mt-3 text-sm text-avi-muted">
+                            Escribe al menos dos letras o números.
+                          </p>
+                        ) : filteredTickets.length === 0 ? (
+                          <p className="mb-0 mt-3 text-sm text-avi-muted">
+                            No encontramos ninguna consulta con esos datos.
+                          </p>
+                        ) : (
+                          <ul className="mt-3 grid max-h-[22rem] gap-2 overflow-y-auto pr-1 md:grid-cols-2">
+                            {filteredTickets.map((item: PeticionPendiente) => (
+                              <li key={item.idpeticion}>
+                                <button
+                                  type="button"
+                                  className="flex min-h-[68px] w-full min-w-0 flex-col items-start justify-center rounded-sm border border-avi-line bg-avi-surface-solid px-3 py-2 text-left transition-colors hover:border-avi-brand hover:bg-avi-brand-soft focus-visible:outline-none focus-visible:shadow-focus"
+                                  onClick={() => pickTicket(item.idpeticion)}
+                                >
+                                  <strong className="w-full truncate text-base text-avi-fog-strong">
+                                    {ticketClientLabel(item)}
+                                  </strong>
+                                  <small className="w-full truncate text-sm text-avi-muted">
+                                    {ticketNeedLabel(item)} · {formatFecha(item.fechainicio)}
+                                  </small>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </>
                     )}
-                  </>
-                )}
-              </fieldset>
+                  </div>
+                ) : null}
+              </section>
 
+              <div className="grid min-w-0 gap-4 lg:grid-cols-2 lg:items-start">
               <fieldset className="m-0 min-w-0 rounded-md border border-avi-line bg-avi-surface p-4">
                 <legend className="float-none flex items-center gap-2 px-1 text-base font-bold text-avi-fog-strong">
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-pill bg-avi-brand text-sm text-white">
-                    2
+                  <span
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-pill text-sm text-white ${
+                      assigneeId ? 'bg-avi-success' : 'bg-avi-brand'
+                    }`}
+                  >
+                    {assigneeId ? <Check size={17} aria-hidden /> : 2}
                   </span>
                   <Users size={18} className="text-avi-brand" aria-hidden />
                   Responsable
                 </legend>
 
                 {workspace.teams.length > 1 ? (
-                  <>
-                    <p className="mb-2 mt-1 text-sm font-semibold text-avi-fog-strong">Equipo</p>
-                    <div className="flex flex-wrap gap-2" role="group" aria-label="Equipo">
-                      {workspace.teams.map((row) => (
-                        <button
-                          key={row.id}
-                          type="button"
-                          className={choiceClass(teamId === row.id)}
-                          aria-pressed={teamId === row.id}
-                          onClick={() => pickTeam(row.id)}
-                        >
-                          {row.name}
-                        </button>
-                      ))}
-                    </div>
-                  </>
+                  <label className="mt-2 block" htmlFor="assign-team">
+                    <span className="mb-1 block text-sm font-semibold text-avi-fog-strong">Equipo</span>
+                    <span className="relative block">
+                      <select
+                        id="assign-team"
+                        className="field-input min-h-tap max-w-none appearance-none pr-12 font-semibold"
+                        value={teamId}
+                        onChange={(event) => pickTeam(event.target.value)}
+                      >
+                        {workspace.teams.map((row) => (
+                          <option key={row.id} value={row.id}>
+                            {row.name}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        size={18}
+                        className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-avi-muted"
+                        aria-hidden
+                      />
+                    </span>
+                  </label>
                 ) : (
                   <p className="mb-3 mt-1 text-sm text-avi-muted">
                     Equipo: <strong className="text-avi-fog-strong">{team?.name}</strong>
                   </p>
                 )}
 
+                <p className="mb-2 mt-4 text-sm font-semibold text-avi-fog-strong">Persona responsable</p>
                 {members.length === 0 ? (
                   <p className="mt-3 text-sm text-avi-danger">
                     Este equipo no tiene asesores. Márcalos en Cuentas y equipos.
                   </p>
                 ) : (
                   <div
-                    className="mt-3 grid gap-2 sm:grid-cols-2 2xl:grid-cols-3"
+                    className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2"
                     role="listbox"
                     aria-label="Persona responsable"
                   >
@@ -540,8 +587,12 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
 
               <fieldset className="m-0 min-w-0 rounded-md border border-avi-line bg-avi-surface p-4">
                 <legend className="float-none flex items-center gap-2 px-1 text-base font-bold text-avi-fog-strong">
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-pill bg-avi-brand text-sm text-white">
-                    3
+                  <span
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-pill text-sm text-white ${
+                      title.trim() && taskTypeId && dueDate ? 'bg-avi-success' : 'bg-avi-brand'
+                    }`}
+                  >
+                    {title.trim() && taskTypeId && dueDate ? <Check size={17} aria-hidden /> : 3}
                   </span>
                   <ClipboardList size={18} className="text-avi-brand" aria-hidden />
                   Tarea y fecha
@@ -564,12 +615,12 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                     <p className="mb-2 mt-4 text-sm font-semibold text-avi-fog-strong" id="assign-type-label">
                       Tipo de tarea
                     </p>
-                    <div className="flex flex-wrap gap-2" role="group" aria-labelledby="assign-type-label">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2 2xl:grid-cols-3" role="group" aria-labelledby="assign-type-label">
                       {types.map((item) => (
                         <button
                           key={item.id}
                           type="button"
-                          className={choiceClass(taskTypeId === item.id)}
+                          className={`${choiceClass(taskTypeId === item.id)} w-full`}
                           aria-pressed={taskTypeId === item.id}
                           onClick={() => setTaskTypeId(item.id)}
                         >
@@ -588,10 +639,10 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                 <p className="mb-2 mt-4 text-sm font-semibold text-avi-fog-strong" id="assign-due-label">
                   ¿Para cuándo?
                 </p>
-                <div className="flex flex-wrap gap-2" role="group" aria-labelledby="assign-due-label">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2 2xl:grid-cols-3" role="group" aria-labelledby="assign-due-label">
                   <button
                     type="button"
-                    className={choiceClass(duePreset === 'hoy')}
+                    className={`${choiceClass(duePreset === 'hoy')} w-full`}
                     aria-pressed={duePreset === 'hoy'}
                     onClick={() => setDueDate(today)}
                   >
@@ -599,7 +650,7 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                   </button>
                   <button
                     type="button"
-                    className={choiceClass(duePreset === 'manana')}
+                    className={`${choiceClass(duePreset === 'manana')} w-full`}
                     aria-pressed={duePreset === 'manana'}
                     onClick={() => setDueDate(tomorrow)}
                   >
@@ -607,13 +658,13 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                   </button>
                   {duePreset === 'otro' ? (
                     <label
-                      className="inline-flex min-h-tap items-center gap-2 rounded-pill border border-avi-brand bg-avi-brand-soft px-4 text-sm font-semibold text-avi-brand-strong"
+                      className="inline-flex min-h-tap w-full items-center justify-center gap-2 rounded-pill border border-avi-brand bg-avi-brand-soft px-3 text-sm font-semibold text-avi-brand-strong"
                       htmlFor="assign-due"
                     >
                       <CalendarDays size={17} aria-hidden />
                       <input
                         id="assign-due"
-                        className="min-h-tap border-0 bg-transparent text-avi-fog-strong outline-none"
+                        className="min-h-tap min-w-0 w-full border-0 bg-transparent text-avi-fog-strong outline-none"
                         type="date"
                         value={dueDate}
                         onChange={(event) => setDueDate(event.target.value)}
@@ -621,14 +672,17 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                       />
                     </label>
                   ) : (
-                    <button type="button" className={choiceClass(false)} onClick={() => setDueDate(shiftIso(today, 2))}>
+                    <button
+                      type="button"
+                      className={`${choiceClass(false)} w-full`}
+                      onClick={() => setDueDate(shiftIso(today, 2))}
+                    >
                       Otro día
                     </button>
                   )}
                 </div>
-              </fieldset>
 
-              <details className="group rounded-md border border-avi-line bg-avi-surface">
+              <details className="group mt-4 rounded-sm border border-avi-line bg-avi-surface-solid">
                 <summary className="flex min-h-tap cursor-pointer list-none items-center gap-2 px-4 py-2 font-semibold text-avi-fog-strong">
                   <Sparkles size={18} className="text-avi-brand" aria-hidden />
                   Tablero y notas
@@ -680,15 +734,33 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                   />
                 </div>
               </details>
+              </fieldset>
+              </div>
+
+              <div className="rounded-md border border-avi-line bg-avi-surface p-4 xl:hidden">
+                <strong className="block text-base text-avi-fog-strong">Revisa y asigna</strong>
+                <p className="mb-0 mt-1 break-words text-sm text-avi-muted">
+                  {selectedAssignee?.name || 'Sin responsable'} · {selectedType?.name || 'Sin tipo'} ·{' '}
+                  {formatDueChip(dueDate, today)}
+                  {title.trim() ? ` · ${title.trim()}` : ''}
+                </p>
+                <p className={`mb-3 mt-3 text-sm ${canSubmit ? 'font-semibold text-avi-success' : 'text-avi-muted'}`}>
+                  {nextAction}
+                </p>
+                <button type="submit" className="client-submit min-h-tap w-full" disabled={!canSubmit}>
+                  <UserPlus size={18} aria-hidden />
+                  {selectedAssignee ? `Asignar a ${selectedAssignee.name}` : 'Asignar tarea'}
+                </button>
+              </div>
             </form>
           )}
         </Card>
 
         <aside className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-4">
           {workspace.teams.length > 0 ? (
-            <Card className="min-w-0" padding="sm">
-              <p className="section-eyebrow">Antes de asignar</p>
-              <h2 className="mt-1 text-lg font-bold tracking-[-0.02em] text-avi-fog-strong">Resumen</h2>
+            <Card className="hidden min-w-0 xl:block" padding="sm">
+              <p className="section-eyebrow">Paso final</p>
+              <h2 className="mt-1 text-lg font-bold tracking-[-0.02em] text-avi-fog-strong">Revisa y asigna</h2>
               <div className="mt-4 flex flex-col gap-3">
                 <div className="flex items-center gap-3 rounded-sm bg-avi-surface p-3">
                   {selectedAssignee ? (
@@ -707,11 +779,15 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                 </div>
                 <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
                   <span className="text-avi-muted">Equipo</span>
-                  <strong className="truncate text-right text-avi-fog-strong">{team?.name || '—'}</strong>
+                  <strong className="min-w-0 break-words text-right text-avi-fog-strong">{team?.name || '—'}</strong>
                   <span className="text-avi-muted">Tarea</span>
-                  <strong className="truncate text-right text-avi-fog-strong">{title.trim() || 'Falta escribir'}</strong>
+                  <strong className="min-w-0 break-words text-right text-avi-fog-strong">
+                    {title.trim() || 'Falta escribir'}
+                  </strong>
                   <span className="text-avi-muted">Tipo</span>
-                  <strong className="truncate text-right text-avi-fog-strong">{selectedType?.name || '—'}</strong>
+                  <strong className="min-w-0 break-words text-right text-avi-fog-strong">
+                    {selectedType?.name || '—'}
+                  </strong>
                   <span className="text-avi-muted">Fecha</span>
                   <strong className="text-right text-avi-fog-strong">{formatDueChip(dueDate, today)}</strong>
                   {linked ? (
@@ -728,7 +804,13 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                   ) : null}
                 </div>
               </div>
-              <p className={`mb-3 mt-4 text-sm ${canSubmit ? 'font-semibold text-avi-success' : 'text-avi-muted'}`}>
+              <p
+                className={`mb-3 mt-4 rounded-sm px-3 py-2 text-sm ${
+                  canSubmit
+                    ? 'border border-avi-success bg-avi-surface-solid font-semibold text-avi-success'
+                    : 'bg-avi-surface text-avi-muted'
+                }`}
+              >
                 {nextAction}
               </p>
               <button
@@ -744,8 +826,7 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
           ) : null}
 
           <Card className="min-w-0" padding="sm">
-            <p className="section-eyebrow">Reciente</p>
-            <h2 className="mt-1 text-lg font-bold tracking-[-0.02em] text-avi-fog-strong">Ya asignadas</h2>
+            <h2 className="text-lg font-bold tracking-[-0.02em] text-avi-fog-strong">Tareas recientes</h2>
             {recentTasks.length === 0 ? (
               <p className="mb-0 mt-3 text-sm text-avi-muted">Cuando asignes una tarea, aparecerá aquí.</p>
             ) : (
@@ -755,18 +836,22 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                   return (
                     <li
                       key={task.id}
-                      className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-x-2 rounded-sm border border-avi-line bg-avi-surface px-3 py-2"
+                      className="flex min-w-0 items-center gap-3 rounded-sm border border-avi-line bg-avi-surface px-3 py-3"
                     >
-                      <strong className="truncate text-sm text-avi-fog-strong">{task.title}</strong>
+                      <span className="min-w-0 flex-1">
+                        <strong className="line-clamp-2 block text-sm leading-snug text-avi-fog-strong">{task.title}</strong>
+                        <small className="mt-1 block truncate text-sm text-avi-muted">
+                          {assignee?.name || 'Sin dueño'} · {catalogName(workspace.taskTypes, task.taskTypeId)} ·{' '}
+                          {formatDueChip(task.dueDate, today)}
+                        </small>
+                      </span>
                       <span
-                        className={`badge row-span-2 ${task.status === 'hecho' ? 'tone-positive' : 'tone-warning'}`}
+                        className={`badge shrink-0 self-center whitespace-nowrap ${
+                          task.status === 'hecho' ? 'tone-positive' : 'tone-warning'
+                        }`}
                       >
                         {task.status === 'hecho' ? 'Hecha' : 'Pendiente'}
                       </span>
-                      <small className="truncate text-sm text-avi-muted">
-                        {assignee?.name || 'Sin dueño'} · {catalogName(workspace.taskTypes, task.taskTypeId)} ·{' '}
-                        {formatDueChip(task.dueDate, today)}
-                      </small>
                     </li>
                   )
                 })}
