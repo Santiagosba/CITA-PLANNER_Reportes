@@ -11,7 +11,8 @@ type Props = {
 
 /** Siempre pinta la chapa. Si no hay matrícula, deja el hueco «SIN MATRÍCULA». */
 export default function TicketPlate({ value, peticion, compact = true, className = '' }: Props) {
-  const plate = formatMatricula(value || '') || (peticion ? ticketPlate(peticion) : '')
+  const raw = (peticion ? ticketPlate(peticion) : '') || String(value || '')
+  const plate = formatMatricula(raw)
   if (plate) return <VehiclePlate value={plate} compact={compact} className={`shrink-0 ${className}`.trim()} />
   return (
     <span

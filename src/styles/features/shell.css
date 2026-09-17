@@ -2481,9 +2481,10 @@ html.dark .hex-loader-aura,
 /* La chapa se pinta en VehiclePlate (Tailwind). Aquí solo ancla para no recortar. */
 .vehicle-plate {
   flex-shrink: 0;
-  overflow: hidden;
 }
 
 .vehicle-plate-code {
-  min-width: 0;
+  min-width: 7.5rem;
+  overflow: visible;
+  color: #141414;
 }
