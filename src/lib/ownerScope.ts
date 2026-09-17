@@ -17,9 +17,9 @@ import type { PeticionPendiente } from './peticionesPendientes'
 export type OwnerScope = 'todas' | 'mias' | 'grupo' | 'companeros' | 'sin_dueno'
 
 export const OWNER_SCOPE_OPTIONS: { id: OwnerScope; label: string }[] = [
-  { id: 'todas', label: 'Todas' },
-  { id: 'mias', label: 'Mías' },
-  { id: 'grupo', label: 'Del grupo' },
+  { id: 'todas', label: 'Cualquiera' },
+  { id: 'mias', label: 'Yo' },
+  { id: 'grupo', label: 'Mi grupo' },
   { id: 'companeros', label: 'Compañeros' },
   { id: 'sin_dueno', label: 'Sin dueño' },
 ]

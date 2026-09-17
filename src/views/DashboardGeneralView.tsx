@@ -16,7 +16,7 @@ import {
 } from '../components/LauraCharts'
 import CitaLinkFilterControl from '../components/CitaLinkFilter'
 import OwnerScopeFilter from '../components/OwnerScopeFilter'
-import TeamAssignPanel from '../components/TeamAssignPanel'
+import PeriodFilter from '../components/PeriodFilter'
 import TeamFilter from '../components/TeamFilter'
 import TicketClientBlock from '../components/TicketClientBlock'
 import TicketOwnerPicker from '../components/TicketOwnerPicker'
@@ -74,7 +74,6 @@ type Props = {
   onOpenTodayTasks?: () => void
   onOpenBoards?: () => void
   onOpenLead?: (peticion: PeticionPendiente) => void
-  onOpenAssign?: (teamId?: string) => void
   refreshToken?: number
 }
 
@@ -87,17 +86,15 @@ export default function DashboardGeneralView({
   onOpenTodayTasks,
   onOpenBoards,
   onOpenLead,
-  onOpenAssign,
   refreshToken = 0,
 }: Props) {
   const workshopId = workshop.containerIdTaller || workshop.id
-  const { workspace, assignTask } = useAdvisorWorkspace(workshopId, currentUser, true)
+  const { workspace } = useAdvisorWorkspace(workshopId, currentUser, true)
   const [scale, setScale] = useState<CalendarScale>('mes')
+  const [anchor, setAnchor] = useState(() => new Date(`${localTodayIso()}T12:00:00`))
   const [ownerScope, setOwnerScope] = useState<OwnerScope>(appRole === 'asesor' ? 'grupo' : 'todas')
   const [teamFilter, setTeamFilter] = useState<TeamFilterId>(TEAM_FILTER_ALL)
   const [citaLink, setCitaLink] = useState<CitaLinkFilter>('todas')
-  const today = localTodayIso()
-  const anchor = useMemo(() => new Date(`${today}T12:00:00`), [today])
   const period = useMemo(() => calendarPeriod(scale, anchor), [scale, anchor])
   const fetchRange = useMemo(() => ({ from: period.from, to: period.to }), [period.from, period.to])
   const { items, tipos, loading, error, sourceNotice, refresh, refreshSilent } = useOperationalData(workshop, fetchRange)
@@ -245,34 +242,11 @@ export default function DashboardGeneralView({
       {citasError ? <ApiStatusBanner message={citasError} variant="error" /> : null}
       {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
 
-      <div className="elevator-filters glass glass-lite squircle flex flex-wrap items-end gap-x-5 gap-y-4 px-4 py-3.5 max-[900px]:items-stretch">
-        <div className="filter-field flex max-w-full flex-col justify-end gap-1.5 max-[900px]:min-w-0 max-[900px]:flex-[1_1_220px] max-[720px]:basis-full">
-          <span className="filter-field-label block min-h-[18px] text-[13px] font-semibold leading-tight text-avi-fog-strong">
-            Periodo
-          </span>
-          <div
-            className="estado-filter inline-flex flex-nowrap items-center gap-1.5 max-[900px]:flex-wrap max-[720px]:w-full"
-            role="group"
-            aria-label="Periodo del dashboard"
-          >
-            {CALENDAR_SCALE_OPTIONS.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className={`preset-chip min-h-tap max-[720px]:flex-1 ${scale === option.id ? 'is-active' : ''}`}
-                onClick={() => setScale(option.id)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
+      <div className="glass glass-lite squircle flex flex-wrap items-center gap-2 px-3 py-2.5">
+        <PeriodFilter scale={scale} anchor={anchor} onScaleChange={setScale} onAnchorChange={setAnchor} />
         <TeamFilter teams={visibleTeams} value={teamFilter} onChange={setTeamFilter} />
         <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Dueño" />
         <CitaLinkFilterControl value={citaLink} onChange={setCitaLink} />
-        <p className="mb-0.5 ml-auto self-center text-sm font-semibold tracking-[-0.02em] text-avi-muted max-[900px]:ml-0 max-[900px]:w-full">
-          {period.label}
-        </p>
       </div>
 
       {!loading && slaCount > 0 ? (
@@ -343,18 +317,6 @@ export default function DashboardGeneralView({
           onClick={onOpenTriage}
         />
       </section>
-
-      {appRole === 'admin' ? (
-        <TeamAssignPanel
-          workshop={workshop}
-          workspace={workspace}
-          currentUser={currentUser}
-          teamFilter={teamFilter}
-          looseTickets={liveItems.filter((item) => !item.gestionado && !item.gestionemail)}
-          assignTask={assignTask}
-          onOpenAssign={onOpenAssign}
-        />
-      ) : null}
 
       {onOpenBoards ? (
         <aside className="glass glass-lite squircle flex flex-wrap items-center gap-x-[18px] gap-y-3.5 px-[18px] py-4">

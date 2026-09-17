@@ -5,9 +5,9 @@ import type { PeticionPendiente } from './peticionesPendientes'
 export type EstadoFilter = 'todas' | 'faltan' | 'hechas'
 
 export const ESTADO_DONE_OPTIONS: { id: EstadoFilter; label: string }[] = [
-  { id: 'faltan', label: 'No hechos' },
-  { id: 'hechas', label: 'Hechos' },
-  { id: 'todas', label: 'Todas' },
+  { id: 'faltan', label: 'Por hacer' },
+  { id: 'hechas', label: 'Ya hechas' },
+  { id: 'todas', label: 'Ver todo' },
 ]
 
 export function matchesEstadoDone(done: boolean, estado: EstadoFilter): boolean {

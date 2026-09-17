@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, History } from 'lucide-react'
+import { History } from 'lucide-react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
 import { HexLoaderScreen } from '../components/ui/HexLoader'
 import Card from '../components/ui/Card'
@@ -28,17 +28,13 @@ import {
 import CitaLinkFilterControl from '../components/CitaLinkFilter'
 import EstadoDoneFilter from '../components/EstadoDoneFilter'
 import OwnerScopeFilter from '../components/OwnerScopeFilter'
+import PeriodFilter from '../components/PeriodFilter'
 import TeamFilter from '../components/TeamFilter'
 import { citaLinkEmptyCopy, matchesCitaLink, type CitaLinkFilter } from '../lib/citaLinkFilter'
 import { compareTicketsByOpenFirst, matchesEstadoDone, type EstadoFilter } from '../lib/doneFilter'
 import { isSlaCritico } from '../lib/tallerStations'
 import { localTodayIso } from '../lib/advisorWorkspace'
-import {
-  CALENDAR_SCALE_OPTIONS,
-  calendarPeriod,
-  shiftCalendarAnchor,
-  type CalendarScale,
-} from '../lib/calendarScale'
+import { calendarPeriod, type CalendarScale } from '../lib/calendarScale'
 import type { Workshop } from '../types'
 
 type Props = {
@@ -90,62 +86,17 @@ export default function TodayTasksView({ workshop, currentUser, appRole = 'aseso
   )
   const stats = useMemo(() => computePeticionesStats(historyAll), [historyAll])
 
-  const changeScale = (next: CalendarScale) => {
-    setScale(next)
-    setAnchor(todayAnchor())
-  }
-
   return (
     <div className="dashboard-page role-desk flex min-w-0 flex-col gap-4">
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
       {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
 
-      <div className="elevator-filters glass glass-lite squircle flex flex-wrap items-end gap-x-5 gap-y-4 px-4 py-3.5">
-        <div className="filter-field flex max-w-full flex-col justify-end gap-1.5">
-          <span className="filter-field-label block min-h-[18px] text-[13px] font-semibold leading-tight text-avi-fog-strong">
-            Periodo
-          </span>
-          <div className="estado-filter inline-flex flex-wrap items-center gap-1.5" role="group" aria-label="Periodo del historial">
-            {CALENDAR_SCALE_OPTIONS.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className={`preset-chip ${scale === option.id ? 'is-active' : ''}`}
-                onClick={() => changeScale(option.id)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="elevator-day-nav flex items-center gap-2">
-          <button
-            type="button"
-            className="ghost-button calendar-nav"
-            onClick={() => setAnchor((current) => shiftCalendarAnchor(scale, current, -1))}
-            aria-label="Periodo anterior"
-          >
-            <ChevronLeft size={17} />
-          </button>
-          <button type="button" className="ghost-button" onClick={() => setAnchor(todayAnchor())}>
-            Hoy
-          </button>
-          <button
-            type="button"
-            className="ghost-button calendar-nav"
-            onClick={() => setAnchor((current) => shiftCalendarAnchor(scale, current, 1))}
-            aria-label="Periodo siguiente"
-          >
-            <ChevronRight size={17} />
-          </button>
-        </div>
-        <p className="mb-0.5 ml-auto self-center text-sm font-semibold tracking-[-0.02em] text-avi-muted max-[900px]:ml-0 max-[900px]:w-full">
-          {period.label}
-        </p>
+      <div className="glass glass-lite squircle flex flex-wrap items-center gap-2 px-3 py-2.5">
+        <PeriodFilter scale={scale} anchor={anchor} onScaleChange={setScale} onAnchorChange={setAnchor} />
+        <EstadoDoneFilter value={estado} onChange={setEstado} />
         <TeamFilter teams={visibleTeams} value={teamFilter} onChange={setTeamFilter} />
         <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Dueño" />
         <CitaLinkFilterControl value={citaLink} onChange={setCitaLink} />
-        <EstadoDoneFilter value={estado} onChange={setEstado} label="Hechas o no" />
       </div>
 
       <section className="ops-kpi-grid grid grid-cols-1 gap-2.5 min-[561px]:grid-cols-3" aria-label="Historial de consultas">
@@ -185,7 +136,7 @@ export default function TodayTasksView({ workshop, currentUser, appRole = 'aseso
             {historyAll.length > 0
               ? estado === 'hechas'
                 ? 'No hay consultas hechas con este filtro.'
-                : 'No hay consultas por hacer. Mira «Hechos» o «Todas».'
+                : 'No hay consultas por hacer. Pulsa «Ya hechas» o «Ver todo».'
               : citaLink !== 'todas'
                 ? citaLinkEmptyCopy(citaLink)
                 : teamFilter !== TEAM_FILTER_ALL

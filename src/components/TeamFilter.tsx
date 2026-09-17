@@ -1,5 +1,6 @@
 import type { AdvisorTeam } from '../lib/advisorWorkspace'
 import { TEAM_FILTER_ALL, TEAM_FILTER_LOOSE, type TeamFilterId } from '../lib/teamScope'
+import FilterSelect from './FilterSelect'
 
 type Props = {
   teams: AdvisorTeam[]
@@ -22,43 +23,22 @@ export default function TeamFilter({
 }: Props) {
   if (teams.length === 0 && !alwaysShow) return null
 
+  const options =
+    teams.length === 0
+      ? []
+      : [
+          { id: TEAM_FILTER_ALL, label: 'Todos' },
+          ...teams.map((team) => ({ id: team.id, label: team.name })),
+          ...(showLoose ? [{ id: TEAM_FILTER_LOOSE, label: 'Sin asignar' }] : []),
+        ]
+
   return (
-    <div className="filter-field team-filter flex max-w-full flex-col justify-end gap-1.5">
-      <span className="filter-field-label block min-h-[18px] text-[13px] font-semibold leading-tight text-avi-fog-strong">
-        {label}
-      </span>
-      {teams.length === 0 ? (
-        <p className="section-subtitle">{emptyHint}</p>
-      ) : (
-      <div className="estado-filter inline-flex flex-wrap items-center gap-1.5" role="group" aria-label={label}>
-        <button
-          type="button"
-          className={`preset-chip ${value === TEAM_FILTER_ALL ? 'is-active' : ''}`}
-          onClick={() => onChange(TEAM_FILTER_ALL)}
-        >
-          Todos
-        </button>
-        {teams.map((team) => (
-          <button
-            key={team.id}
-            type="button"
-            className={`preset-chip ${value === team.id ? 'is-active' : ''}`}
-            onClick={() => onChange(team.id)}
-          >
-            {team.name}
-          </button>
-        ))}
-        {showLoose ? (
-          <button
-            type="button"
-            className={`preset-chip ${value === TEAM_FILTER_LOOSE ? 'is-active' : ''}`}
-            onClick={() => onChange(TEAM_FILTER_LOOSE)}
-          >
-            Sin dueño
-          </button>
-        ) : null}
-      </div>
-      )}
-    </div>
+    <FilterSelect
+      label={label}
+      value={value}
+      options={options}
+      onChange={onChange}
+      emptyHint={emptyHint}
+    />
   )
 }

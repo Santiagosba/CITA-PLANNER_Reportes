@@ -831,11 +831,6 @@ export default function DashboardShell({
             hideDeskWindows()
             setShellRoute('boards')
           }}
-          onOpenAssign={(teamId) => {
-            hideDeskWindows()
-            if (teamId) sessionStorage.setItem('avi_assign_team', teamId)
-            setShellRoute('asignar-tarea')
-          }}
           onOpenLead={openLead}
           refreshToken={gestionBump}
         />

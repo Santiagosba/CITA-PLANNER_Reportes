@@ -48,7 +48,7 @@ export const BRANCH_OPTIONS = [
 ]
 
 export const CHANNEL_OPTIONS = [
-  { id: 'voz-wa', label: 'Voz & WhatsApp' },
+  { id: 'voz-wa', label: 'Voz y WhatsApp' },
   { id: 'voz', label: 'Solo voz' },
   { id: 'wa', label: 'Solo WhatsApp' },
 ]

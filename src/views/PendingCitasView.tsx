@@ -1,6 +1,6 @@
 import PaginatedItems from '../components/PaginatedItems'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, Columns3, Search, Table2 } from 'lucide-react'
+import { CalendarDays, Columns3, Table2 } from 'lucide-react'
 import ApiStatusBanner from '../components/ApiStatusBanner'
 import { withLoadDeadline } from '../lib/loadDeadline'
 import PendingCitasToolbar, { type EstadoFilter } from '../components/PendingCitasToolbar'
@@ -457,6 +457,9 @@ export default function PendingCitasView({
         onTeamFilterChange={setTeamFilter}
         citaLink={citaLink}
         onCitaLinkChange={setCitaLink}
+        tipos={tipos}
+        tipoFilter={tipoFilter}
+        onTipoFilterChange={setTipoFilter}
         search={callerFilter}
         onSearchChange={setCallerFilter}
         onPresetChange={handlePresetChange}
@@ -523,37 +526,6 @@ export default function PendingCitasView({
         />
       ) : tab === 'kanban' ? (
         <div className="queue-full">
-          <div className="queue-filterbar glass glass-lite card-pad-sm">
-            <label className="queue-filter-search">
-              <span className="field-label">Buscar</span>
-              <div className="relative">
-                <Search size={18} className="field-input-icon" aria-hidden />
-                <input
-                  type="text"
-                  placeholder="Cliente, teléfono, matrícula o avería"
-                  value={callerFilter}
-                  onChange={(e) => setCallerFilter(e.target.value)}
-                  className="field-input"
-                />
-              </div>
-            </label>
-            <label className="queue-filter-tipo">
-              <span className="field-label">Tipo</span>
-              <select
-                value={tipoFilter}
-                onChange={(e) => setTipoFilter(e.target.value === '' ? '' : Number(e.target.value))}
-                className="field-select"
-              >
-                <option value="">Todas</option>
-                {tipos.map((t) => (
-                  <option key={t.idtipopeticion} value={t.idtipopeticion}>
-                    {t.tipopeticion}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
           {loading ? (
             <HexLoaderScreen label="Cargando consultas…" />
           ) : filteredItems.length === 0 ? (
@@ -572,12 +544,12 @@ export default function PendingCitasView({
               <p className="section-subtitle mt-2">
                 {items.length > 0
                   ? citaLink !== 'todas'
-                    ? 'Prueba «Todas» para ver tickets con y sin cita.'
+                    ? 'Pulsa «Da igual» en Cita para ver tickets con y sin cita.'
                     : ownerScope !== 'todas'
-                      ? 'Prueba «Todas» o cambia el dueño.'
+                      ? 'Pulsa «Cualquiera» en Dueño para ver más tickets.'
                       : estado === 'hechas'
                         ? `Faltan ${stats.porHacer} por terminar.`
-                        : `Hay ${stats.hechas} hechos. Cambia el filtro a «Hechos» o «Todas» para verlos.`
+                        : `Hay ${stats.hechas} ya hechas. Pulsa «Ya hechas» o «Ver todo» para verlas.`
                   : 'Prueba «Ver todo» o amplía el rango de fechas.'}
               </p>
             </Card>

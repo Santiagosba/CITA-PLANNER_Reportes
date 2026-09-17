@@ -1189,12 +1189,8 @@ export default function BoardsManagerView({
               alwaysShow={appRole === 'admin'}
             />
           </div>
-          <div className="elevator-filters" style={{ marginTop: 'var(--space-3)' }}>
-            {appRole === 'admin' ? (
-              <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} />
-            ) : (
-              <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Dueño" />
-            )}
+          <div className="mt-3 flex flex-wrap items-end gap-3">
+            <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Dueño" />
             <CitaLinkFilterControl value={citaLink} onChange={setCitaLink} />
           </div>
         </div>

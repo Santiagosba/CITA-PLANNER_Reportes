@@ -3,7 +3,7 @@ import type { PeticionPendiente } from './peticionesPendientes'
 export type CitaLinkFilter = 'todas' | 'con_cita' | 'sin_cita'
 
 export const CITA_LINK_OPTIONS: { id: CitaLinkFilter; label: string }[] = [
-  { id: 'todas', label: 'Todas' },
+  { id: 'todas', label: 'Da igual' },
   { id: 'con_cita', label: 'Con cita' },
   { id: 'sin_cita', label: 'Sin cita' },
 ]
