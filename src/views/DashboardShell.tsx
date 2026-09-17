@@ -44,14 +44,20 @@ import {
   type PeticionPendiente,
 } from '../lib/peticionesPendientes'
 import { callNoteLine, useSoftphone } from '../lib/softphone'
-import { findCachedPeticion } from '../hooks/useOperationalData'
+import {
+  findCachedPeticion,
+  findCachedPeticiones,
+  invalidateOperationalData,
+} from '../hooks/useOperationalData'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
 import { teamLabelForEmail } from '../lib/advisorWorkspace'
 import { fetchLicenseViews, type LicenseViewId } from '../lib/crmViews'
-import { isDemoTicketId } from '../lib/demoTickets'
+import { isDemoTicketId, isLocalInboundTicketId } from '../lib/demoTickets'
 import { applyPeticionPatch, PETICIONES_PATCHED_EVENT } from '../lib/ticketOps'
 import { isIdleDeskClick } from '../lib/osDeskClick'
 import { ticketClientLabel } from '../lib/ticketClient'
+import { createInboundPeticion } from '../lib/inboundPeticion'
+import { suggestTicketOwner } from '../lib/ticketOwnerSuggest'
 
 type Props = {
   workshop: Workshop
@@ -717,7 +723,7 @@ export default function DashboardShell({
       }
 
       if (id.startsWith('inbound-') || id.startsWith('cita-') || isDemoTicketId(id)) {
-        if (isDemoTicketId(id)) {
+        if (isDemoTicketId(id) || isLocalInboundTicketId(id)) {
           void applyPeticionPatch(workshop, session.peticion, {
             gestionado,
             gestionobservaciones: session.gestionObs.trim() || undefined,
@@ -958,43 +964,27 @@ export default function DashboardShell({
 
               {inboundOpen ? (
                 <NewInboundDrawer
-                  workshopName={workshop.name}
+                  workshop={workshop}
                   onClose={() => setInboundOpen(false)}
-                  onSubmit={(payload) => {
-                    const now = new Date().toISOString()
-                    const draft: PeticionPendiente = {
-                      idpeticion: `inbound-${Date.now()}`,
-                      idtaller: String(workshop.originalId || workshop.containerIdTaller || ''),
-                      descripcion: payload.descripcion,
-                      idtipopeticion: null,
-                      tipopeticion: payload.canal === 'voz' ? 'Voz Laura' : 'WhatsApp',
-                      fechainicio: now,
-                      fechafin: null,
-                      fechacreacion: now,
-                      caller: payload.caller,
-                      gestionado: false,
-                      gestionemail: null,
-                      gestionfecha: null,
-                      gestionobservaciones: `Inbound manual · ${payload.cliente || 'Sin nombre'}`,
-                      idcita: null,
-                      cita: payload.matricula
-                        ? {
-                            idcita: `draft-${Date.now()}`,
-                            fecha: null,
-                            nombre: payload.cliente || null,
-                            apellidos: null,
-                            matricula: payload.matricula,
-                            marca: null,
-                            modelo: payload.modelo || null,
-                            email: null,
-                            telefono: payload.caller,
-                            movil: payload.caller,
-                            asunto: payload.descripcion,
-                          }
-                        : null,
-                    }
+                  onSubmit={async (payload) => {
+                    const suggestion = suggestTicketOwner(
+                      workspace,
+                      {
+                        idpeticion: `inbound-${Date.now()}`,
+                        caller: payload.caller,
+                        tipopeticion: payload.tipoPeticion,
+                        gestionemail: null,
+                      },
+                      findCachedPeticiones(),
+                    )
+                    const created = await createInboundPeticion(workshop, {
+                      ...payload,
+                      gestionemail: suggestion?.person.email,
+                    })
                     setInboundOpen(false)
-                    openLead(draft)
+                    invalidateOperationalData(workshop)
+                    setGestionBump((value) => value + 1)
+                    openLead(created)
                   }}
                 />
               ) : null}

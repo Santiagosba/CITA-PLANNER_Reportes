@@ -120,6 +120,8 @@ export type PeticionPendiente = {
   gestionobservaciones: string | null
   idcita: string | null
   cita: CitaResumen | null
+  /** Canal explícito en altas manuales; las peticiones antiguas se infieren por texto. */
+  canalentrada?: 'voz' | 'whatsapp' | null
   /** Identidad de Citas cruzada por teléfono; no implica cita vinculada. */
   clienteNombre?: string | null
 }

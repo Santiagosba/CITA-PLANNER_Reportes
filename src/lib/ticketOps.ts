@@ -6,7 +6,7 @@ import {
   type AdvisorPerson,
   type AdvisorWorkspace,
 } from './advisorWorkspace'
-import { isDemoTicketId, patchDemoTicket } from './demoTickets'
+import { isDemoTicketId, isLocalInboundTicketId, patchDemoTicket } from './demoTickets'
 import { suggestTicketOwner } from './ticketOwnerSuggest'
 import {
   classifyOwnerEmail,
@@ -81,7 +81,7 @@ export async function applyPeticionPatch(
     gestionfecha: patch.gestionado ? new Date().toISOString() : peticion.gestionfecha,
   }
 
-  if (isDemoTicketId(peticion.idpeticion)) {
+  if (isDemoTicketId(peticion.idpeticion) || isLocalInboundTicketId(peticion.idpeticion)) {
     patchDemoTicket(workshop, peticion.idpeticion, next)
     notifyPeticionPatched(workshop, peticion.idpeticion, next)
     return next

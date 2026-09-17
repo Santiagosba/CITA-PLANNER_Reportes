@@ -221,6 +221,31 @@ export async function sqlFetchPendingPeticiones(
   return parseJson<PeticionPendiente[]>(await apiFetch(url('/api/peticiones-pendientes', params)))
 }
 
+export type SqlCreateInboundInput = {
+  idtaller: string
+  idtipopeticion: number
+  descripcion: string
+  caller: string
+  cliente: string
+  matricula: string
+  modelo: string
+  canal: 'voz' | 'whatsapp'
+  gestionemail?: string
+}
+
+export async function sqlCreateInboundPeticion(input: SqlCreateInboundInput): Promise<PeticionPendiente> {
+  if (!isCrmUuid(input.idtaller)) {
+    throw new SqlServerApiError('El centro elegido no es válido.')
+  }
+  return parseJson<PeticionPendiente>(
+    await apiFetch(url('/api/peticiones', { idTaller: input.idtaller }), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  )
+}
+
 export async function sqlFetchCitas(
   idTallerIds: string[],
   range: { from?: string; to?: string } = {},

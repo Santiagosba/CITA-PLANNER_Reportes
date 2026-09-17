@@ -1,4 +1,4 @@
-import { ChevronDown, Phone } from 'lucide-react'
+import { ChevronDown, ExternalLink, Phone, UserRound } from 'lucide-react'
 import { memo, type ReactNode } from 'react'
 import ActionButton, { type ActionStatus } from './ui/ActionButton'
 import TicketPlate from './TicketPlate'
@@ -48,13 +48,11 @@ function PeticionRow({
   const tel = phone.replace(/\s/g, '')
   const telHref = tel ? `tel:${tel}` : null
 
-  // Datos que el asesor necesita ver de un vistazo para llamar con contexto
+  // Datos secundarios: la fecha completa ya aparece en el encabezado del día.
   const facts: { label: string; value: ReactNode }[] = []
   facts.push({ label: 'Tipo', value: p.tipopeticion ?? 'Sin tipo' })
   if (teamLabel) facts.push({ label: 'Grupo', value: teamLabel })
-  facts.push({ label: 'Consulta', value: formatFecha(p.fechainicio) })
-  if (vehiculo) facts.push({ label: 'Vehículo', value: vehiculo })
-  if (c?.email) facts.push({ label: 'Email', value: c.email })
+  facts.push({ label: 'Recibida', value: formatAgendaTime(p.fechainicio) })
   if (c?.fecha) facts.push({ label: 'Cita', value: formatFecha(c.fecha) })
 
   const openInWindow = Boolean(onOpenLead)
@@ -63,13 +61,13 @@ function PeticionRow({
 
   return (
     <li
-      className={`prow glass glass-lite squircle${animateEntry ? ' triage-item-enter' : ''}${showBody ? ' is-expanded' : ''}${openInWindow ? ' is-windowed' : ''} overflow-visible`}
+      className={`prow glass glass-lite squircle${animateEntry ? ' triage-item-enter' : ''}${showBody ? ' is-expanded' : ''}${openInWindow ? ' is-windowed' : ''} min-w-0 overflow-visible`}
       style={animateEntry ? { animationDelay: `${revealIndex * 24}ms` } : undefined}
     >
-      <div className="prow-head flex min-w-0 items-start gap-2 overflow-visible">
+      <div className="flex min-w-0 flex-col gap-3 overflow-visible p-3">
         <button
           type="button"
-          className="prow-toggle"
+          className="group min-w-0 rounded-md p-2 text-left transition-colors hover:bg-avi-surface focus-visible:outline-none focus-visible:shadow-focus"
           onClick={() => {
             if (onOpenLead) {
               onOpenLead(p)
@@ -80,56 +78,108 @@ function PeticionRow({
           aria-expanded={openInWindow ? undefined : expanded}
           aria-controls={openInWindow ? undefined : `prow-body-${p.idpeticion}`}
         >
-          <span className={`prow-marker ${pendiente ? 'is-pending' : 'is-done'}`} aria-hidden />
-          <span className="prow-info">
-            <span className="prow-headline flex flex-wrap items-center gap-2 overflow-visible">
-              <TicketPlate peticion={p} />
-              <span className="prow-name min-w-0 flex-1">
-                <TicketClientBlock peticion={p} size="md" />
-              </span>
-              {isDemoTicketId(p.idpeticion) ? <span className="badge tone-info">Prueba</span> : null}
-              <span className={`badge ${p.gestionado ? 'tone-positive' : 'tone-warning'}`}>
-                {p.gestionado ? 'Hecha' : 'Por hacer'}
-              </span>
-              {!p.gestionado ? (
-                <span className={`badge ${pendiente ? 'tone-warning' : 'tone-neutral'}`}>
-                  {pendiente ? 'Sin cita' : 'Con cita'}
+          <span className="flex min-w-0 items-start gap-3">
+            <span
+              className={`mt-2 h-3 w-3 shrink-0 rounded-pill ${
+                pendiente
+                  ? 'bg-avi-warning shadow-[0_0_0_4px_rgba(180,100,10,0.12)]'
+                  : 'bg-avi-success shadow-[0_0_0_4px_rgba(29,138,78,0.12)]'
+              }`}
+              aria-hidden
+            />
+            <span className="flex min-w-0 flex-1 flex-col gap-3">
+              <span className="grid min-w-0 gap-3 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start">
+                <TicketPlate peticion={p} />
+                <span className="min-w-0">
+                  <span className="mb-2 flex flex-wrap items-center gap-1.5">
+                    {isDemoTicketId(p.idpeticion) ? <span className="badge tone-info">Prueba</span> : null}
+                    <span className={`badge ${p.gestionado ? 'tone-positive' : 'tone-warning'}`}>
+                      {p.gestionado ? 'Hecha' : 'Por hacer'}
+                    </span>
+                    {!p.gestionado ? (
+                      <span className={`badge ${pendiente ? 'tone-warning' : 'tone-neutral'}`}>
+                        {pendiente ? 'Sin cita' : 'Con cita'}
+                      </span>
+                    ) : null}
+                    {p.canalentrada ? (
+                      <span className="badge tone-neutral">
+                        {p.canalentrada === 'whatsapp' ? 'WhatsApp' : 'Llamada'}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="block">
+                    <TicketClientBlock peticion={p} size="md" />
+                  </span>
                 </span>
-              ) : null}
+              </span>
+
+              <span className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4">
+                {facts.map((fact) => (
+                  <span
+                    key={fact.label}
+                    className="flex min-h-[62px] min-w-0 flex-col justify-center gap-0.5 rounded-sm border border-avi-line bg-avi-surface px-3 py-2"
+                  >
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.04em] text-avi-muted">
+                      {fact.label}
+                    </span>
+                    <span className="line-clamp-2 text-sm font-semibold leading-tight text-avi-fog-strong">
+                      {fact.value}
+                    </span>
+                  </span>
+                ))}
+              </span>
             </span>
-            <span className="prow-facts">
-              {facts.map((f) => (
-                <span key={f.label} className="prow-fact">
-                  <span className="prow-fact-label">{f.label}</span>
-                  <span className="prow-fact-value">{f.value}</span>
-                </span>
-              ))}
-            </span>
-          </span>
-          <span className="prow-aside">
-            <span className="prow-time">{formatAgendaTime(p.fechainicio)}</span>
-            {openInWindow ? (
-              <span className="prow-open-hint">Abrir</span>
-            ) : (
-              <ChevronDown size={20} className={`prow-chevron ${expanded ? 'is-open' : ''}`} aria-hidden />
-            )}
+
+            {!openInWindow ? (
+              <span className="hidden shrink-0 items-center self-center text-avi-brand min-[560px]:inline-flex">
+                <ChevronDown
+                  size={20}
+                  className={`transition-transform ${expanded ? 'rotate-180' : ''}`}
+                  aria-hidden
+                />
+              </span>
+            ) : null}
           </span>
         </button>
 
-        {ownerSlot}
+        <div className="grid min-w-0 gap-2 border-t border-avi-line pt-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+          {ownerSlot ? (
+            <div
+              className="flex min-h-tap min-w-0 items-center gap-2 rounded-md border border-avi-line bg-avi-surface px-3 py-2"
+              onClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
+              <UserRound size={18} className="shrink-0 text-avi-muted" aria-hidden />
+              <div className="min-w-0 flex-1">{ownerSlot}</div>
+            </div>
+          ) : null}
 
-        {telHref ? (
-          <a
-            href={telHref}
-            className="prow-call confirm-action"
-            aria-label={`Llamar a ${titulo}`}
-            data-call-label={titulo}
-            data-call-peticion={p.idpeticion}
-          >
-            <Phone size={16} />
-            Llamar
-          </a>
-        ) : null}
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
+            {openInWindow ? (
+              <button
+                type="button"
+                className="ghost-button min-h-tap flex-1 whitespace-nowrap sm:flex-none"
+                onClick={() => onOpenLead?.(p)}
+              >
+                <ExternalLink size={16} aria-hidden />
+                Abrir ficha
+              </button>
+            ) : null}
+
+            {telHref ? (
+              <a
+                href={telHref}
+                className="ghost-button confirm-action min-h-tap flex-1 whitespace-nowrap sm:flex-none"
+                aria-label={`Llamar a ${titulo}`}
+                data-call-label={titulo}
+                data-call-peticion={p.idpeticion}
+              >
+                <Phone size={16} aria-hidden />
+                Llamar
+              </a>
+            ) : null}
+          </div>
+        </div>
       </div>
 
       {showBody ? (

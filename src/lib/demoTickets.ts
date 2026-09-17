@@ -13,6 +13,7 @@ import type { Workshop } from '../types'
 export const DEMO_TICKETS_PER_ADVISOR = 35
 export const DEMO_TICKET_PREFIX = 'demo-ticket-'
 export const DEMO_CITA_PREFIX = 'demo-cita-'
+export const LOCAL_INBOUND_PREFIX = 'inbound-local-'
 export const DEMO_TICKETS_NOTICE =
   'Junto a los tickets reales de la API hay 35 de prueba por asesor (Recepción y Comercial), para demos. Se pueden pasar entre el equipo y no se guardan en el taller real.'
 
@@ -82,6 +83,10 @@ const CARS = [
 
 export function isDemoTicketId(id: string | null | undefined): boolean {
   return String(id || '').startsWith(DEMO_TICKET_PREFIX)
+}
+
+export function isLocalInboundTicketId(id: string | null | undefined): boolean {
+  return String(id || '').startsWith(LOCAL_INBOUND_PREFIX)
 }
 
 export function isDemoCitaId(id: string | null | undefined): boolean {
@@ -202,7 +207,7 @@ function shiftStamp(value: string | null | undefined, days: number): string | nu
 /** Si el lote es de otro día, mueve las fechas a hoy para que el periodo (día/mes) las vea. */
 export function refreshDemoTicketDates(rows: PeticionPendiente[]): PeticionPendiente[] {
   const today = toDateInputValue(new Date())
-  const newest = rows.reduce((max, row) => {
+  const newest = rows.filter((row) => isDemoTicketId(row.idpeticion)).reduce((max, row) => {
     const key = ticketLocalDay(row)
     return key > max ? key : max
   }, '')
@@ -211,22 +216,27 @@ export function refreshDemoTicketDates(rows: PeticionPendiente[]): PeticionPendi
     (new Date(`${today}T12:00:00`).getTime() - new Date(`${newest}T12:00:00`).getTime()) / 86_400_000,
   )
   if (days <= 0) return rows
-  return rows.map((row) => ({
-    ...row,
-    fechainicio: shiftStamp(row.fechainicio, days) ?? row.fechainicio,
-    fechacreacion: shiftStamp(row.fechacreacion, days) ?? row.fechacreacion,
-    fechafin: row.fechafin ? shiftStamp(row.fechafin, days) : row.fechafin,
-    gestionfecha: row.gestionfecha ? shiftStamp(row.gestionfecha, days) : row.gestionfecha,
-    cita: row.cita
-      ? { ...row.cita, fecha: shiftStamp(row.cita.fecha, days) ?? row.cita.fecha }
-      : row.cita,
-  }))
+  return rows.map((row) =>
+    isDemoTicketId(row.idpeticion)
+      ? {
+        ...row,
+        fechainicio: shiftStamp(row.fechainicio, days) ?? row.fechainicio,
+        fechacreacion: shiftStamp(row.fechacreacion, days) ?? row.fechacreacion,
+        fechafin: row.fechafin ? shiftStamp(row.fechafin, days) : row.fechafin,
+        gestionfecha: row.gestionfecha ? shiftStamp(row.gestionfecha, days) : row.gestionfecha,
+        cita: row.cita
+          ? { ...row.cita, fecha: shiftStamp(row.cita.fecha, days) ?? row.cita.fecha }
+          : row.cita,
+      }
+      : row,
+  )
 }
 
 function demoTicketsNeedRebuild(rows: PeticionPendiente[]): boolean {
   const advisors = demoTicketAdvisors()
-  if (rows.length !== advisors.length * DEMO_TICKETS_PER_ADVISOR) return true
-  const have = new Set(rows.map((row) => normalizeEmail(row.gestionemail || '')).filter(Boolean))
+  const demos = rows.filter((row) => isDemoTicketId(row.idpeticion))
+  if (demos.length !== advisors.length * DEMO_TICKETS_PER_ADVISOR) return true
+  const have = new Set(demos.map((row) => normalizeEmail(row.gestionemail || '')).filter(Boolean))
   return advisors.some((asesor) => !have.has(normalizeEmail(asesor.email)))
 }
 
@@ -237,9 +247,18 @@ export function loadDemoTickets(workshop: Workshop): PeticionPendiente[] {
     const raw = localStorage.getItem(key)
     if (raw) {
       const parsed = JSON.parse(raw) as unknown
-      if (Array.isArray(parsed) && parsed.length && !demoTicketsNeedRebuild(parsed as PeticionPendiente[])) {
-        const rows = refreshDemoTicketDates(parsed as PeticionPendiente[])
-        if (rows !== parsed) saveDemoTickets(workshop, rows)
+      if (Array.isArray(parsed) && parsed.length) {
+        const stored = parsed as PeticionPendiente[]
+        if (!demoTicketsNeedRebuild(stored)) {
+          const rows = refreshDemoTicketDates(stored)
+          if (rows !== parsed) saveDemoTickets(workshop, rows)
+          return rows
+        }
+        const rows = [
+          ...stored.filter((row) => isLocalInboundTicketId(row.idpeticion)),
+          ...generateDemoTickets(workshop),
+        ]
+        saveDemoTickets(workshop, rows)
         return rows
       }
     }
@@ -258,6 +277,15 @@ export function saveDemoTickets(workshop: Workshop, rows: PeticionPendiente[]): 
   } catch {
     /* quota */
   }
+}
+
+export function addLocalInboundTicket(
+  workshop: Workshop,
+  ticket: PeticionPendiente,
+): PeticionPendiente {
+  const rows = loadDemoTickets(workshop).filter((row) => row.idpeticion !== ticket.idpeticion)
+  saveDemoTickets(workshop, [ticket, ...rows])
+  return ticket
 }
 
 export function patchDemoTicket(

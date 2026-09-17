@@ -55,6 +55,14 @@ export function findCachedPeticion(idpeticion: string): PeticionPendiente | null
   return null
 }
 
+export function findCachedPeticiones(): PeticionPendiente[] {
+  const found = new Map<string, PeticionPendiente>()
+  for (const entry of cache.values()) {
+    for (const row of entry.items) found.set(row.idpeticion, row)
+  }
+  return [...found.values()]
+}
+
 function workshopKey(workshop: Workshop): string {
   return `${String(workshop.originalId || '')}|${String(workshop.containerIdTaller || '')}`
 }

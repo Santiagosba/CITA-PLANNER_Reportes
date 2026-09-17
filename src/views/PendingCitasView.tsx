@@ -267,7 +267,8 @@ export default function PendingCitasView({
 
   const matchesScopeFilters = useCallback(
     (p: PeticionPendiente) => {
-      const text = `${p.tipopeticion || ''} ${p.descripcion || ''} ${p.cita?.marca || ''} ${p.cita?.modelo || ''} ${p.cita?.asunto || ''}`
+      const explicitChannel = p.canalentrada === 'whatsapp' ? 'WhatsApp' : p.canalentrada === 'voz' ? 'Voz llamada' : ''
+      const text = `${explicitChannel} ${p.tipopeticion || ''} ${p.descripcion || ''} ${p.cita?.marca || ''} ${p.cita?.modelo || ''} ${p.cita?.asunto || ''}`
       if (!matchesChannelText(text, channel)) return false
       if (slaOnly && !isSlaCritico(p.fechainicio) && !isSlaCritico(p.cita?.fecha)) return false
       if (!matchesTeamFilter(workspace, p, teamFilter, appRole, currentUser.email)) return false
@@ -590,7 +591,7 @@ export default function PendingCitasView({
                             appRole={appRole}
                             peticion={p}
                             tickets={items}
-                            compact
+                            showTeam={false}
                           />
                         }
                       />

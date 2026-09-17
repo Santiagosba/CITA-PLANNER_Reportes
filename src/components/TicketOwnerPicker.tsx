@@ -30,6 +30,7 @@ type Props = {
   tickets?: PeticionPendiente[]
   compact?: boolean
   layout?: 'inline' | 'card'
+  showTeam?: boolean
 }
 
 type OwnerGroup = {
@@ -223,6 +224,7 @@ export default function TicketOwnerPicker({
   tickets = [],
   compact = false,
   layout = 'inline',
+  showTeam = true,
 }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -249,7 +251,7 @@ export default function TicketOwnerPicker({
   const applying = useRef(false)
   const grouped = useMemo(() => groupedTeammates(workspace, people), [workspace, people])
   const teamLabel = ticketTeamLabel(workspace, peticion)
-  const teamLine = teamLabel ? <span className="ticket-owner-team">Grupo {teamLabel}</span> : null
+  const teamLine = showTeam && teamLabel ? <span className="ticket-owner-team">Grupo {teamLabel}</span> : null
 
   const onChange = async (next: string) => {
     setBusy(true)
