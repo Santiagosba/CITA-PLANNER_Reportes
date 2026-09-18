@@ -3,8 +3,9 @@ import { Bell, LayoutGrid, Moon, Search, Server, Sparkles, Sun } from 'lucide-re
 import { OPEN_TASKBAR_EVENT, useTaskbarVisible } from '../lib/apps'
 import { headerNoticeItems, searchPeticionesAi } from '../lib/aiHeaderSearch'
 import { loadReadNoticeIds, mergeReadNoticeIds } from '../lib/headerNoticeReads'
+import { useNoticeHistory } from '../lib/headerNoticeHistory'
 import { resolveDateRange } from '../lib/dateRangePresets'
-import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
+import { formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
 import TicketClientBlock from './TicketClientBlock'
 import { isSlaCritico } from '../lib/tallerStations'
 import { invalidateOperationalData, useOperationalData } from '../hooks/useOperationalData'
@@ -13,6 +14,7 @@ import type { CrmAppRole } from '../lib/crmRoles'
 import type { Workshop } from '../types'
 import TicketPlate from './TicketPlate'
 import NoticeCountBadge from './NoticeCountBadge'
+import NoticeCenter from './NoticeCenter'
 
 type TriageTab = 'kanban' | 'tabla' | 'calendario'
 
@@ -168,10 +170,11 @@ export default function ViewPageHeader({
   const notices = useMemo(() => headerNoticeItems(items), [items])
   const liveNoticeIds = useMemo(() => notices.map((item) => item.idpeticion), [notices])
   const workshopNoticeKey = workshop.containerIdTaller || workshop.id
+  const { entries: noticeHistory, statusOf, setStatus } = useNoticeHistory(workshop, notices)
   const [readIds, setReadIds] = useState(() => loadReadNoticeIds(workshop))
   const unreadNotices = useMemo(
-    () => notices.filter((item) => !readIds.has(item.idpeticion)),
-    [notices, readIds],
+    () => notices.filter((item) => statusOf(item.idpeticion) === 'inbox' && !readIds.has(item.idpeticion)),
+    [notices, readIds, statusOf],
   )
   const noticeCount = unreadNotices.length
   const [bellRing, setBellRing] = useState(false)
@@ -182,6 +185,12 @@ export default function ViewPageHeader({
   }, [workshopNoticeKey])
 
   const markNoticesRead = (ids: string[]) => {
+    setStatus(ids, 'read')
+    setReadIds((current) => mergeReadNoticeIds(workshop, current, ids, liveNoticeIds))
+  }
+
+  const deleteNotices = (ids: string[]) => {
+    setStatus(ids, 'deleted')
     setReadIds((current) => mergeReadNoticeIds(workshop, current, ids, liveNoticeIds))
   }
 
@@ -358,7 +367,9 @@ export default function ViewPageHeader({
         <div className="view-page-bell" ref={noticesRef}>
           <button
             type="button"
-            className={`view-page-bell-btn ${noticesOpen ? 'is-open' : ''}`}
+            className={`view-page-bell-btn transition-[color,border-color,transform,box-shadow] duration-200 hover:scale-105 active:scale-95 ${
+              noticesOpen ? 'is-open' : ''
+            }`}
             onClick={() => setNoticesOpen((open) => !open)}
             aria-expanded={noticesOpen}
             aria-haspopup="dialog"
@@ -375,55 +386,16 @@ export default function ViewPageHeader({
             </span>
           </button>
           {noticesOpen ? (
-            <div className="view-page-popover glass glass-lite view-page-notices" role="dialog" aria-label="Notificaciones">
-              <div className="view-page-notices-head">
-                <strong>{noticeCount > 0 ? `${noticeCount} avisos por leer` : 'Avisos del taller'}</strong>
-                <div className="flex shrink-0 items-center gap-2">
-                  {noticeCount > 0 ? (
-                    <button
-                      type="button"
-                      className="ghost-button"
-                      onClick={() => {
-                        markNoticesRead(unreadNotices.map((item) => item.idpeticion))
-                        setNoticesOpen(false)
-                      }}
-                    >
-                      Ya las he visto
-                    </button>
-                  ) : null}
-                  <button type="button" className="ghost-button" onClick={() => setNoticesOpen(false)}>
-                    Cerrar
-                  </button>
-                </div>
-              </div>
-              {unreadNotices.length === 0 ? (
-                <p className="section-subtitle view-page-popover-empty">
-                  {notices.length > 0 ? 'Ya has leído los avisos de ahora.' : 'No hay avisos pendientes.'}
-                </p>
-              ) : (
-                <ul className="view-page-popover-list custom-scrollbar-light">
-                  {unreadNotices.map((item) => {
-                    const sla = isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha)
-                    return (
-                      <li key={item.idpeticion}>
-                        <button type="button" className="view-page-popover-row" onClick={() => openHit(item)}>
-                          <span className="view-page-popover-row-top">
-                            <TicketClientBlock peticion={item} size="sm" />
-                            <span className={`badge ${sla ? 'tone-negative' : 'tone-warning'}`}>
-                              {sla ? 'SLA crítico' : isPeticionPendiente(item) ? 'Pendiente' : 'Aviso'}
-                            </span>
-                          </span>
-                          <span className="view-page-popover-row-meta">
-                            <span>{item.tipopeticion || 'Sin tipo'}</span>
-                            <time>{formatFecha(item.fechainicio)}</time>
-                          </span>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </div>
+            <NoticeCenter
+              inbox={unreadNotices}
+              history={noticeHistory}
+              tickets={items}
+              loading={loading}
+              onClose={() => setNoticesOpen(false)}
+              onOpen={openHit}
+              onRead={markNoticesRead}
+              onDelete={deleteNotices}
+            />
           ) : null}
         </div>
       </div>

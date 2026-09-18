@@ -122,6 +122,7 @@ export function useOsWindow({
     others: WinRect[]
     fromTile: boolean
     untiled: boolean
+    moved: boolean
   } | null>(null)
   const liveRectRef = useRef<WinRect | null>(null)
   const rafRef = useRef(0)
@@ -265,9 +266,10 @@ export function useOsWindow({
     pendingPtrRef.current = null
     const el = rootRef.current
     const finalRect = liveRectRef.current
+    const moved = dragRef.current?.moved ?? false
     dragRef.current = null
     liveRectRef.current = null
-    if (el && finalRect) {
+    if (el && finalRect && moved) {
       el.style.transition = 'none'
       commitWinRectToElement(el, finalRect)
       void el.offsetWidth
@@ -277,7 +279,7 @@ export function useOsWindow({
     document.body.style.userSelect = ''
     document.body.style.cursor = ''
     clearOsSnapLines()
-    if (!finalRect) return
+    if (!finalRect || !moved) return
     refreshLiquidGlass(el)
     onRectChangeRef.current(finalRect)
   }, [])
@@ -287,6 +289,11 @@ export function useOsWindow({
       const e = pendingPtrRef.current
       const d = dragRef.current
       if (!e || !d) return
+      if (!d.moved) {
+        const distance = Math.hypot(e.clientX - d.ox, e.clientY - d.oy)
+        if (distance < 3) return
+        d.moved = true
+      }
 
       if (d.mode === 'move') {
         if (d.fromTile && !d.untiled) {
@@ -392,6 +399,7 @@ export function useOsWindow({
         others: otherOsRects(windowId),
         fromTile: tiled,
         untiled: false,
+        moved: false,
       }
       liveRectRef.current = shown
       beginGesture('move')
@@ -422,6 +430,7 @@ export function useOsWindow({
         others: otherOsRects(windowId),
         fromTile: tiled,
         untiled: true,
+        moved: false,
       }
       liveRectRef.current = shown
       beginGesture('resize')
@@ -482,7 +491,10 @@ export function useOsWindow({
 
   const requestPlace = useCallback((next: OsPlacement) => {
     if (phaseRef.current === 'closing' || phaseRef.current === 'minimizing') return
-    maxFromRef.current = rootRef.current?.getBoundingClientRect() ?? null
+    const currentBox = rootRef.current?.getBoundingClientRect() ?? null
+    maxAnimationRef.current?.cancel()
+    maxFromRef.current = currentBox
+    placementRef.current = next
     onPlaceRef.current(next)
   }, [])
 

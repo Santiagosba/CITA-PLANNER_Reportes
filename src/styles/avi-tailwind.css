@@ -459,6 +459,98 @@
     animation: avi-notice-bell 700ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
+  @keyframes avi-notice-sheet {
+    from {
+      opacity: 0;
+      transform: translate3d(10px, -18px, 0) scale(0.92);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes avi-notice-row {
+    from {
+      opacity: 0;
+      transform: translate3d(0, -8px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes avi-notice-sheet-out {
+    to {
+      opacity: 0;
+      transform: translate3d(10px, -12px, 0) scale(0.94);
+    }
+  }
+
+  @keyframes avi-notice-pane {
+    from {
+      opacity: 0;
+      transform: translate3d(10px, 0, 0);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes avi-notice-dismiss-read {
+    to {
+      opacity: 0;
+      transform: translate3d(-28px, 0, 0) scale(0.97);
+    }
+  }
+
+  @keyframes avi-notice-dismiss-delete {
+    to {
+      opacity: 0;
+      transform: translate3d(42px, 0, 0) scale(0.94);
+    }
+  }
+
+  @keyframes avi-notice-list-out {
+    to {
+      opacity: 0;
+      transform: translate3d(0, -10px, 0) scale(0.98);
+    }
+  }
+
+  .animate-notice-sheet {
+    transform-origin: 100% 0;
+    animation: avi-notice-sheet 420ms cubic-bezier(0.22, 1.08, 0.36, 1) both;
+  }
+
+  .animate-notice-sheet-out {
+    transform-origin: 100% 0;
+    animation: avi-notice-sheet-out 220ms cubic-bezier(0.4, 0, 1, 1) both;
+  }
+
+  .animate-notice-pane {
+    animation: avi-notice-pane 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-notice-row {
+    animation: avi-notice-row 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .animate-notice-dismiss-read {
+    animation: avi-notice-dismiss-read 320ms cubic-bezier(0.4, 0, 1, 1) both;
+  }
+
+  .animate-notice-dismiss-delete {
+    animation: avi-notice-dismiss-delete 320ms cubic-bezier(0.4, 0, 1, 1) both;
+  }
+
+  .animate-notice-list-out {
+    transform-origin: 50% 0;
+    animation: avi-notice-list-out 300ms cubic-bezier(0.4, 0, 1, 1) both;
+  }
+
   @keyframes avi-center-item {
     0% { opacity: 0; transform: translateY(-10px); }
     100% { opacity: 1; transform: translateY(0); }
@@ -498,6 +590,13 @@
     .animate-notice-ring,
     .animate-notice-glow,
     .animate-notice-bell,
+    .animate-notice-sheet,
+    .animate-notice-sheet-out,
+    .animate-notice-pane,
+    .animate-notice-row,
+    .animate-notice-dismiss-read,
+    .animate-notice-dismiss-delete,
+    .animate-notice-list-out,
     .center-switch-item,
     .center-switch-pin.is-open {
       animation: none;

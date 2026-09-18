@@ -651,6 +651,7 @@ export default function BoardsManagerView({
   const [draftPhone, setDraftPhone] = useState('')
   const [draftNote, setDraftNote] = useState('')
   const tabsRef = useRef<HTMLElement>(null)
+  const tabsRailRef = useRef<HTMLDivElement>(null)
   const [tabsOverflow, setTabsOverflow] = useState({ left: false, right: false })
 
   const ghostLayerRef = useRef<HTMLElement | null>(null)
@@ -819,6 +820,27 @@ export default function BoardsManagerView({
       observer.disconnect()
     }
   }, [updateTabsOverflow, visibleOperations.length])
+
+  useEffect(() => {
+    const rail = tabsRailRef.current
+    const scroller = tabsRef.current
+    if (!rail || !scroller) return
+    const onWheel = (event: WheelEvent) => {
+      const target = event.target
+      if (!(target instanceof Node) || !rail.contains(target)) return
+      if (scroller.scrollWidth <= scroller.clientWidth + 1) return
+      const raw = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
+      if (!raw) return
+      event.preventDefault()
+      const card = scroller.querySelector<HTMLElement>('.department-tab')
+      const step = (card?.offsetWidth ?? 280) + 10
+      const notch = event.deltaMode !== 0 || Math.abs(raw) >= 40
+      const delta = event.deltaMode === 2 ? Math.sign(raw) * scroller.clientWidth : notch ? Math.sign(raw) * step : raw
+      scroller.scrollLeft = Math.max(0, Math.min(scroller.scrollWidth - scroller.clientWidth, scroller.scrollLeft + delta))
+    }
+    document.addEventListener('wheel', onWheel, { passive: false, capture: true })
+    return () => document.removeEventListener('wheel', onWheel, true)
+  }, [visibleOperations.length])
 
   useEffect(() => {
     const activeTab = tabsRef.current?.querySelector<HTMLElement>('.department-tab.is-active')
@@ -1164,10 +1186,10 @@ export default function BoardsManagerView({
         </p>
       ) : null}
 
-      <div className="operation-tabs-rail !gap-2">
+      <div ref={tabsRailRef} className="operation-tabs-rail min-w-0 max-w-full !gap-2">
         <nav
           ref={tabsRef}
-          className="department-tabs custom-scrollbar-light !flex !max-h-none !snap-x !snap-mandatory !overflow-x-auto !overflow-y-hidden !p-1"
+          className="department-tabs custom-scrollbar-light min-w-0 !flex !max-h-none !overflow-x-auto !overflow-y-hidden !overscroll-x-contain !p-1"
           aria-label="Tipos de consulta"
         >
           {visibleOperations.map((operation) => {
@@ -1178,7 +1200,7 @@ export default function BoardsManagerView({
               <button
                 key={operation.id}
                 type="button"
-                className={`department-tab glass glass-lite !flex h-auto min-h-[72px] w-max min-w-[17.5rem] shrink-0 snap-start !flex-row !items-center !gap-3 !p-3 ${selected ? 'is-active bg-avi-brand-soft' : ''}`}
+                className={`department-tab glass glass-lite !flex h-auto min-h-[72px] w-max min-w-[17.5rem] shrink-0 !flex-row !items-center !gap-3 !p-3 ${selected ? 'is-active bg-avi-brand-soft' : ''}`}
                 onClick={() => {
                   setActiveOperation(operation.id)
                   setShowNewEntry(false)

@@ -105,6 +105,8 @@ export default function WindowControls({
         onPointerEnter={scheduleShow}
         onPointerLeave={scheduleHide}
         onClick={(e) => {
+          clearTimers()
+          setMenu(null)
           if (e.altKey || e.metaKey) {
             onPlace('free')
             return

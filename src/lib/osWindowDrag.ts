@@ -85,15 +85,22 @@ export function commitWinRectToElement(el: HTMLElement, rect: WinRect): void {
   el.style.removeProperty('transform')
 }
 
-/** Anima left/top/width/height para que el canto de cristal no se escale. */
+/** FLIP por transform: el compositor anima la caja sin recalcular el layout en cada frame. */
 export function animateWinBox(el: HTMLElement, from: DOMRect): Animation {
   const to = el.getBoundingClientRect()
+  const scaleX = to.width > 0 ? from.width / to.width : 1
+  const scaleY = to.height > 0 ? from.height / to.height : 1
+  const translateX = from.left - to.left
+  const translateY = from.top - to.top
   return el.animate(
     [
-      { left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px` },
-      { left: `${to.left}px`, top: `${to.top}px`, width: `${to.width}px`, height: `${to.height}px` },
+      {
+        transformOrigin: 'top left',
+        transform: `translate3d(${translateX}px, ${translateY}px, 0) scale(${scaleX}, ${scaleY})`,
+      },
+      { transformOrigin: 'top left', transform: 'translate3d(0, 0, 0) scale(1)' },
     ],
-    { duration: 280, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+    { duration: 150, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
   )
 }
 

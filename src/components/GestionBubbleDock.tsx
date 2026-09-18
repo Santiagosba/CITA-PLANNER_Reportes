@@ -210,6 +210,7 @@ function GestionBubbleDock({
     sy: number
     sw: number
     sh: number
+    moved: boolean
   } | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -368,20 +369,21 @@ function GestionBubbleDock({
     }
     pendingPtrRef.current = null
     const final = liveRef.current
+    const moved = dragRef.current?.moved ?? false
     dragRef.current = null
     liveRef.current = null
     const el = rootRef.current
-    if (el && final) commitWinRectToElement(el, final)
+    if (el && final && moved) commitWinRectToElement(el, final)
     el?.classList.remove('is-gesturing', 'is-moving', 'is-resizing')
     document.body.style.userSelect = ''
     document.body.style.cursor = ''
-    if (!final) return
+    clearOsSnapLines()
+    if (!final || !moved) return
     const nextPos = clampPos(final.x, final.y, final.w, final.h)
     const nextSize = { w: final.w, h: final.h }
     setPos(nextPos)
     setSize(nextSize)
     persistLayout(nextPos, nextSize)
-    clearOsSnapLines()
     refreshLiquidGlass(el)
   }, [])
 
@@ -391,6 +393,12 @@ function GestionBubbleDock({
       const e = pendingPtrRef.current
       const d = dragRef.current
       if (!e || !d) return
+      if (!d.moved) {
+        const distance = Math.hypot(e.clientX - d.ox, e.clientY - d.oy)
+        if (distance < 3) return
+        d.moved = true
+        leaveMaximized()
+      }
 
       if (d.mode === 'move') {
         const dx = e.clientX - d.ox
@@ -441,7 +449,7 @@ function GestionBubbleDock({
       window.removeEventListener('pointercancel', onPointerUp)
       if (rafRef.current) cancelAnimationFrame(rafRef.current)
     }
-  }, [applyLive, applyLiveMove, endGesture])
+  }, [applyLive, applyLiveMove, endGesture, leaveMaximized])
 
   const beginGesture = useCallback((mode: 'move' | 'resize') => {
     rootRef.current?.classList.add('is-gesturing', mode === 'move' ? 'is-moving' : 'is-resizing')
@@ -532,7 +540,6 @@ function GestionBubbleDock({
       const target = e.target as HTMLElement
       if (target.closest('button, a, .call-agenda-list')) return
       e.preventDefault()
-      leaveMaximized()
       const p = posRef.current
       const s = sizeRef.current
       dragRef.current = {
@@ -543,12 +550,13 @@ function GestionBubbleDock({
         sy: p.y,
         sw: s.w,
         sh: s.h,
+        moved: false,
       }
       liveRef.current = { x: p.x, y: p.y, w: s.w, h: s.h }
       beginGesture('move')
       document.body.style.cursor = 'move'
     },
-    [beginGesture, leaveMaximized],
+    [beginGesture],
   )
 
   const startResize = useCallback(
@@ -557,7 +565,6 @@ function GestionBubbleDock({
       e.stopPropagation()
       e.preventDefault()
       onFocus?.()
-      leaveMaximized()
       const p = posRef.current
       const s = sizeRef.current
       const origin = { x: p.x, y: p.y, w: s.w, h: s.h }
@@ -570,12 +577,13 @@ function GestionBubbleDock({
         sy: p.y,
         sw: s.w,
         sh: s.h,
+        moved: false,
       }
       liveRef.current = origin
       beginGesture('resize')
       document.body.style.cursor = cursorForSides(sidesFromEdge(edge))
     },
-    [beginGesture, leaveMaximized, onFocus],
+    [beginGesture, onFocus],
   )
 
   const onHeadDoubleClick = useCallback(
