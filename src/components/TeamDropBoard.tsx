@@ -69,15 +69,15 @@ type BoardDrag = {
 }
 
 const DRAG_START = 8
-const CARD_H = 164
+const CARD_H = 248
 const STACK_OVERLAP = 72
 const STRIDE = CARD_H - STACK_OVERLAP
 const CARD_SLOT = 178
 const CARD_GAP = 14
 const SLOT_H = CARD_SLOT - CARD_GAP
 const SLOT_STICK = 18
-const VIEW_BUFFER = 4
-const VIEW_MIN = 8
+const VIEW_BUFFER = 3
+const VIEW_MIN = 6
 
 function isInteractive(target: EventTarget | null): boolean {
   const node = target as HTMLElement | null
@@ -136,13 +136,38 @@ function measureBoard(root: HTMLElement, skipId?: string): ColGeom[] {
   return next
 }
 
+function ticketIndex(el: HTMLElement): number {
+  const raw = Number(el.dataset.ticketIndex)
+  return Number.isFinite(raw) ? raw : -1
+}
+
+function columnStride(list: HTMLElement): number {
+  const raw = Number(list.dataset.stackStride)
+  return Number.isFinite(raw) && raw > 20 ? raw : STRIDE
+}
+
 function indexAtY(col: ColGeom, clientY: number, slot: HTMLElement | null, slotIndex: number | null): number {
   if (slotIndex !== null && slot?.isConnected) {
     const hole = slot.getBoundingClientRect()
     if (clientY >= hole.top - SLOT_STICK && clientY <= hole.bottom + SLOT_STICK) return slotIndex
   }
-  const y = clientY - col.list.getBoundingClientRect().top + col.list.scrollTop
-  return Math.max(0, Math.min(col.count, Math.round(y / STRIDE)))
+  const stride = columnStride(col.list)
+  if (col.cards.length === 0) {
+    const y = clientY - col.list.getBoundingClientRect().top + col.list.scrollTop
+    return Math.max(0, Math.min(col.count, Math.round(y / stride)))
+  }
+  const first = col.cards[0].el.getBoundingClientRect()
+  const firstIdx = Math.max(0, ticketIndex(col.cards[0].el))
+  if (clientY < first.top) {
+    return Math.max(0, firstIdx - Math.round((first.top - clientY) / stride))
+  }
+  for (let i = 0; i < col.cards.length; i += 1) {
+    const rect = col.cards[i].el.getBoundingClientRect()
+    const next = col.cards[i + 1]?.el.getBoundingClientRect()
+    const bottom = next ? next.top : rect.bottom
+    if (clientY < (rect.top + bottom) / 2) return Math.max(0, ticketIndex(col.cards[i].el))
+  }
+  return Math.min(col.count, ticketIndex(col.cards[col.cards.length - 1].el) + 1)
 }
 
 function hitHover(clientX: number, clientY: number, board: BoardDrag, current: HoverSlot | null): HoverSlot | null {
@@ -169,16 +194,11 @@ function placeSlot(board: BoardDrag, col: string, index: number) {
   }
   dest.slotIndex = index
   const virtual = dest.list.querySelector<HTMLElement>(':scope > .team-drop-virtual') ?? dest.list
-  if (board.slot.parentElement !== virtual) virtual.appendChild(board.slot)
-  board.slot.style.top = `${index * STRIDE}px`
-
-  for (const geom of board.geoms) {
-    const insertAt = geom.id === dest.id ? index : -1
-    for (const card of geom.cards) {
-      const idx = Number(card.el.dataset.ticketIndex)
-      card.el.style.transform = insertAt >= 0 && idx >= insertAt ? `translate3d(0, ${SLOT_H}px, 0)` : ''
-    }
-  }
+  const before = dest.cards.find((card) => ticketIndex(card.el) >= index)?.el
+  if (before) virtual.insertBefore(board.slot, before)
+  else virtual.appendChild(board.slot)
+  board.slot.style.position = ''
+  board.slot.style.top = ''
 }
 
 function clearLiveDragDom(board?: BoardDrag | null) {
@@ -269,10 +289,11 @@ function playAssignFlights(
   return Promise.all(flights)
 }
 
-function stackWindow(scrollTop: number, viewHeight: number, count: number) {
+function stackWindow(scrollTop: number, viewHeight: number, count: number, stride: number) {
   if (count <= VIEW_MIN) return { start: 0, end: count }
-  const start = Math.max(0, Math.floor(scrollTop / STRIDE) - VIEW_BUFFER)
-  const visible = Math.ceil(Math.max(viewHeight, STRIDE) / STRIDE) + VIEW_BUFFER * 2 + 1
+  const step = Math.max(48, stride)
+  const start = Math.max(0, Math.floor(scrollTop / step) - VIEW_BUFFER)
+  const visible = Math.ceil(Math.max(viewHeight, step) / step) + VIEW_BUFFER * 2 + 1
   return { start, end: Math.min(count, Math.max(start + visible, start + VIEW_MIN)) }
 }
 
@@ -286,15 +307,22 @@ function StackList({
   render: (item: PeticionPendiente) => ReactNode
 }) {
   const scrollerRef = useRef<HTMLDivElement>(null)
+  const [cardH, setCardH] = useState(CARD_H)
   const [range, setRange] = useState({ start: 0, end: Math.min(items.length, VIEW_MIN) })
+  const stride = Math.max(48, cardH - STACK_OVERLAP)
 
   const syncWindow = useCallback(() => {
     const el = scrollerRef.current
-    const next = stackWindow(el?.scrollTop ?? 0, el?.clientHeight ?? 0, items.length)
+    const next = stackWindow(el?.scrollTop ?? 0, el?.clientHeight ?? 0, items.length, stride)
     setRange((current) => (current.start === next.start && current.end === next.end ? current : next))
-  }, [items.length])
+  }, [items.length, stride])
 
   useLayoutEffect(() => {
+    const card = scrollerRef.current?.querySelector<HTMLElement>('.team-ticket-card')
+    if (card) {
+      const height = Math.round(card.getBoundingClientRect().height)
+      if (height >= 140 && Math.abs(height - cardH) > 6) setCardH(height)
+    }
     syncWindow()
     const el = scrollerRef.current
     if (!el) return
@@ -314,26 +342,21 @@ function StackList({
       observer.disconnect()
       if (raf) cancelAnimationFrame(raf)
     }
-  }, [syncWindow])
+  }, [cardH, syncWindow])
 
   const shown = items.slice(range.start, range.end)
+  const padTop = range.start * stride
+  const padBottom = Math.max(0, items.length - range.end) * stride
 
   return (
     <div
       ref={scrollerRef}
       className={`team-drop-cards${items.length > 1 ? ' is-stack' : ''}`}
       data-stack-count={items.length}
-      style={items.length > 1 ? { ['--stack-count' as string]: items.length } : undefined}
+      data-stack-stride={stride}
     >
       {items.length === 0 ? empty : (
-        <div
-          className="team-drop-virtual"
-          style={
-            items.length > 1
-              ? { height: CARD_H + (items.length - 1) * STRIDE }
-              : undefined
-          }
-        >
+        <div className="team-drop-virtual" style={{ paddingTop: padTop, paddingBottom: padBottom }}>
           {shown.map((item, offset) => {
             const index = range.start + offset
             return (
@@ -343,7 +366,6 @@ function StackList({
                 data-ticket-index={index}
                 className={`team-drop-stack-item hover:!z-50${index < VIEW_MIN ? ' team-card-enter' : ''}`}
                 style={{
-                  ['--stack-index' as string]: index,
                   zIndex: index + 1,
                   animationDelay: index < VIEW_MIN ? `${index * 16}ms` : undefined,
                 }}
@@ -459,10 +481,6 @@ function TeamDropBoard({
     slot.className = 'team-drop-slot'
     slot.setAttribute('aria-hidden', 'true')
     slot.style.minHeight = `${SLOT_H}px`
-    slot.style.position = 'absolute'
-    slot.style.left = '0'
-    slot.style.right = '0'
-    slot.style.zIndex = '40'
     const geoms = measureBoard(root, live.item.idpeticion)
     const from = ticketDropColumnId(workspace, live.item)
     const fromIndex = Math.max(

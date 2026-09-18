@@ -62,7 +62,7 @@ function TeamTicketCard({
   return (
     <article
       data-ticket-id={item.idpeticion}
-      className={`kanban-card glass glass-lite squircle team-ticket-card${lite ? ' is-lite [contain:layout_style]' : ''}${dragging ? ' is-dragging-source' : ''}${onDragStart ? ' is-draggable' : ''} flex flex-col gap-2 overflow-visible`}
+      className={`kanban-card glass glass-lite squircle team-ticket-card${lite ? ' is-lite' : ''}${dragging ? ' is-dragging-source' : ''}${onDragStart ? ' is-draggable' : ''} flex flex-col gap-2 overflow-visible`}
       onPointerDown={onDragStart ? (event) => onDragStart(item, event) : undefined}
     >
       <div className="kanban-card-top flex items-center gap-2 overflow-visible">
