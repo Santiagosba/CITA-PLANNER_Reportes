@@ -676,7 +676,7 @@ function DashTicketRow({ item, workshop, workspace, currentUser, appRole, onOpen
         </div>
       </div>
       <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-        <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <TicketOwnerPicker
             workshop={workshop}
             workspace={workspace}

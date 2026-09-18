@@ -12,7 +12,10 @@ export default function TicketTeamBadge({ workspace, ticket, className = '' }: P
   const label = ticketTeamLabel(workspace, ticket)
   if (!label) return null
   return (
-    <span className={`badge tone-neutral max-w-full min-w-0 truncate ${className}`.trim()} title={label}>
+    <span
+      className={`badge tone-neutral inline-flex w-fit max-w-[12rem] min-w-0 items-center self-center justify-self-start truncate align-middle ${className}`.trim()}
+      title={label}
+    >
       {label}
     </span>
   )

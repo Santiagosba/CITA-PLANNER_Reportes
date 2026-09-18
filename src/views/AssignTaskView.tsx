@@ -104,6 +104,12 @@ function choiceClass(active: boolean): string {
   }`
 }
 
+const TASK_EXAMPLES = [
+  'Llamar al cliente',
+  'Confirmar la cita',
+  'Revisar y responder la consulta',
+]
+
 export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks }: Props) {
   const workshopId = workshop.containerIdTaller || workshop.id
   const { workspace, loading: workspaceLoading, persistError, assignTask } = useAdvisorWorkspace(
@@ -326,7 +332,7 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
         />
       ) : null}
 
-      <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.55fr)]">
+      <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card className="min-w-0 overflow-visible" padding="none">
           <div className="flex flex-wrap items-center gap-3 border-b border-avi-line px-4 py-4 sm:px-5">
             <span
@@ -336,11 +342,26 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
               <ClipboardList size={22} />
             </span>
             <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-bold tracking-[-0.02em] text-avi-fog-strong">Nueva tarea</h2>
+              <p className="section-eyebrow">Solo tres pasos</p>
+              <h2 className="text-lg font-bold tracking-[-0.02em] text-avi-fog-strong">Asignar una tarea</h2>
               <p className="m-0 text-sm text-avi-muted">
-                Elige quién la hará, explica el trabajo y confirma la fecha.
+                Elige la persona, dile qué debe hacer y marca el día.
               </p>
             </div>
+            <ol className="grid w-full grid-cols-1 gap-2 border-t border-avi-line pt-3 sm:grid-cols-3" aria-label="Pasos para asignar">
+              {[
+                ['1', 'Responsable'],
+                ['2', 'Qué debe hacer'],
+                ['3', 'Cuándo'],
+              ].map(([number, label]) => (
+                <li key={number} className="flex items-center gap-2 text-sm font-semibold text-avi-fog-strong">
+                  <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-pill bg-avi-brand text-white">
+                    {number}
+                  </span>
+                  {label}
+                </li>
+              ))}
+            </ol>
           </div>
 
           {workspaceLoading && workspace.teams.length === 0 ? (
@@ -362,27 +383,27 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                   <span className="min-w-0 flex-1">{notice}</span>
                   {onOpenTodayTasks ? (
                     <button type="button" className="ghost-button" onClick={onOpenTodayTasks}>
-                      Ver historial
+                      Ir al historial
                     </button>
                   ) : null}
                 </div>
               ) : null}
 
-              <section className="min-w-0 rounded-md border border-avi-line bg-avi-surface p-3 sm:p-4">
+              <section className="min-w-0 rounded-md border border-dashed border-avi-line bg-avi-surface p-3 sm:p-4">
                 <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3 sm:flex sm:items-center">
                   <span
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-avi-brand-soft font-bold text-avi-brand"
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-avi-brand-soft text-avi-brand"
                     aria-hidden
                   >
-                    {linked ? <Check size={17} /> : 1}
+                    {linked ? <Check size={17} /> : <Link2 size={17} />}
                   </span>
                   <span className="min-w-0 flex-1">
                     <strong className="flex flex-wrap items-center gap-2 text-base text-avi-fog-strong">
-                      Consulta relacionada
+                      ¿La tarea viene de un ticket?
                       <span className="badge">Opcional</span>
                     </strong>
                     <small className="block text-sm text-avi-muted">
-                      Si eliges una, proponemos automáticamente quién debería atenderla.
+                      Puedes buscarlo y rellenaremos parte de la tarea por ti.
                     </small>
                   </span>
                   {!linked ? (
@@ -396,7 +417,7 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                       }}
                     >
                       <Search size={17} aria-hidden />
-                      <span className="hidden sm:inline">{consultationOpen ? 'Cerrar' : 'Buscar consulta'}</span>
+                      <span className="hidden sm:inline">{consultationOpen ? 'Cerrar buscador' : 'Buscar ticket'}</span>
                       <span className="sm:hidden">{consultationOpen ? 'Cerrar' : 'Buscar'}</span>
                     </button>
                   ) : null}
@@ -485,7 +506,7 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                 ) : null}
               </section>
 
-              <div className="grid min-w-0 gap-4 lg:grid-cols-2 lg:items-start">
+              <div className="grid min-w-0 grid-cols-1 gap-4">
               <fieldset className="m-0 min-w-0 rounded-md border border-avi-line bg-avi-surface p-4">
                 <legend className="float-none flex items-center gap-2 px-1 text-base font-bold text-avi-fog-strong">
                   <span
@@ -493,10 +514,10 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                       assigneeId ? 'bg-avi-success' : 'bg-avi-brand'
                     }`}
                   >
-                    {assigneeId ? <Check size={17} aria-hidden /> : 2}
+                    {assigneeId ? <Check size={17} aria-hidden /> : 1}
                   </span>
                   <Users size={18} className="text-avi-brand" aria-hidden />
-                  Responsable
+                  ¿Quién debe hacerla?
                 </legend>
 
                 {workspace.teams.length > 1 ? (
@@ -528,14 +549,16 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                   </p>
                 )}
 
-                <p className="mb-2 mt-4 text-sm font-semibold text-avi-fog-strong">Persona responsable</p>
+                <p className="mb-2 mt-4 text-sm font-semibold text-avi-fog-strong">
+                  Toca una persona para elegirla
+                </p>
                 {members.length === 0 ? (
                   <p className="mt-3 text-sm text-avi-danger">
                     Este equipo no tiene asesores. Márcalos en Cuentas y equipos.
                   </p>
                 ) : (
                   <div
-                    className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2"
+                    className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2"
                     role="listbox"
                     aria-label="Persona responsable"
                   >
@@ -589,17 +612,17 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                 <legend className="float-none flex items-center gap-2 px-1 text-base font-bold text-avi-fog-strong">
                   <span
                     className={`inline-flex h-8 w-8 items-center justify-center rounded-pill text-sm text-white ${
-                      title.trim() && taskTypeId && dueDate ? 'bg-avi-success' : 'bg-avi-brand'
+                      title.trim() && taskTypeId ? 'bg-avi-success' : 'bg-avi-brand'
                     }`}
                   >
-                    {title.trim() && taskTypeId && dueDate ? <Check size={17} aria-hidden /> : 3}
+                    {title.trim() && taskTypeId ? <Check size={17} aria-hidden /> : 2}
                   </span>
                   <ClipboardList size={18} className="text-avi-brand" aria-hidden />
-                  Tarea y fecha
+                  ¿Qué debe hacer?
                 </legend>
 
                 <label className="mb-1 mt-1 block text-sm font-semibold text-avi-fog-strong" htmlFor="assign-title">
-                  ¿Qué tiene que hacer?
+                  Escríbelo como se lo dirías a la persona
                 </label>
                 <input
                   id="assign-title"
@@ -609,6 +632,22 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                   placeholder="Ej.: Llamar al cliente y confirmar la cita"
                   required
                 />
+                <div className="mt-2 flex flex-wrap items-center gap-2" aria-label="Ejemplos de tarea">
+                  <span className="text-sm text-avi-muted">Ejemplos:</span>
+                  {TASK_EXAMPLES.map((example) => (
+                    <button
+                      key={example}
+                      type="button"
+                      className="min-h-tap rounded-pill border border-avi-line bg-avi-surface-solid px-3 py-2 text-sm font-semibold text-avi-fog-strong hover:border-avi-brand hover:bg-avi-brand-soft"
+                      onClick={() => {
+                        setTitle(example)
+                        setNotice(null)
+                      }}
+                    >
+                      {example}
+                    </button>
+                  ))}
+                </div>
 
                 {types.length > 1 ? (
                   <>
@@ -630,15 +669,34 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                     </div>
                   </>
                 ) : null}
+                {types.length === 1 ? (
+                  <div className="mt-4 flex flex-wrap items-center gap-2 rounded-sm bg-avi-surface-solid px-3 py-2.5">
+                    <span className="text-sm text-avi-muted">Tipo de tarea</span>
+                    <strong className="text-sm text-avi-fog-strong">{types[0].name}</strong>
+                    <Check size={16} className="ml-auto text-avi-success" aria-hidden />
+                  </div>
+                ) : null}
                 {types.length === 0 ? (
                   <p className="mt-3 text-sm text-avi-danger">
                     Este equipo no tiene tipos de tarea. Ponlos en Cuentas y equipos.
                   </p>
                 ) : null}
 
-                <p className="mb-2 mt-4 text-sm font-semibold text-avi-fog-strong" id="assign-due-label">
-                  ¿Para cuándo?
-                </p>
+                <div className="mt-5 flex items-center gap-2 border-t border-avi-line pt-4">
+                  <span
+                    className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-pill text-sm text-white ${
+                      dueDate ? 'bg-avi-success' : 'bg-avi-brand'
+                    }`}
+                    aria-hidden
+                  >
+                    {dueDate ? <Check size={17} /> : 3}
+                  </span>
+                  <CalendarDays size={18} className="text-avi-brand" aria-hidden />
+                  <p className="m-0 text-base font-bold text-avi-fog-strong" id="assign-due-label">
+                    ¿Para cuándo?
+                  </p>
+                </div>
+                <p className="mb-2 mt-1 text-sm text-avi-muted">Toca un día. «Hoy» ya viene elegido.</p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2 2xl:grid-cols-3" role="group" aria-labelledby="assign-due-label">
                   <button
                     type="button"
@@ -738,7 +796,7 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
               </div>
 
               <div className="rounded-md border border-avi-line bg-avi-surface p-4 xl:hidden">
-                <strong className="block text-base text-avi-fog-strong">Revisa y asigna</strong>
+                <strong className="block text-base text-avi-fog-strong">Comprueba y asigna</strong>
                 <p className="mb-0 mt-1 break-words text-sm text-avi-muted">
                   {selectedAssignee?.name || 'Sin responsable'} · {selectedType?.name || 'Sin tipo'} ·{' '}
                   {formatDueChip(dueDate, today)}
@@ -749,7 +807,7 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                 </p>
                 <button type="submit" className="client-submit min-h-tap w-full" disabled={!canSubmit}>
                   <UserPlus size={18} aria-hidden />
-                  {selectedAssignee ? `Asignar a ${selectedAssignee.name}` : 'Asignar tarea'}
+                  {selectedAssignee ? `Confirmar y asignar a ${selectedAssignee.name}` : 'Asignar tarea'}
                 </button>
               </div>
             </form>
@@ -760,7 +818,7 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
           {workspace.teams.length > 0 ? (
             <Card className="hidden min-w-0 xl:block" padding="sm">
               <p className="section-eyebrow">Paso final</p>
-              <h2 className="mt-1 text-lg font-bold tracking-[-0.02em] text-avi-fog-strong">Revisa y asigna</h2>
+              <h2 className="mt-1 text-lg font-bold tracking-[-0.02em] text-avi-fog-strong">Comprueba antes de asignar</h2>
               <div className="mt-4 flex flex-col gap-3">
                 <div className="flex items-center gap-3 rounded-sm bg-avi-surface p-3">
                   {selectedAssignee ? (
@@ -820,13 +878,13 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                 disabled={!canSubmit}
               >
                 <UserPlus size={18} aria-hidden />
-                {selectedAssignee ? `Asignar a ${selectedAssignee.name}` : 'Asignar tarea'}
+                {selectedAssignee ? `Confirmar y asignar a ${selectedAssignee.name}` : 'Asignar tarea'}
               </button>
             </Card>
           ) : null}
 
           <Card className="min-w-0" padding="sm">
-            <h2 className="text-lg font-bold tracking-[-0.02em] text-avi-fog-strong">Tareas recientes</h2>
+            <h2 className="text-lg font-bold tracking-[-0.02em] text-avi-fog-strong">Últimas tareas asignadas</h2>
             {recentTasks.length === 0 ? (
               <p className="mb-0 mt-3 text-sm text-avi-muted">Cuando asignes una tarea, aparecerá aquí.</p>
             ) : (
