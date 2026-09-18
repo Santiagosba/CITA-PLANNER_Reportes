@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Sparkles, Undo2 } from 'lucide-react'
 import {
   isPersonOnTeam,
@@ -58,6 +58,7 @@ type ColGeom = {
   right: number
   top: number
   bottom: number
+  count: number
   cards: CardGeom[]
   slotIndex: number | null
 }
@@ -67,15 +68,16 @@ type BoardDrag = {
   geoms: ColGeom[]
 }
 
-type FlipMove = { el: HTMLElement; dx: number; dy: number }
-
 const DRAG_START = 8
-const INITIAL_RENDER = 8
-const RENDER_BATCH = 10
+const CARD_H = 164
+const STACK_OVERLAP = 72
+const STRIDE = CARD_H - STACK_OVERLAP
 const CARD_SLOT = 178
 const CARD_GAP = 14
 const SLOT_H = CARD_SLOT - CARD_GAP
 const SLOT_STICK = 18
+const VIEW_BUFFER = 4
+const VIEW_MIN = 8
 
 function isInteractive(target: EventTarget | null): boolean {
   const node = target as HTMLElement | null
@@ -109,13 +111,15 @@ function measureBoard(root: HTMLElement, skipId?: string): ColGeom[] {
     const list = column.querySelector<HTMLElement>('.team-drop-cards')
     if (!id || !list) return
     const rect = column.getBoundingClientRect()
+    const host = list.querySelector<HTMLElement>(':scope > .team-drop-virtual') ?? list
     const cards: CardGeom[] = []
-    for (const node of list.children) {
+    for (const node of host.children) {
       if (!(node instanceof HTMLElement) || node.classList.contains('team-drop-slot')) continue
       const ticketId = node.dataset.ticketId
       if (!ticketId || (skipId && ticketId === skipId) || node.classList.contains('is-dragging-source')) continue
       cards.push({ el: node })
     }
+    const parsed = Number(list.dataset.stackCount)
     next.push({
       id,
       el: column,
@@ -124,6 +128,7 @@ function measureBoard(root: HTMLElement, skipId?: string): ColGeom[] {
       right: rect.right,
       top: rect.top,
       bottom: rect.bottom,
+      count: Number.isFinite(parsed) ? parsed : cards.length,
       cards,
       slotIndex: null,
     })
@@ -136,14 +141,8 @@ function indexAtY(col: ColGeom, clientY: number, slot: HTMLElement | null, slotI
     const hole = slot.getBoundingClientRect()
     if (clientY >= hole.top - SLOT_STICK && clientY <= hole.bottom + SLOT_STICK) return slotIndex
   }
-  let rect = col.cards[0]?.el.getBoundingClientRect()
-  for (let i = 0; i < col.cards.length && rect; i += 1) {
-    const next = col.cards[i + 1]?.el.getBoundingClientRect()
-    const bottom = next ? next.top : rect.bottom
-    if (clientY < (rect.top + bottom) / 2) return i
-    rect = next
-  }
-  return col.cards.length
+  const y = clientY - col.list.getBoundingClientRect().top + col.list.scrollTop
+  return Math.max(0, Math.min(col.count, Math.round(y / STRIDE)))
 }
 
 function hitHover(clientX: number, clientY: number, board: BoardDrag, current: HoverSlot | null): HoverSlot | null {
@@ -160,55 +159,26 @@ function hitHover(clientX: number, clientY: number, board: BoardDrag, current: H
   return null
 }
 
-function playFlip(movers: FlipMove[]) {
-  if (!movers.length) return
-  for (const move of movers) {
-    move.el.style.transition = 'none'
-    move.el.style.transform = `translate3d(${move.dx}px, ${move.dy}px, 0)`
-  }
-  requestAnimationFrame(() => {
-    for (const move of movers) {
-      move.el.style.transition = ''
-      move.el.style.transform = ''
-    }
-  })
-}
-
 function placeSlot(board: BoardDrag, col: string, index: number) {
   const dest = board.geoms.find((item) => item.id === col)
   if (!dest) return
-  const origin = board.geoms.find((item) => item.slotIndex !== null) ?? dest
-  if (dest.slotIndex === index && origin === dest) return
+  if (dest.slotIndex === index && board.slot.isConnected) return
 
-  const first = new Map<HTMLElement, DOMRect>()
-  const snapshot = (geom: ColGeom, from: number, to = geom.cards.length) => {
-    for (let i = Math.max(0, from); i < Math.min(to, geom.cards.length); i += 1) {
-      const card = geom.cards[i]
-      first.set(card.el, card.el.getBoundingClientRect())
+  for (const geom of board.geoms) {
+    if (geom !== dest) geom.slotIndex = null
+  }
+  dest.slotIndex = index
+  const virtual = dest.list.querySelector<HTMLElement>(':scope > .team-drop-virtual') ?? dest.list
+  if (board.slot.parentElement !== virtual) virtual.appendChild(board.slot)
+  board.slot.style.top = `${index * STRIDE}px`
+
+  for (const geom of board.geoms) {
+    const insertAt = geom.id === dest.id ? index : -1
+    for (const card of geom.cards) {
+      const idx = Number(card.el.dataset.ticketIndex)
+      card.el.style.transform = insertAt >= 0 && idx >= insertAt ? `translate3d(0, ${SLOT_H}px, 0)` : ''
     }
   }
-  const previousIndex = origin.slotIndex ?? 0
-  if (dest === origin) snapshot(origin, Math.min(previousIndex, index), Math.max(previousIndex, index) + 1)
-  else {
-    snapshot(origin, previousIndex)
-    snapshot(dest, index)
-  }
-
-  if (origin !== dest) origin.slotIndex = null
-  dest.slotIndex = index
-  const before = dest.cards[index]?.el
-  if (before) dest.list.insertBefore(board.slot, before)
-  else dest.list.appendChild(board.slot)
-
-  const movers: FlipMove[] = []
-  first.forEach((a, el) => {
-    if (!el.isConnected) return
-    const b = el.getBoundingClientRect()
-    const dx = a.left - b.left
-    const dy = a.top - b.top
-    if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) movers.push({ el, dx, dy })
-  })
-  playFlip(movers)
 }
 
 function clearLiveDragDom(board?: BoardDrag | null) {
@@ -299,31 +269,91 @@ function playAssignFlights(
   return Promise.all(flights)
 }
 
+function stackWindow(scrollTop: number, viewHeight: number, count: number) {
+  if (count <= VIEW_MIN) return { start: 0, end: count }
+  const start = Math.max(0, Math.floor(scrollTop / STRIDE) - VIEW_BUFFER)
+  const visible = Math.ceil(Math.max(viewHeight, STRIDE) / STRIDE) + VIEW_BUFFER * 2 + 1
+  return { start, end: Math.min(count, Math.max(start + visible, start + VIEW_MIN)) }
+}
+
 function StackList({
   items,
-  limit,
   empty,
   render,
 }: {
   items: PeticionPendiente[]
-  limit: number
   empty: ReactNode
   render: (item: PeticionPendiente) => ReactNode
 }) {
-  const shown = limit >= items.length ? items : items.slice(0, limit)
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  const [range, setRange] = useState({ start: 0, end: Math.min(items.length, VIEW_MIN) })
+
+  const syncWindow = useCallback(() => {
+    const el = scrollerRef.current
+    const next = stackWindow(el?.scrollTop ?? 0, el?.clientHeight ?? 0, items.length)
+    setRange((current) => (current.start === next.start && current.end === next.end ? current : next))
+  }, [items.length])
+
+  useLayoutEffect(() => {
+    syncWindow()
+    const el = scrollerRef.current
+    if (!el) return
+    let raf = 0
+    const onScroll = () => {
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        syncWindow()
+      })
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    const observer = new ResizeObserver(onScroll)
+    observer.observe(el)
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      observer.disconnect()
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [syncWindow])
+
+  const shown = items.slice(range.start, range.end)
+
   return (
-    <div className={`team-drop-cards${items.length > 1 ? ' is-stack' : ''}`}>
-      {items.length === 0 ? empty : null}
-      {shown.map((item, index) => (
+    <div
+      ref={scrollerRef}
+      className={`team-drop-cards${items.length > 1 ? ' is-stack' : ''}`}
+      data-stack-count={items.length}
+      style={items.length > 1 ? { ['--stack-count' as string]: items.length } : undefined}
+    >
+      {items.length === 0 ? empty : (
         <div
-          key={item.idpeticion}
-          data-ticket-id={item.idpeticion}
-          className="team-drop-stack-item team-card-enter hover:!z-50"
-          style={{ zIndex: index + 1, animationDelay: `${Math.min(index, 10) * 16}ms` }}
+          className="team-drop-virtual"
+          style={
+            items.length > 1
+              ? { height: CARD_H + (items.length - 1) * STRIDE }
+              : undefined
+          }
         >
-          {render(item)}
+          {shown.map((item, offset) => {
+            const index = range.start + offset
+            return (
+              <div
+                key={item.idpeticion}
+                data-ticket-id={item.idpeticion}
+                data-ticket-index={index}
+                className={`team-drop-stack-item hover:!z-50${index < VIEW_MIN ? ' team-card-enter' : ''}`}
+                style={{
+                  ['--stack-index' as string]: index,
+                  zIndex: index + 1,
+                  animationDelay: index < VIEW_MIN ? `${index * 16}ms` : undefined,
+                }}
+              >
+                {render(item)}
+              </div>
+            )
+          })}
         </div>
-      ))}
+      )}
     </div>
   )
 }
@@ -368,33 +398,6 @@ function TeamDropBoard({
   }, [tickets, teams, workspace])
 
   columnsRef.current = columns
-
-  const maxColLen = useMemo(() => {
-    let max = 0
-    for (const list of columns.values()) max = Math.max(max, list.length)
-    return max
-  }, [columns])
-
-  // Montamos las tarjetas por tandas: primero un lote visible y el resto en
-  // fotogramas siguientes. Así no se paga un layout de decenas de tarjetas de golpe.
-  const [renderLimit, setRenderLimit] = useState(INITIAL_RENDER)
-  useEffect(() => {
-    setRenderLimit(INITIAL_RENDER)
-    if (maxColLen <= INITIAL_RENDER) return
-    let raf = 0
-    const step = () => {
-      setRenderLimit((current) => {
-        const next = current + RENDER_BATCH
-        if (next < maxColLen) raf = requestAnimationFrame(step)
-        return next
-      })
-    }
-    raf = requestAnimationFrame(step)
-    return () => cancelAnimationFrame(raf)
-  }, [maxColLen])
-
-  // Al empezar a arrastrar montamos todo, para medir bien columnas y huecos.
-  const ensureAllMounted = useCallback(() => setRenderLimit((current) => (current >= maxColLen ? current : maxColLen)), [maxColLen])
 
   const teamMembers = useMemo(() => {
     const map = new Map<string, AdvisorPerson[]>()
@@ -456,9 +459,12 @@ function TeamDropBoard({
     slot.className = 'team-drop-slot'
     slot.setAttribute('aria-hidden', 'true')
     slot.style.minHeight = `${SLOT_H}px`
+    slot.style.position = 'absolute'
+    slot.style.left = '0'
+    slot.style.right = '0'
+    slot.style.zIndex = '40'
     const geoms = measureBoard(root, live.item.idpeticion)
     const from = ticketDropColumnId(workspace, live.item)
-    const origin = geoms.find((item) => item.id === from)
     const fromIndex = Math.max(
       0,
       (columnsRef.current.get(from) ?? []).findIndex((item) => item.idpeticion === live.item.idpeticion),
@@ -466,12 +472,7 @@ function TeamDropBoard({
     const board: BoardDrag = { slot, geoms }
     boardRef.current = board
     slotRef.current = { col: from, index: fromIndex }
-    if (origin) {
-      origin.slotIndex = fromIndex
-      const before = origin.cards[fromIndex]?.el
-      if (before) origin.list.insertBefore(slot, before)
-      else origin.list.appendChild(slot)
-    }
+    placeSlot(board, from, fromIndex)
     paintOver(from)
     return true
   }
@@ -586,7 +587,6 @@ function TeamDropBoard({
     if (isInteractive(event.target)) return
     if (event.button !== 0) return
     event.preventDefault()
-    ensureAllMounted()
     const rect = event.currentTarget.getBoundingClientRect()
     pointerRef.current = { x: event.clientX, y: event.clientY }
     pendingRef.current = {
@@ -598,7 +598,7 @@ function TeamDropBoard({
       grabY: event.clientY - rect.top,
       width: rect.width,
     }
-  }, [ensureAllMounted])
+  }, [])
 
   const autoAssign = async (team: AdvisorTeam) => {
     const items = columns.get(team.id) ?? []
@@ -701,7 +701,6 @@ function TeamDropBoard({
           </header>
           <StackList
             items={loose}
-            limit={renderLimit}
             empty={<p className="section-subtitle ops-empty kanban-empty">Suelta aquí para dejarlo sin equipo.</p>}
             render={renderCard}
           />
@@ -765,7 +764,6 @@ function TeamDropBoard({
               <p className="team-drop-auto-hint">{hint}</p>
               <StackList
                 items={items}
-                limit={renderLimit}
                 empty={<p className="section-subtitle ops-empty kanban-empty">Arrastra aquí las tarjetas de este equipo.</p>}
                 render={renderCard}
               />
