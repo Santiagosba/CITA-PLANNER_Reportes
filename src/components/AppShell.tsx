@@ -26,6 +26,9 @@ import { BOT_CONFIG_EVENT, loadActiveBotProfile } from '../lib/botProfiles'
 import type { CrmAppRole } from '../lib/crmRoles'
 import { licenseViewEnabled, type LicenseViewId } from '../lib/crmViews'
 import { LOCAL_PREVIEW_ASESORES } from '../lib/localPreview'
+import CenterSwitcher from './CenterSwitcher'
+import { canSwitchCenters } from '../lib/activeCenter'
+import type { Workshop } from '../types'
 
 const ADMIN_NAV: { id: DashboardShellRoute; label: string; icon: LucideIcon }[] = [
   { id: 'dashboard-general', label: 'Dashboard general', icon: LayoutDashboard },
@@ -142,6 +145,8 @@ type Props = {
   enabledViews?: LicenseViewId[] | null
   onLocalPreviewRole?: (role: CrmAppRole, advisorId?: string) => void
   previewAdvisorId?: string
+  workshop?: Workshop | null
+  onSelectCenter?: (centerId: string | null) => void
   children: ReactNode
 }
 
@@ -167,6 +172,8 @@ export default function AppShell({
   enabledViews = null,
   onLocalPreviewRole,
   previewAdvisorId,
+  workshop = null,
+  onSelectCenter,
   children,
 }: Props) {
   const baseNav = appRole === 'admin' ? ADMIN_NAV : ASESOR_NAV
@@ -244,9 +251,14 @@ export default function AppShell({
             <div className="dashboard-sidebar-dealer-copy">
               <p className="section-eyebrow">{groupName || 'Licencia'}</p>
               <p className="dashboard-sidebar-workshop">{workshopName}</p>
-              {centerName ? <p className="dashboard-sidebar-center">{centerName}</p> : null}
+              {workshop && onSelectCenter && canSwitchCenters(workshop) ? null : centerName ? (
+                <p className="dashboard-sidebar-center">{centerName}</p>
+              ) : null}
             </div>
           </div>
+          {workshop && onSelectCenter && canSwitchCenters(workshop) ? (
+            <CenterSwitcher workshop={workshop} onSelectCenter={onSelectCenter} />
+          ) : null}
           {asesorName ? (
             <p className="dashboard-sidebar-asesor">
               <strong>{asesorName}</strong>

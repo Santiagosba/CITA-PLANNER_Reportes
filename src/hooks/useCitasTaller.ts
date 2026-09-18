@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { matchesActiveCenter } from '../lib/activeCenter'
 import { fetchCitasTaller, type CitaTaller } from '../lib/citasTaller'
 import { isExpectedDemoIdError } from '../lib/crmUuid'
 import { isDemoCitaId, mergeLiveAndDemoCitas } from '../lib/demoTickets'
@@ -79,5 +80,10 @@ export function useCitasTaller(workshop: Workshop, range: Range) {
     void load()
   }, [load])
 
-  return { citas, loading, error, refresh: () => load(true) }
+  const visibleCitas = useMemo(
+    () => citas.filter((cita) => matchesActiveCenter(cita.idCentro, workshop)),
+    [citas, workshop],
+  )
+
+  return { citas: visibleCitas, loading, error, refresh: () => load(true) }
 }

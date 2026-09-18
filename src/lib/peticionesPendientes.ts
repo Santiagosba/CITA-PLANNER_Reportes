@@ -102,6 +102,8 @@ export type CitaResumen = {
   marca: string | null
   modelo: string | null
   asunto: string | null
+  idCentro?: string | null
+  idEstadoCita?: number | null
 }
 
 export type PeticionPendiente = {
@@ -166,7 +168,7 @@ const PETICION_SELECT =
   'idpeticion,idtaller,descripcion,idtipopeticion,fechainicio,fechafin,fechacreacion,caller,gestionado,gestionemail,gestionfecha,gestionobservaciones,idcita'
 
 const CITA_SELECT =
-  'idcita,fecha,nombre,apellidos,razonsocial,contacto,telefono,movil,email,matricula,marca,modelo,asunto'
+  'idcita,fecha,nombre,apellidos,razonsocial,contacto,telefono,movil,email,matricula,marca,modelo,asunto,idcentro,idestadocita'
 
 export type ResolvedTallerIds = {
   ids: string[]
@@ -353,6 +355,8 @@ function normalizeCitaResumen(row: Record<string, unknown>): CitaResumen {
     marca: emptyToNull(row.marca),
     modelo: emptyToNull(row.modelo),
     asunto: emptyToNull(row.asunto),
+    idCentro: emptyToNull(row.idcentro ?? row.idCentro),
+    idEstadoCita: row.idestadocita == null && row.idEstadoCita == null ? null : Number(row.idestadocita ?? row.idEstadoCita),
   }
 }
 
@@ -390,6 +394,8 @@ async function fetchCitasForNameMatch(
         marca: row.marca,
         modelo: row.modelo,
         asunto: row.asunto,
+        idCentro: row.idCentro ?? null,
+        idEstadoCita: row.idEstadoCita ?? null,
       }))
     }
   } catch (e) {

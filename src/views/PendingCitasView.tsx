@@ -59,6 +59,8 @@ import TicketOwnerPicker from '../components/TicketOwnerPicker'
 import TicketTeamBadge from '../components/TicketTeamBadge'
 import type { CrmAppRole } from '../lib/crmRoles'
 
+type TabId = 'kanban' | 'tabla' | 'calendario'
+
 type Props = {
   workshop: Workshop
   currentUser: { name: string; email: string }
@@ -68,9 +70,8 @@ type Props = {
   onOpenLead?: (peticion: PeticionPendiente) => void
   refreshToken?: number
   appRole?: CrmAppRole
+  onTabChange?: (tab: TabId) => void
 }
-
-type TabId = 'kanban' | 'tabla' | 'calendario'
 
 export default function PendingCitasView({
   workshop,
@@ -80,6 +81,7 @@ export default function PendingCitasView({
   onOpenLead,
   refreshToken = 0,
   appRole = 'asesor',
+  onTabChange,
 }: Props) {
   const [tab, setTab] = useState<TabId>(initialTab)
   const [items, setItems] = useState<PeticionPendiente[]>([])
@@ -482,7 +484,10 @@ export default function PendingCitasView({
           role="tab"
           aria-selected={tab === 'kanban'}
           className={`triage-view-btn ${tab === 'kanban' ? 'is-active' : ''}`}
-          onClick={() => setTab('kanban')}
+          onClick={() => {
+            setTab('kanban')
+            onTabChange?.('kanban')
+          }}
         >
           <Columns3 size={16} />
           Vista Kanban
@@ -492,7 +497,10 @@ export default function PendingCitasView({
           role="tab"
           aria-selected={tab === 'tabla'}
           className={`triage-view-btn ${tab === 'tabla' ? 'is-active' : ''}`}
-          onClick={() => setTab('tabla')}
+          onClick={() => {
+            setTab('tabla')
+            onTabChange?.('tabla')
+          }}
         >
           <Table2 size={16} />
           Vista Tabla
@@ -502,7 +510,10 @@ export default function PendingCitasView({
           role="tab"
           aria-selected={tab === 'calendario'}
           className={`triage-view-btn ${tab === 'calendario' ? 'is-active' : ''}`}
-          onClick={() => setTab('calendario')}
+          onClick={() => {
+            setTab('calendario')
+            onTabChange?.('calendario')
+          }}
         >
           <CalendarDays size={16} />
           Calendario Taller
@@ -591,6 +602,7 @@ export default function PendingCitasView({
                             appRole={appRole}
                             peticion={p}
                             tickets={items}
+                            compact
                             showTeam={false}
                           />
                         }

@@ -142,19 +142,24 @@ function PeticionRow({
           </span>
         </button>
 
-        <div className="grid min-w-0 gap-2 border-t border-avi-line pt-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 border-t border-avi-line pt-3">
           {ownerSlot ? (
             <div
-              className="flex min-h-tap min-w-0 items-center gap-2 rounded-md border border-avi-line bg-avi-surface px-3 py-2"
+              className="flex min-w-0 items-center gap-2"
               onClick={(event) => event.stopPropagation()}
               onPointerDown={(event) => event.stopPropagation()}
             >
-              <UserRound size={18} className="shrink-0 text-avi-muted" aria-hidden />
-              <div className="min-w-0 flex-1">{ownerSlot}</div>
+              <span
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-pill bg-avi-brand text-white"
+                aria-hidden
+              >
+                <UserRound size={16} />
+              </span>
+              {ownerSlot}
             </div>
           ) : null}
 
-          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:justify-end">
+          <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2">
             {openInWindow ? (
               <button
                 type="button"

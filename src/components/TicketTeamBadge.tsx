@@ -11,5 +11,9 @@ type Props = {
 export default function TicketTeamBadge({ workspace, ticket, className = '' }: Props) {
   const label = ticketTeamLabel(workspace, ticket)
   if (!label) return null
-  return <span className={`badge tone-neutral ${className}`.trim()}>{label}</span>
+  return (
+    <span className={`badge tone-neutral max-w-full min-w-0 truncate ${className}`.trim()} title={label}>
+      {label}
+    </span>
+  )
 }

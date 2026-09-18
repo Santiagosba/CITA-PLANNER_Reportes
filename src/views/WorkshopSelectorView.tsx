@@ -1,5 +1,5 @@
 /**
- * Elige grupo, licencia y centro. Misma capa visual que el login (Card, pasos, tarjetas).
+ * Elige grupo y licencia. Los centros entran con la sesión.
  */
 
 import React, { useEffect, useMemo, useState } from 'react'
@@ -30,6 +30,7 @@ import { getAppProductName } from '../lib/appIdentity'
 import { LOCAL_PREVIEW_WORKSHOP, readLocalPreview } from '../lib/localPreview'
 import type { TallerBranding } from '../lib/tallerBranding'
 import Card from '../components/ui/Card'
+import { withSavedCenter } from '../lib/activeCenter'
 
 const LOCAL_PREVIEW_CONTAINERS: ContainerRow[] = [
   {
@@ -385,13 +386,13 @@ const WorkshopSelectorView: React.FC<WorkshopSelectorViewProps> = ({
       (readLocalPreview() ? LOCAL_PREVIEW_CENTERS : groupCenters).filter((item) => item.idtaller === shopId),
       user,
     )
-    enterWorkshop({
-      ...workshop,
-      groupName: workshop.groupName || groupName || undefined,
-      centers: rows.map((item) => ({ id: item.idcentro, name: item.nombre })),
-      centerId: rows.length === 1 ? rows[0].idcentro : undefined,
-      centerName: rows.length === 1 ? rows[0].nombre : rows.length ? `${rows.length} centros` : undefined,
-    })
+    enterWorkshop(
+      withSavedCenter({
+        ...workshop,
+        groupName: workshop.groupName || groupName || undefined,
+        centers: rows.map((item) => ({ id: item.idcentro, name: item.nombre })),
+      }),
+    )
   }
 
   const handlePickContainer = (row: ContainerRow) => {

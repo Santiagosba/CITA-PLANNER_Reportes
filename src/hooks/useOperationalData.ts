@@ -14,6 +14,7 @@ import { isExpectedDemoIdError } from '../lib/crmUuid'
 import { DEMO_TICKETS_NOTICE, isDemoTicketId, mergeLiveAndDemoTickets } from '../lib/demoTickets'
 import { isLocalPreviewWorkshop } from '../lib/localPreview'
 import { PETICIONES_PATCHED_EVENT } from '../lib/ticketOps'
+import { matchesTicketCenter } from '../lib/activeCenter'
 import { withLoadDeadline } from '../lib/loadDeadline'
 import { boundedDateRange } from '../lib/dateRangePresets'
 import {
@@ -209,6 +210,7 @@ export function useOperationalData(workshop: Workshop, range: DateRange) {
   // Su identidad no debe cambiar al recibir datos o cambiar loading/error.
   const refresh = useCallback(() => load(true), [load])
   const refreshSilent = useCallback(() => load(false, true), [load])
+  const refreshLive = useCallback(() => load(true, true), [load])
 
   useEffect(() => {
     const onPatch = (event: Event) => {
@@ -224,16 +226,22 @@ export function useOperationalData(workshop: Workshop, range: DateRange) {
     return () => window.removeEventListener(PETICIONES_PATCHED_EVENT, onPatch)
   }, [key])
 
+  const visibleItems = useMemo(
+    () => items.filter((item) => matchesTicketCenter(item, workshop)),
+    [items, workshop],
+  )
+
   return useMemo(
     () => ({
-      items,
+      items: visibleItems,
       tipos,
       loading,
       error,
       sourceNotice,
       refresh,
       refreshSilent,
+      refreshLive,
     }),
-    [items, tipos, loading, error, sourceNotice, refresh, refreshSilent],
+    [visibleItems, tipos, loading, error, sourceNotice, refresh, refreshSilent, refreshLive],
   )
 }

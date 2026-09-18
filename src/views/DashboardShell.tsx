@@ -38,6 +38,12 @@ import {
   type CrmAppRole,
 } from '../lib/crmRoles'
 import { getAppProductName } from '../lib/appIdentity'
+import {
+  defaultTabForRoute,
+  readShellLocation,
+  writeShellLocation,
+  type ShellTriageTab,
+} from '../lib/shellHistory'
 import { BOT_CONFIG_EVENT, loadActiveBotProfile } from '../lib/botProfiles'
 import {
   updatePeticionGestion,
@@ -69,6 +75,7 @@ type Props = {
   onToggleTheme: () => void
   onLocalPreviewRole?: (role: CrmAppRole, advisorId?: string) => void
   previewAdvisorId?: string
+  onSelectCenter: (centerId: string | null) => void
 }
 
 type GestionSession = {
@@ -198,9 +205,18 @@ export default function DashboardShell({
   onToggleTheme,
   onLocalPreviewRole,
   previewAdvisorId,
+  onSelectCenter,
 }: Props) {
   const appRole = resolveCrmAppRole(sessionUser)
-  const [shellRoute, setShellRoute] = useState<DashboardShellRoute>(() => defaultRouteForRole(appRole, { superAdmin: isSuperAdminUser(sessionUser) }))
+  const bootLocation = readShellLocation()
+  const bootAllowed =
+    bootLocation &&
+    routeAllowedForRole(bootLocation.route, appRole, { superAdmin: isSuperAdminUser(sessionUser) })
+  const [shellRoute, setShellRoute] = useState<DashboardShellRoute>(() =>
+    bootAllowed
+      ? bootLocation.route
+      : defaultRouteForRole(appRole, { superAdmin: isSuperAdminUser(sessionUser) }),
+  )
   const asesor = mapSessionUserToCrmUser(sessionUser)
   const currentUser = { name: asesor.displayName, email: asesor.email }
   const workshopId = workshop.containerIdTaller || workshop.id
@@ -209,7 +225,9 @@ export default function DashboardShell({
     () => teamLabelForEmail(workspace, currentUser.email),
     [workspace, currentUser.email],
   )
-  const [triageTab, setTriageTab] = useState<'kanban' | 'tabla' | 'calendario'>('kanban')
+  const [triageTab, setTriageTab] = useState<ShellTriageTab>(() =>
+    bootAllowed && bootLocation ? defaultTabForRoute(bootLocation.route, bootLocation.tab) : 'kanban',
+  )
   const [sessions, setSessions] = useState<GestionSession[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [inboundOpen, setInboundOpen] = useState(false)
@@ -258,10 +276,13 @@ export default function DashboardShell({
   useEffect(() => {
     if (shellRoute === 'contrasenas') {
       setShellRoute('equipos')
+      writeShellLocation({ route: 'equipos', tab: 'kanban' }, 'replace')
       return
     }
     if (!routeAllowedForRole(shellRoute, appRole, { superAdmin: isSuperAdmin, enabledViews })) {
-      setShellRoute(defaultRouteForRole(appRole, { superAdmin: isSuperAdmin, enabledViews }))
+      const next = defaultRouteForRole(appRole, { superAdmin: isSuperAdmin, enabledViews })
+      setShellRoute(next)
+      writeShellLocation({ route: next, tab: defaultTabForRoute(next) }, 'replace')
     }
   }, [appRole, shellRoute, isSuperAdmin, enabledViews])
 
@@ -405,6 +426,36 @@ export default function DashboardShell({
     setSideMinWave((n) => n + 1)
     setActiveId(null)
   }, [])
+
+  const navigateShell = useCallback(
+    (route: DashboardShellRoute, opts?: { tab?: ShellTriageTab; mode?: 'push' | 'replace'; slaOnly?: boolean }) => {
+      hideDeskWindows()
+      const tab = defaultTabForRoute(route, opts?.tab)
+      if (opts?.slaOnly != null) setTriageSlaOnly(opts.slaOnly)
+      if (route === 'pending-citas' || route === 'reportes') setTriageTab(tab)
+      setShellRoute(route)
+      writeShellLocation({ route, tab }, opts?.mode ?? 'push')
+    },
+    [hideDeskWindows],
+  )
+
+  useEffect(() => {
+    if (!readShellLocation()) {
+      writeShellLocation({ route: shellRoute, tab: defaultTabForRoute(shellRoute, triageTab) }, 'push')
+    }
+    const onPop = () => {
+      const loc = readShellLocation()
+      if (!loc) return
+      if (!routeAllowedForRole(loc.route, appRole, { superAdmin: isSuperAdmin, enabledViews })) return
+      hideDeskWindows()
+      setShellRoute(loc.route)
+      setTriageTab(loc.tab)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+    // Solo al entrar al taller: el historial se escribe al navegar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appRole, isSuperAdmin, enabledViews, hideDeskWindows])
 
   const restoreDesk = useCallback(() => {
     setAgendaTucked(false)
@@ -752,12 +803,9 @@ export default function DashboardShell({
 
   const goToSection = useCallback(
     (route: DashboardShellRoute) => {
-      hideDeskWindows()
-      if (route === 'pending-citas') setTriageTab('kanban')
-      if (route === 'reportes') setTriageTab('tabla')
-      setShellRoute(route)
+      navigateShell(route)
     },
-    [hideDeskWindows],
+    [navigateShell],
   )
 
   const agendaSessions = useMemo<AgendaSessionItem[]>(
@@ -795,6 +843,8 @@ export default function DashboardShell({
       enabledViews={enabledViews}
       onLocalPreviewRole={onLocalPreviewRole}
       previewAdvisorId={previewAdvisorId}
+      workshop={workshop}
+      onSelectCenter={onSelectCenter}
     >
       <ViewPageHeader
         route={shellRoute}
@@ -806,10 +856,7 @@ export default function DashboardShell({
         onToggleTheme={onToggleTheme}
         onOpenLead={openLead}
         onOpenTriage={(opts) => {
-          hideDeskWindows()
-          setTriageSlaOnly(Boolean(opts?.slaOnly))
-          setTriageTab('kanban')
-          setShellRoute('pending-citas')
+          navigateShell('pending-citas', { tab: 'kanban', slaOnly: Boolean(opts?.slaOnly) })
         }}
         onSynced={() => setGestionBump((n) => n + 1)}
       />
@@ -820,22 +867,16 @@ export default function DashboardShell({
           currentUser={currentUser}
           appRole={appRole}
           onOpenTriage={() => {
-            hideDeskWindows()
-            setTriageTab('kanban')
-            setShellRoute('pending-citas')
+            navigateShell('pending-citas', { tab: 'kanban' })
           }}
           onOpenCalendar={() => {
-            hideDeskWindows()
-            setTriageTab('calendario')
-            setShellRoute('pending-citas')
+            navigateShell('pending-citas', { tab: 'calendario' })
           }}
           onOpenTodayTasks={() => {
-            hideDeskWindows()
-            setShellRoute('tareas-hoy')
+            navigateShell('tareas-hoy')
           }}
           onOpenBoards={() => {
-            hideDeskWindows()
-            setShellRoute('boards')
+            navigateShell('boards')
           }}
           onOpenLead={openLead}
           refreshToken={gestionBump}
@@ -853,8 +894,7 @@ export default function DashboardShell({
           workshop={workshop}
           currentUser={currentUser}
           onOpenTodayTasks={() => {
-            hideDeskWindows()
-            setShellRoute('tareas-hoy')
+            navigateShell('tareas-hoy')
           }}
         />
       ) : shellRoute === 'stats-equipo' ? (
@@ -907,6 +947,7 @@ export default function DashboardShell({
           refreshToken={gestionBump}
           onOpenLead={openLead}
           appRole={appRole}
+          onTabChange={(tab) => navigateShell('pending-citas', { tab })}
         />
       )}
       </div>

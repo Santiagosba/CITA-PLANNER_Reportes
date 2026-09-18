@@ -3,6 +3,7 @@ import HexLoader from './components/ui/HexLoader'
 import { supabase } from './lib/supabase'
 import { CRM_FAVICON_FALLBACK_HREF, fetchCrmHubWebBranding, type CrmHubWebBranding } from './lib/crmHubWebBranding'
 import { HUB_WEB_PATH_SYNC_EVENT, replaceStateToRoot } from './lib/urlSync'
+import { clearShellLocation } from './lib/shellHistory'
 import { parseWorkshopSlugFromPathname } from './lib/routePath'
 import { applyTealAccentVars } from './lib/brandTheme'
 import {
@@ -38,6 +39,7 @@ import DashboardShell from './views/DashboardShell'
 import LoginView from './views/LoginView'
 import WorkshopSelectorView from './views/WorkshopSelectorView'
 import type { Workshop } from './types'
+import { applyActiveCenter } from './lib/activeCenter'
 
 type LoginNotice = {
   kind: 'error' | 'info'
@@ -620,6 +622,7 @@ export default function App() {
       setSlugBranding(null)
       setPreferredWorkshopIdTaller(null)
       replaceStateToRoot(null)
+      clearShellLocation('replace')
     } catch (e) {
       console.error('Logout error', e)
     }
@@ -643,6 +646,9 @@ export default function App() {
   )
   const effectiveUser = previewUser ?? (session as { user?: unknown } | null)?.user
   const effectiveWorkshop = selectedWorkshop
+  const handleSelectCenter = useCallback((centerId: string | null) => {
+    setSelectedWorkshop((prev) => (prev ? applyActiveCenter(prev, centerId) : prev))
+  }, [])
 
   const rootClass = isDarkMode ? 'dark' : ''
 
@@ -698,6 +704,7 @@ export default function App() {
         licenseLogoUrl={mergedSidebarLogo}
         onLogout={() => void handleLogout()}
         onClearWorkshop={() => {
+          clearShellLocation('replace')
           setSelectedWorkshop(null)
           setPreferredWorkshopIdTaller(null)
           setSlugBranding(null)
@@ -707,6 +714,7 @@ export default function App() {
         onToggleTheme={() => setIsDarkMode((prev) => !prev)}
         onLocalPreviewRole={LOCAL_PREVIEW_ENABLED ? handleLocalPreview : undefined}
         previewAdvisorId={localPreview?.advisorId}
+        onSelectCenter={handleSelectCenter}
       />
     </div>
   )

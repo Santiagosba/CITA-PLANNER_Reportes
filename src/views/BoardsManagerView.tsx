@@ -568,25 +568,29 @@ const BoardTicket = memo(function BoardTicket({
       </div>
       <TicketClientBlock peticion={item} size="md" />
       {item.tipopeticion ? <span className="kanban-card-meta">{item.tipopeticion}</span> : null}
-      {appRole === 'admin' && onAssignTeam ? (
-        <TicketTeamPicker
-          workspace={workspace}
-          ticket={item}
-          onAssign={(teamId) => onAssignTeam(item.idpeticion, teamId)}
-        />
-      ) : (
-        <TicketTeamBadge workspace={workspace} ticket={item} />
-      )}
       {vehicle ? <span className="kanban-card-meta">{vehicle}</span> : null}
-      <TicketOwnerPicker
-        workshop={workshop}
-        workspace={workspace}
-        currentUser={currentUser}
-        appRole={appRole}
-        peticion={item}
-        tickets={tickets}
-        compact
-      />
+      <div className="grid min-w-0 grid-cols-1 justify-items-start gap-2">
+        {appRole === 'admin' && onAssignTeam ? (
+          <TicketTeamPicker
+            workspace={workspace}
+            ticket={item}
+            compact
+            onAssign={(teamId) => onAssignTeam(item.idpeticion, teamId)}
+          />
+        ) : (
+          <TicketTeamBadge workspace={workspace} ticket={item} />
+        )}
+        <TicketOwnerPicker
+          workshop={workshop}
+          workspace={workspace}
+          currentUser={currentUser}
+          appRole={appRole}
+          peticion={item}
+          tickets={tickets}
+          compact
+          showTeam={false}
+        />
+      </div>
       <footer>
         <time dateTime={item.fechainicio ?? undefined}>{formatCardWhen(item.fechainicio, today)}</time>
         <span title={urgency.reasons.join(' · ') || 'Fórmula de urgencia'}>Urgencia {urgency.score}</span>

@@ -187,13 +187,13 @@ function OwnerSelect({
   const triggerName = compact ? firstName(currentName) : currentName
 
   return (
-    <div className={`ticket-owner-select is-${variant}${compact ? ' is-compact' : ''}${suggested ? ' is-suggested' : ''} min-w-0`}>
+    <div className={`ticket-owner-select is-${variant}${compact ? ' is-compact w-fit max-w-full shrink-0' : ''}${suggested ? ' is-suggested' : ''} min-w-0`}>
       <button
         ref={triggerRef}
         type="button"
         className={`ticket-owner-select-trigger${open ? ' is-open' : ''} ${
           compact
-            ? 'inline-flex h-8 max-w-[9.5rem] items-center gap-1 rounded-full px-2.5 text-[13px] font-medium text-avi-muted'
+            ? 'inline-flex h-9 w-fit max-w-full items-center gap-1.5 rounded-full bg-avi-brand px-3 text-sm font-semibold text-white shadow-brand'
             : 'inline-flex min-h-tap w-full items-center justify-between gap-2'
         }`}
         disabled={disabled}
@@ -208,7 +208,7 @@ function OwnerSelect({
         }}
       >
         <span className="min-w-0 truncate">{triggerName}</span>
-        <ChevronDown size={compact ? 14 : 16} className="shrink-0 opacity-60" aria-hidden />
+        <ChevronDown size={compact ? 15 : 16} className={`shrink-0 ${compact ? 'text-white' : 'opacity-60'}`} aria-hidden />
       </button>
       {menu}
     </div>
@@ -368,23 +368,31 @@ export default function TicketOwnerPicker({
 
   if (!allowed) {
     return (
-      <span className={`ticket-owner-readonly text-[13px] font-semibold text-avi-muted${showSuggest ? ' is-suggested' : ''}`}>
+      <span
+        className={`ticket-owner-readonly${showSuggest ? ' is-suggested' : ''} ${
+          compact
+            ? 'inline-flex h-9 w-fit max-w-full items-center rounded-full bg-avi-brand px-3 text-sm font-semibold text-white shadow-brand'
+            : 'text-[13px] font-semibold text-avi-muted'
+        }`}
+      >
         {showSuggest && suggested
-          ? `${suggested.person.name} · le tocaría`
-          : currentName}
-        {teamLine}
+          ? `${compact ? firstName(suggested.person.name) : suggested.person.name} · le tocaría`
+          : compact
+            ? firstName(currentName)
+            : currentName}
+        {compact ? null : teamLine}
       </span>
     )
   }
 
   return (
     <div
-      className={`ticket-owner-picker${compact ? ' is-compact w-auto max-w-none' : ''}${showSuggest ? ' is-suggested' : ''} flex min-w-0 flex-col gap-1`}
+      className={`ticket-owner-picker${compact ? ' is-compact w-fit max-w-full' : ''}${showSuggest ? ' is-suggested' : ''} flex min-w-0 flex-col gap-1`}
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
     >
       {compact ? null : <span className="filter-field-label">{label}</span>}
-      <div className="ticket-owner-main flex min-w-0 items-center gap-2">
+      <div className={`ticket-owner-main flex min-w-0 items-center gap-2 ${compact ? 'w-fit max-w-full flex-wrap' : ''}`}>
         {select}
         {actions}
       </div>

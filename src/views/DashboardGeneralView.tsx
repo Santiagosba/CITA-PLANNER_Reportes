@@ -669,29 +669,34 @@ function DashTicketRow({ item, workshop, workspace, currentUser, appRole, onOpen
         <TicketPlate peticion={item} />
         <div className="ops-feed-identity min-w-0 flex-1">
           <TicketClientBlock peticion={item} size="sm" />
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5">
             <span className="text-[12px] font-semibold text-avi-muted">{item.tipopeticion || 'Sin tipo'}</span>
-            <TicketTeamBadge workspace={workspace} ticket={item} />
             {isDemoTicketId(item.idpeticion) ? <span className="badge tone-info">Prueba</span> : null}
           </div>
         </div>
       </div>
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <TicketOwnerPicker
-          workshop={workshop}
-          workspace={workspace}
-          currentUser={currentUser}
-          appRole={appRole}
-          peticion={item}
-          tickets={tickets}
-          compact
-        />
+      <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+        <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
+          <TicketOwnerPicker
+            workshop={workshop}
+            workspace={workspace}
+            currentUser={currentUser}
+            appRole={appRole}
+            peticion={item}
+            tickets={tickets}
+            compact
+            showTeam={false}
+          />
+          <TicketTeamBadge workspace={workspace} ticket={item} />
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
         <span className={`badge ${item.gestionado ? 'tone-positive' : sla ? 'tone-negative' : 'tone-warning'}`}>
           {item.gestionado ? 'Hecho' : sla ? 'SLA' : 'No hecho'}
         </span>
         <time className="ml-auto whitespace-nowrap text-[12px] font-semibold text-avi-muted">
           {formatFecha(item.fechainicio)}
         </time>
+        </div>
       </div>
     </li>
   )

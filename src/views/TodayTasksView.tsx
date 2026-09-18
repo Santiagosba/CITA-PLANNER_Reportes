@@ -181,6 +181,7 @@ export default function TodayTasksView({ workshop, currentUser, appRole = 'aseso
                             peticion={item}
                             tickets={liveItems}
                             compact
+                            showTeam={false}
                           />
                           <span className={`badge ${item.gestionado ? 'tone-positive' : sla ? 'tone-negative' : 'tone-warning'}`}>
                             {item.gestionado ? 'Hecha' : sla ? 'SLA' : 'Por hacer'}

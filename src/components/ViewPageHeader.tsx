@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Bell, LayoutGrid, Moon, Search, Server, Sparkles, Sun } from 'lucide-react'
 import { OPEN_TASKBAR_EVENT, useTaskbarVisible } from '../lib/apps'
 import { headerNoticeItems, searchPeticionesAi } from '../lib/aiHeaderSearch'
+import { loadReadNoticeIds, mergeReadNoticeIds } from '../lib/headerNoticeReads'
 import { resolveDateRange } from '../lib/dateRangePresets'
 import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
 import TicketClientBlock from './TicketClientBlock'
@@ -11,6 +12,7 @@ import type { DashboardShellRoute } from './Sidebar'
 import type { CrmAppRole } from '../lib/crmRoles'
 import type { Workshop } from '../types'
 import TicketPlate from './TicketPlate'
+import NoticeCountBadge from './NoticeCountBadge'
 
 type TriageTab = 'kanban' | 'tabla' | 'calendario'
 
@@ -141,7 +143,7 @@ export default function ViewPageHeader({
   onSynced,
 }: Props) {
   const range = resolveDateRange('mes', '', '')
-  const { items, loading, refresh } = useOperationalData(workshop, range)
+  const { items, loading, refresh, refreshLive } = useOperationalData(workshop, range)
   const [query, setQuery] = useState('')
   const copy = pageCopy(route, triageTab, botName, appRole)
 
@@ -164,6 +166,52 @@ export default function ViewPageHeader({
 
   const hits = useMemo(() => searchPeticionesAi(items, query), [items, query])
   const notices = useMemo(() => headerNoticeItems(items), [items])
+  const liveNoticeIds = useMemo(() => notices.map((item) => item.idpeticion), [notices])
+  const workshopNoticeKey = workshop.containerIdTaller || workshop.id
+  const [readIds, setReadIds] = useState(() => loadReadNoticeIds(workshop))
+  const unreadNotices = useMemo(
+    () => notices.filter((item) => !readIds.has(item.idpeticion)),
+    [notices, readIds],
+  )
+  const noticeCount = unreadNotices.length
+  const [bellRing, setBellRing] = useState(false)
+  const lastNoticeCount = useRef<number | null>(null)
+
+  useEffect(() => {
+    setReadIds(loadReadNoticeIds(workshop))
+  }, [workshopNoticeKey])
+
+  const markNoticesRead = (ids: string[]) => {
+    setReadIds((current) => mergeReadNoticeIds(workshop, current, ids, liveNoticeIds))
+  }
+
+  useEffect(() => {
+    const pull = () => {
+      if (document.visibilityState === 'visible') void refreshLive()
+    }
+    const id = window.setInterval(pull, 20_000)
+    document.addEventListener('visibilitychange', pull)
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', pull)
+    }
+  }, [refreshLive])
+
+  useEffect(() => {
+    if (loading && lastNoticeCount.current == null) return
+    if (lastNoticeCount.current == null) {
+      lastNoticeCount.current = noticeCount
+      return
+    }
+    if (noticeCount <= lastNoticeCount.current) {
+      lastNoticeCount.current = noticeCount
+      return
+    }
+    lastNoticeCount.current = noticeCount
+    setBellRing(true)
+    const calm = window.setTimeout(() => setBellRing(false), 800)
+    return () => window.clearTimeout(calm)
+  }, [loading, noticeCount])
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -186,6 +234,7 @@ export default function ViewPageHeader({
   }, [])
 
   const openHit = (item: PeticionPendiente) => {
+    markNoticesRead([item.idpeticion])
     setSearchOpen(false)
     setNoticesOpen(false)
     setQuery('')
@@ -315,27 +364,45 @@ export default function ViewPageHeader({
             aria-haspopup="dialog"
             title="Notificaciones"
           >
-            <Bell size={18} aria-hidden />
-            {notices.length > 0 ? (
-              <span className="view-page-bell-dot" aria-hidden />
-            ) : null}
-            <span className="sr-only">
-              {notices.length > 0 ? `${notices.length} avisos` : 'Sin avisos'}
+            <Bell
+              size={18}
+              aria-hidden
+              className={bellRing ? 'animate-notice-bell' : ''}
+            />
+            <NoticeCountBadge count={noticeCount} ready={!loading || noticeCount > 0} />
+            <span className="sr-only" aria-live="polite">
+              {noticeCount > 0 ? `${noticeCount} avisos` : 'Sin avisos'}
             </span>
           </button>
           {noticesOpen ? (
             <div className="view-page-popover glass glass-lite view-page-notices" role="dialog" aria-label="Notificaciones">
               <div className="view-page-notices-head">
-                <strong>Avisos del taller</strong>
-                <button type="button" className="ghost-button" onClick={() => setNoticesOpen(false)}>
-                  Cerrar
-                </button>
+                <strong>{noticeCount > 0 ? `${noticeCount} avisos por leer` : 'Avisos del taller'}</strong>
+                <div className="flex shrink-0 items-center gap-2">
+                  {noticeCount > 0 ? (
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() => {
+                        markNoticesRead(unreadNotices.map((item) => item.idpeticion))
+                        setNoticesOpen(false)
+                      }}
+                    >
+                      Ya las he visto
+                    </button>
+                  ) : null}
+                  <button type="button" className="ghost-button" onClick={() => setNoticesOpen(false)}>
+                    Cerrar
+                  </button>
+                </div>
               </div>
-              {notices.length === 0 ? (
-                <p className="section-subtitle view-page-popover-empty">No hay avisos pendientes.</p>
+              {unreadNotices.length === 0 ? (
+                <p className="section-subtitle view-page-popover-empty">
+                  {notices.length > 0 ? 'Ya has leído los avisos de ahora.' : 'No hay avisos pendientes.'}
+                </p>
               ) : (
                 <ul className="view-page-popover-list custom-scrollbar-light">
-                  {notices.map((item) => {
+                  {unreadNotices.map((item) => {
                     const sla = isSlaCritico(item.fechainicio) || isSlaCritico(item.cita?.fecha)
                     return (
                       <li key={item.idpeticion}>

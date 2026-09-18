@@ -31,13 +31,16 @@ export type ClientNameSource = {
 }
 
 export type TicketClientInput = {
+  idpeticion?: string
+  fechainicio?: string | null
+  fechacreacion?: string | null
   caller?: string | null
   descripcion?: string | null
   tipopeticion?: string | null
   gestionobservaciones?: string | null
   /** Nombre cruzado por teléfono con una cita (sin enlazar IDCita). */
   clienteNombre?: string | null
-  cita?: ClientNameSource | null
+  cita?: (ClientNameSource & { idEstadoCita?: number | null }) | null
 }
 
 export function personFromCitaFields(cita: ClientNameSource | null | undefined): string {
@@ -131,4 +134,37 @@ export function ticketNeedLabel(p: TicketClientInput): string {
 export function ticketVehicleLabel(p: TicketClientInput): string {
   const cita = p.cita
   return [clean(cita?.marca), clean(cita?.modelo)].filter(Boolean).join(' ')
+}
+
+const CANCEL_TEXT = /cancel|anul(ar|aci[oó]n)/i
+const RECONTACT_TEXT = /recontact|vuelve a llamar|llama otra vez|de nuevo/i
+const CANCEL_CITA_IDS = new Set([3, 7, 8])
+
+function ticketStamp(p: TicketClientInput): number {
+  return Date.parse(String(p.fechainicio || p.fechacreacion || ''))
+}
+
+export function ticketIsCancelled(p: TicketClientInput): boolean {
+  const tipo = clean(p.tipopeticion)
+  const text = `${p.descripcion || ''} ${p.cita?.asunto || ''} ${p.gestionobservaciones || ''}`
+  if (CANCEL_TEXT.test(tipo) || CANCEL_TEXT.test(text)) return true
+  const estado = Number(p.cita?.idEstadoCita)
+  return CANCEL_CITA_IDS.has(estado)
+}
+
+export function ticketIsRecontact(p: TicketClientInput, others: TicketClientInput[] = []): boolean {
+  const tipo = clean(p.tipopeticion)
+  const text = `${p.descripcion || ''} ${p.cita?.asunto || ''}`
+  if (RECONTACT_TEXT.test(tipo) || RECONTACT_TEXT.test(text)) return true
+  const key = phoneMatchKey(p.caller || p.cita?.movil || p.cita?.telefono)
+  if (!key) return false
+  const mine = ticketStamp(p)
+  return others.some((row) => {
+    if (row.idpeticion && p.idpeticion && row.idpeticion === p.idpeticion) return false
+    const otherKey = phoneMatchKey(row.caller || row.cita?.movil || row.cita?.telefono)
+    if (otherKey !== key) return false
+    const theirs = ticketStamp(row)
+    if (Number.isFinite(mine) && Number.isFinite(theirs)) return theirs < mine
+    return Boolean(row.idpeticion)
+  })
 }

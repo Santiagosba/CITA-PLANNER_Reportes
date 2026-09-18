@@ -103,26 +103,32 @@ export default function AdvisorTicketList({
                 </button>
                 <p className="list-row-meta text-[12px] text-avi-muted">
                   {item.tipopeticion || 'Sin tipo'}
-                  {` · ${formatFecha(item.fechainicio)}`}{' '}
-                  <TicketTeamBadge workspace={workspace} ticket={item} />
+                  {` · ${formatFecha(item.fechainicio)}`}
                 </p>
-                <div className="role-task-actions flex flex-wrap items-center gap-2">
-                  <TicketOwnerPicker
-                    workshop={workshop}
-                    workspace={workspace}
-                    currentUser={currentUser}
-                    appRole={readOnly ? 'asesor' : 'admin'}
-                    peticion={item}
-                    tickets={tickets}
-                    compact
-                  />
-                  {readOnly ? null : (
-                    <TicketTeamPicker
+                <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                  <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-2">
+                    <TicketOwnerPicker
+                      workshop={workshop}
                       workspace={workspace}
-                      ticket={item}
-                      onAssign={(teamId) => onAssignTeam(item.idpeticion, teamId)}
+                      currentUser={currentUser}
+                      appRole={readOnly ? 'asesor' : 'admin'}
+                      peticion={item}
+                      tickets={tickets}
+                      compact
+                      showTeam={false}
                     />
-                  )}
+                    {readOnly ? (
+                      <TicketTeamBadge workspace={workspace} ticket={item} />
+                    ) : (
+                      <TicketTeamPicker
+                        workspace={workspace}
+                        ticket={item}
+                        compact
+                        onAssign={(teamId) => onAssignTeam(item.idpeticion, teamId)}
+                      />
+                    )}
+                  </div>
+                  <div className="role-task-actions flex flex-wrap items-center gap-2">
                   <span className={`badge ${item.gestionado ? 'tone-positive' : sla ? 'tone-negative' : 'tone-warning'}`}>
                     {item.gestionado ? 'Hecho' : sla ? 'SLA' : 'Por hacer'}
                   </span>
@@ -131,6 +137,7 @@ export default function AdvisorTicketList({
                       Abrir ficha
                     </button>
                   ) : null}
+                  </div>
                 </div>
               </li>
             )

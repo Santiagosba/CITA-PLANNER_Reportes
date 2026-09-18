@@ -3,7 +3,7 @@
 /* ---- Dashboard shell (sidebar + workspace) ---- */
 .dashboard-shell {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 278px minmax(0, 1fr);
   min-height: 100vh;
   background: var(--bg-primary);
 }
@@ -1676,7 +1676,7 @@ html.dark .hex-loader-aura,
   --glass-sheen: 0.28;
   --glass-shadow: 0 1px 1px rgba(0, 0, 0, 0.22), 0 10px 28px rgba(0, 0, 0, 0.3);
   color-scheme: dark;
-  grid-template-columns: 216px minmax(0, 1fr);
+  grid-template-columns: 278px minmax(0, 1fr);
   background:
     radial-gradient(900px 620px at 74% -15%, rgba(11, 99, 214, 0.1), transparent 60%),
     radial-gradient(680px 480px at 18% 100%, rgba(11, 99, 214, 0.06), transparent 65%),

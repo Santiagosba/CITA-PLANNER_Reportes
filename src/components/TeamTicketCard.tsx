@@ -80,23 +80,27 @@ function TeamTicketCard({
       {lite ? (
         <p className="team-ticket-owner-line m-0 text-[13px] font-medium text-avi-muted">{ownerLabel(workspace, item.gestionemail)}</p>
       ) : null}
-      {readOnly || lite || !showTeamPicker || !onAssignTeam ? null : (
-        <TicketTeamPicker
-          workspace={workspace}
-          ticket={item}
-          onAssign={(teamId) => onAssignTeam(item.idpeticion, teamId)}
-        />
-      )}
       {lite ? null : (
-        <TicketOwnerPicker
-          workshop={workshop}
-          workspace={workspace}
-          currentUser={currentUser}
-          appRole={readOnly ? 'asesor' : 'admin'}
-          peticion={item}
-          tickets={tickets}
-          compact
-        />
+        <div className="grid min-w-0 grid-cols-1 gap-2">
+          {readOnly || !showTeamPicker || !onAssignTeam ? null : (
+            <TicketTeamPicker
+              workspace={workspace}
+              ticket={item}
+              compact
+              onAssign={(teamId) => onAssignTeam(item.idpeticion, teamId)}
+            />
+          )}
+          <TicketOwnerPicker
+            workshop={workshop}
+            workspace={workspace}
+            currentUser={currentUser}
+            appRole={readOnly ? 'asesor' : 'admin'}
+            peticion={item}
+            tickets={tickets}
+            compact
+            showTeam={false}
+          />
+        </div>
       )}
       <footer>
         <time dateTime={item.fechainicio ?? undefined}>{formatCardWhen(item.fechainicio, today)}</time>

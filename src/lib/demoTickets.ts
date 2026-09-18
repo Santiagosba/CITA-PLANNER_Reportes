@@ -68,6 +68,8 @@ const ISSUES = [
   { tipo: 'WhatsApp', desc: 'Envía foto de testigo amarillo y matrícula.' },
   { tipo: 'Carrocería', desc: 'Rayón en puerta del conductor, pide presupuesto.' },
   { tipo: 'Cita mecánica', desc: 'Cambio de aceite y filtros, cliente de flota.' },
+  { tipo: 'Cancelación', desc: 'Quiere cancelar la cita de mañana por un viaje.' },
+  { tipo: 'Recontacto', desc: 'Llama otra vez: sigue sin fecha para el peritaje.' },
 ]
 
 const CARS = [
@@ -136,6 +138,8 @@ function buildTicket(
   const done = idIndex >= DEMO_TICKETS_PER_ADVISOR - 2
   const hasCita = contentIndex % 4 === 0
   const plate = car.plate.replace(/\s/g, '').replace(/(\d{4})([A-Z]{3})/, '$1 $2')
+  const centers = workshop.centers ?? []
+  const center = centers.length ? centers[idIndex % centers.length] : undefined
 
   return {
     idpeticion: id,
@@ -168,6 +172,8 @@ function buildTicket(
           marca: car.marca,
           modelo: car.modelo,
           asunto: issue.desc,
+          idCentro: center?.id ?? null,
+          idEstadoCita: contentIndex % 8 === 3 ? 3 : null,
         }
       : null,
   }
@@ -232,12 +238,20 @@ export function refreshDemoTicketDates(rows: PeticionPendiente[]): PeticionPendi
   )
 }
 
-function demoTicketsNeedRebuild(rows: PeticionPendiente[]): boolean {
+function demoTicketsNeedRebuild(rows: PeticionPendiente[], workshop: Workshop): boolean {
   const advisors = demoTicketAdvisors()
   const demos = rows.filter((row) => isDemoTicketId(row.idpeticion))
   if (demos.length !== advisors.length * DEMO_TICKETS_PER_ADVISOR) return true
   const have = new Set(demos.map((row) => normalizeEmail(row.gestionemail || '')).filter(Boolean))
-  return advisors.some((asesor) => !have.has(normalizeEmail(asesor.email)))
+  if (advisors.some((asesor) => !have.has(normalizeEmail(asesor.email)))) return true
+  const centers = workshop.centers ?? []
+  if (centers.length > 1) {
+    const withCita = demos.filter((row) => row.cita)
+    const used = new Set(withCita.map((row) => row.cita?.idCentro).filter(Boolean))
+    if (withCita.some((row) => !row.cita?.idCentro) || used.size < 2) return true
+  }
+  if (!demos.some((row) => /cancel|recontact/i.test(row.tipopeticion || ''))) return true
+  return false
 }
 
 export function loadDemoTickets(workshop: Workshop): PeticionPendiente[] {
@@ -249,7 +263,7 @@ export function loadDemoTickets(workshop: Workshop): PeticionPendiente[] {
       const parsed = JSON.parse(raw) as unknown
       if (Array.isArray(parsed) && parsed.length) {
         const stored = parsed as PeticionPendiente[]
-        if (!demoTicketsNeedRebuild(stored)) {
+        if (!demoTicketsNeedRebuild(stored, workshop)) {
           const rows = refreshDemoTicketDates(stored)
           if (rows !== parsed) saveDemoTickets(workshop, rows)
           return rows
@@ -365,7 +379,7 @@ export function demoCitasFromTickets(workshop: Workshop, range?: { from?: string
       kilometros: null,
       idEstadoCita: rows.length % 5 === 0 ? 3 : 4,
       idMotivoCancelada: rows.length % 5 === 0 ? [36, 26, 27, 7][rows.length % 4] : null,
-      idCentro: null,
+      idCentro: cita.idCentro ?? null,
       idOperario: null,
       direccion: null,
       poblacion: null,
