@@ -38,8 +38,14 @@ import {
   resizeRectFromPointer,
   sidesFromEdge,
   type Edge,
+  type Side,
   type WinRect,
 } from '../lib/osWindowDrag'
+import {
+  beginOsPointerGesture,
+  endOsPointerGesture,
+  type OsPointerGestureHandlers,
+} from '../lib/osPointerGesture'
 import { useLiquidGlass } from './useLiquidGlass'
 
 export type AnimPhase = 'enter' | 'idle' | 'closing' | 'minimizing'
@@ -106,12 +112,14 @@ export function useOsWindow({
   const dragRef = useRef<{
     mode: 'move' | 'resize'
     edge?: Edge
+    sides?: Set<Side>
     ox: number
     oy: number
     sx: number
     sy: number
     sw: number
     sh: number
+    others: WinRect[]
     fromTile: boolean
     untiled: boolean
   } | null>(null)
@@ -129,6 +137,7 @@ export function useOsWindow({
   const finishTimerRef = useRef(0)
   const maxFromRef = useRef<DOMRect | null>(null)
   const maxAnimationRef = useRef<Animation | null>(null)
+  const pointerHandlersRef = useRef<OsPointerGestureHandlers | null>(null)
 
   useEffect(() => {
     if (dragRef.current) return
@@ -212,7 +221,7 @@ export function useOsWindow({
       if (phaseRef.current !== 'enter') return
       phaseRef.current = 'idle'
       setPhase('idle')
-    }, enterFrom === 'restore' ? 560 : 540)
+    }, enterFrom === 'restore' ? 400 : 380)
     return () => {
       cancelAnimationFrame(raf1)
       cancelAnimationFrame(raf2)
@@ -244,6 +253,11 @@ export function useOsWindow({
   )
 
   const endGesture = useCallback(() => {
+    const handlers = pointerHandlersRef.current
+    if (handlers) {
+      endOsPointerGesture(handlers)
+      pointerHandlersRef.current = null
+    }
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current)
       rafRef.current = 0
@@ -268,13 +282,11 @@ export function useOsWindow({
     onRectChangeRef.current(finalRect)
   }, [])
 
-  useEffect(() => {
-    const flushPointer = () => {
+  const flushPointer = useCallback(() => {
       rafRef.current = 0
       const e = pendingPtrRef.current
       const d = dragRef.current
       if (!e || !d) return
-      const others = otherOsRects(windowId)
 
       if (d.mode === 'move') {
         if (d.fromTile && !d.untiled) {
@@ -305,50 +317,47 @@ export function useOsWindow({
           w: d.sw,
           h: d.sh,
         }
-        const snapped = snapMoveRect(raw, others)
+        const snapped = snapMoveRect(raw, d.others)
         setOsSnapLines(snapped.lines)
         applyLiveMove(origin, snapped.rect)
         return
       }
 
       const origin = { x: d.sx, y: d.sy, w: d.sw, h: d.sh }
+      const sides = d.sides ?? sidesFromEdge(d.edge!)
       const resized = resizeRectFromPointer({
         origin,
-        sides: sidesFromEdge(d.edge!),
+        sides,
         clientX: e.clientX,
         clientY: e.clientY,
         minW,
         minH,
       })
-      const snapped = snapResizeRect(resized, sidesFromEdge(d.edge!), others, undefined, minW, minH)
+      const snapped = snapResizeRect(resized, sides, d.others, undefined, minW, minH)
       setOsSnapLines(snapped.lines)
       applyLiveRect(snapped.rect)
-    }
+  }, [applyLiveMove, applyLiveRect, minH, minW, windowId])
 
-    const onPointerMove = (e: PointerEvent) => {
-      if (!dragRef.current) return
-      pendingPtrRef.current = e
-      if (!rafRef.current) rafRef.current = requestAnimationFrame(flushPointer)
+  const startPointerEvents = useCallback(() => {
+    const handlers: OsPointerGestureHandlers = {
+      move: (e) => {
+        if (!dragRef.current) return
+        pendingPtrRef.current = e
+        if (!rafRef.current) rafRef.current = requestAnimationFrame(flushPointer)
+      },
+      end: () => {
+        if (!dragRef.current) return
+        if (pendingPtrRef.current && rafRef.current) {
+          cancelAnimationFrame(rafRef.current)
+          rafRef.current = 0
+          flushPointer()
+        }
+        endGesture()
+      },
     }
-    const onPointerUp = () => {
-      if (!dragRef.current) return
-      if (pendingPtrRef.current && rafRef.current) {
-        cancelAnimationFrame(rafRef.current)
-        rafRef.current = 0
-        flushPointer()
-      }
-      endGesture()
-    }
-    window.addEventListener('pointermove', onPointerMove, { passive: true })
-    window.addEventListener('pointerup', onPointerUp)
-    window.addEventListener('pointercancel', onPointerUp)
-    return () => {
-      window.removeEventListener('pointermove', onPointerMove)
-      window.removeEventListener('pointerup', onPointerUp)
-      window.removeEventListener('pointercancel', onPointerUp)
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-    }
-  }, [applyLiveMove, applyLiveRect, endGesture, minH, minW, windowId])
+    pointerHandlersRef.current = handlers
+    beginOsPointerGesture(handlers)
+  }, [endGesture, flushPointer])
 
   const beginGesture = useCallback((mode: 'move' | 'resize') => {
     const el = rootRef.current
@@ -358,7 +367,8 @@ export function useOsWindow({
       phaseRef.current = 'idle'
       setPhase('idle')
     }
-  }, [])
+    startPointerEvents()
+  }, [startPointerEvents])
 
   const startMove = useCallback(
     (e: ReactPointerEvent) => {
@@ -379,6 +389,7 @@ export function useOsWindow({
         sy: tiled ? free.y : shown.y,
         sw: tiled ? free.w : shown.w,
         sh: tiled ? free.h : shown.h,
+        others: otherOsRects(windowId),
         fromTile: tiled,
         untiled: false,
       }
@@ -401,12 +412,14 @@ export function useOsWindow({
       dragRef.current = {
         mode: 'resize',
         edge,
+        sides: sidesFromEdge(edge),
         ox: e.clientX,
         oy: e.clientY,
         sx: shown.x,
         sy: shown.y,
         sw: shown.w,
         sh: shown.h,
+        others: otherOsRects(windowId),
         fromTile: tiled,
         untiled: true,
       }
@@ -441,7 +454,7 @@ export function useOsWindow({
     phaseRef.current = 'closing'
     setPhase('closing')
     window.clearTimeout(finishTimerRef.current)
-    finishTimerRef.current = window.setTimeout(finishClose, 480)
+    finishTimerRef.current = window.setTimeout(finishClose, 320)
   }, [finishClose])
 
   const requestMinimize = useCallback(
@@ -461,7 +474,7 @@ export function useOsWindow({
       phaseRef.current = 'minimizing'
       setPhase('minimizing')
       window.clearTimeout(finishTimerRef.current)
-      const ms = style === 'side' ? 560 + staggerMs : 500
+      const ms = style === 'side' ? 400 + staggerMs : 360
       finishTimerRef.current = window.setTimeout(finishMinimize, ms)
     },
     [finishMinimize, staggerMs],
@@ -501,7 +514,18 @@ export function useOsWindow({
     requestMinimize(minimizeStyle)
   }, [minimizeRequest, minimizeStyle, requestMinimize])
 
-  useEffect(() => () => window.clearTimeout(finishTimerRef.current), [])
+  useEffect(
+    () => () => {
+      window.clearTimeout(finishTimerRef.current)
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+      const handlers = pointerHandlersRef.current
+      if (handlers) endOsPointerGesture(handlers)
+      clearOsSnapLines()
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+    },
+    [],
+  )
 
   const onWinMotionEnd = useCallback((e: ReactTransitionEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget) return

@@ -56,7 +56,7 @@ import {
   invalidateOperationalData,
 } from '../hooks/useOperationalData'
 import { useAdvisorWorkspace } from '../hooks/useAdvisorWorkspace'
-import { teamLabelForEmail } from '../lib/advisorWorkspace'
+import { teamLabelForEmail, type AdvisorWorkspace } from '../lib/advisorWorkspace'
 import { fetchLicenseViews, type LicenseViewId } from '../lib/crmViews'
 import { isDemoTicketId, isLocalInboundTicketId } from '../lib/demoTickets'
 import { applyPeticionPatch, PETICIONES_PATCHED_EVENT } from '../lib/ticketOps'
@@ -125,6 +125,7 @@ function defaultRect(index: number): WinRect {
 type SessionWindowProps = {
   session: GestionSession
   workshop: Workshop
+  workspace: AdvisorWorkspace
   currentUser: { name: string; email: string }
   appRole: CrmAppRole
   minimizeRequest: number
@@ -141,6 +142,7 @@ type SessionWindowProps = {
 const SessionWindow = memo(function SessionWindow({
   session,
   workshop,
+  workspace,
   currentUser,
   appRole,
   minimizeRequest,
@@ -153,8 +155,6 @@ const SessionWindow = memo(function SessionWindow({
   onMinimize,
   onPlace,
 }: SessionWindowProps) {
-  const workshopId = workshop.containerIdTaller || workshop.id
-  const { workspace } = useAdvisorWorkspace(workshopId, currentUser, true)
   const id = session.id
   const handleFocus = useCallback(() => onFocus(id), [id, onFocus])
   const handleRect = useCallback((rect: WinRect) => onRectChange(id, rect), [id, onRectChange])
@@ -218,7 +218,10 @@ export default function DashboardShell({
       : defaultRouteForRole(appRole, { superAdmin: isSuperAdminUser(sessionUser) }),
   )
   const asesor = mapSessionUserToCrmUser(sessionUser)
-  const currentUser = { name: asesor.displayName, email: asesor.email }
+  const currentUser = useMemo(
+    () => ({ name: asesor.displayName, email: asesor.email }),
+    [asesor.displayName, asesor.email],
+  )
   const workshopId = workshop.containerIdTaller || workshop.id
   const { workspace } = useAdvisorWorkspace(workshopId, currentUser, true)
   const asesorTeam = useMemo(
@@ -230,6 +233,11 @@ export default function DashboardShell({
   )
   const [sessions, setSessions] = useState<GestionSession[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
+  const sessionsRef = useRef(sessions)
+  const activeIdRef = useRef(activeId)
+  const focusPendingRef = useRef<string | null>(null)
+  sessionsRef.current = sessions
+  activeIdRef.current = activeId
   const [inboundOpen, setInboundOpen] = useState(false)
   const [gestionBump, setGestionBump] = useState(0)
   const [triageSlaOnly, setTriageSlaOnly] = useState(false)
@@ -369,8 +377,25 @@ export default function DashboardShell({
 
   const focusSession = useCallback(
     (id: string) => {
+      // El mismo gesto llega como pointerdown en la barra y mousedown en la
+      // raíz. Ignorar la segunda pasada evita dos z-index y dos renders.
+      if (focusPendingRef.current === id) return
+      const current = sessionsRef.current
+      const target = current.find((session) => session.id === id)
+      const alreadyFront =
+        target &&
+        !target.minimized &&
+        activeIdRef.current === id &&
+        apps.getState().activeAppId == null &&
+        current.every((session) => session.z <= target.z)
+      if (alreadyFront) return
+      focusPendingRef.current = id
+      activeIdRef.current = id
+      queueMicrotask(() => {
+        if (focusPendingRef.current === id) focusPendingRef.current = null
+      })
       apps.blurActive()
-      setAgendaTucked(false)
+      setAgendaTucked((value) => (value ? false : value))
       setActiveId(id)
       const z = bumpZ()
       setSessions((prev) =>
@@ -411,11 +436,6 @@ export default function DashboardShell({
   const minimizeAllToSides = useCallback(() => {
     setSideMinWave((n) => n + 1)
   }, [])
-
-  const sessionsRef = useRef(sessions)
-  useEffect(() => {
-    sessionsRef.current = sessions
-  }, [sessions])
 
   /** Recoge fichas y apps abiertas al cambiar de panel. No crea ni abre la barra si no había ventanas. */
   const hideDeskWindows = useCallback(() => {
@@ -604,11 +624,7 @@ export default function DashboardShell({
     return () => document.removeEventListener('pointerdown', onPointerDown, true)
   }, [minimizeAllToSides, restoreDesk, tuckAgenda])
 
-  const activeIdRef = useRef(activeId)
   const activeAppIdRef = useRef(activeAppId)
-  useEffect(() => {
-    activeIdRef.current = activeId
-  }, [activeId])
   useEffect(() => {
     activeAppIdRef.current = activeAppId
   }, [activeAppId])
@@ -746,7 +762,7 @@ export default function DashboardShell({
 
   const handleMarkGestionado = useCallback(
     async (id: string, gestionado: boolean) => {
-      const session = sessions.find((s) => s.id === id)
+      const session = sessionsRef.current.find((s) => s.id === id)
       if (!session) return
 
       const applyLocal = () => {
@@ -798,7 +814,7 @@ export default function DashboardShell({
         setSessions((prev) => prev.map((s) => (s.id === id ? { ...s, saveStatus: 'idle' } : s)))
       }
     },
-    [asesor.email, closeSession, sessions, workshop],
+    [asesor.email, closeSession, workshop],
   )
 
   const goToSection = useCallback(
@@ -807,6 +823,24 @@ export default function DashboardShell({
     },
     [navigateShell],
   )
+  const openTriage = useCallback(
+    (opts?: { slaOnly?: boolean }) => {
+      navigateShell('pending-citas', { tab: 'kanban', slaOnly: Boolean(opts?.slaOnly) })
+    },
+    [navigateShell],
+  )
+  const openCalendar = useCallback(
+    () => navigateShell('pending-citas', { tab: 'calendario' }),
+    [navigateShell],
+  )
+  const openTodayTasks = useCallback(() => navigateShell('tareas-hoy'), [navigateShell])
+  const openBoards = useCallback(() => navigateShell('boards'), [navigateShell])
+  const handleTriageTabChange = useCallback(
+    (tab: ShellTriageTab) => navigateShell('pending-citas', { tab }),
+    [navigateShell],
+  )
+  const handleSynced = useCallback(() => setGestionBump((n) => n + 1), [])
+  const openInbound = useCallback(() => setInboundOpen(true), [])
 
   const agendaSessions = useMemo<AgendaSessionItem[]>(
     () =>
@@ -817,6 +851,168 @@ export default function DashboardShell({
         active: s.id === activeId,
       })),
     [sessions, activeId],
+  )
+
+  // El panel activo no depende de mover, enfocar o escribir en una ventana.
+  // Conservar el mismo elemento evita reconstruir dashboards/listas completos
+  // por cada interacción del escritorio flotante.
+  const routeView = useMemo(() => {
+    if (shellRoute === 'dashboard-general') {
+      return (
+        <DashboardGeneralView
+          workshop={workshop}
+          currentUser={currentUser}
+          appRole={appRole}
+          onOpenTriage={openTriage}
+          onOpenCalendar={openCalendar}
+          onOpenTodayTasks={openTodayTasks}
+          onOpenBoards={openBoards}
+          onOpenLead={openLead}
+          refreshToken={gestionBump}
+        />
+      )
+    }
+    if (shellRoute === 'equipos') {
+      return (
+        <TeamsManagerView
+          workshop={workshop}
+          currentUser={currentUser}
+          readOnly={appRole === 'asesor'}
+          canCreateTallerAdmin={canEditHubBranding}
+          onOpenLead={openLead}
+        />
+      )
+    }
+    if (shellRoute === 'asignar-tarea') {
+      return (
+        <AssignTaskView
+          workshop={workshop}
+          currentUser={currentUser}
+          onOpenTodayTasks={openTodayTasks}
+        />
+      )
+    }
+    if (shellRoute === 'stats-equipo') {
+      return (
+        <OperatorsDeskView
+          workshop={workshop}
+          currentUser={currentUser}
+          readOnly={appRole === 'asesor'}
+          onOpenLead={openLead}
+        />
+      )
+    }
+    if (shellRoute === 'licencias') return <LicensesDeskView workshop={workshop} />
+    if (shellRoute === 'gasto-ia') return <AiUsageView workshop={workshop} />
+    if (shellRoute === 'tareas-hoy') {
+      return (
+        <TodayTasksView
+          workshop={workshop}
+          currentUser={currentUser}
+          appRole={appRole}
+          onOpenLead={openLead}
+        />
+      )
+    }
+    if (shellRoute === 'boards') {
+      return (
+        <BoardsManagerView
+          workshop={workshop}
+          currentUser={currentUser}
+          appRole={appRole}
+          onOpenLead={openLead}
+          refreshToken={gestionBump}
+        />
+      )
+    }
+    if (shellRoute === 'laura') {
+      return (
+        <LauraIntelligenceView
+          workshopName={workshop.name}
+          idtaller={workshop.containerIdTaller || String(workshop.id || '')}
+          idtalleres={[workshop.containerIdTaller, workshop.id, workshop.originalId].map((item) => String(item || ''))}
+          showCallCosts={showCallCosts}
+        />
+      )
+    }
+    if (shellRoute === 'bot-identity') return <BotIdentityView />
+    if (shellRoute === 'configuration') {
+      return (
+        <div className="dashboard-page">
+          <SettingsShellView
+            workshop={workshop}
+            isDarkMode={isDarkMode}
+            showBrandingTab={canEditHubBranding}
+            showTeamTab={appRole === 'admin'}
+          />
+        </div>
+      )
+    }
+    return (
+      <PendingCitasView
+        workshop={workshop}
+        currentUser={currentUser}
+        isDarkMode={isDarkMode}
+        initialTab={shellRoute === 'reportes' ? 'tabla' : triageTab}
+        initialSlaOnly={triageSlaOnly}
+        key={`${shellRoute}-${triageTab}`}
+        refreshToken={gestionBump}
+        onOpenLead={openLead}
+        appRole={appRole}
+        onTabChange={handleTriageTabChange}
+      />
+    )
+  }, [
+    appRole,
+    canEditHubBranding,
+    currentUser,
+    gestionBump,
+    handleTriageTabChange,
+    isDarkMode,
+    openBoards,
+    openCalendar,
+    openLead,
+    openTodayTasks,
+    openTriage,
+    shellRoute,
+    showCallCosts,
+    triageSlaOnly,
+    triageTab,
+    workshop,
+  ])
+  const shellChildren = useMemo(
+    () => (
+      <>
+        <ViewPageHeader
+          route={shellRoute}
+          triageTab={shellRoute === 'reportes' ? 'tabla' : triageTab}
+          workshop={workshop}
+          botName={botName}
+          appRole={appRole}
+          isDarkMode={isDarkMode}
+          onToggleTheme={onToggleTheme}
+          onOpenLead={openLead}
+          onOpenTriage={openTriage}
+          onSynced={handleSynced}
+        />
+        <div key={shellRoute} className="app-view-enter">
+          {routeView}
+        </div>
+      </>
+    ),
+    [
+      appRole,
+      botName,
+      handleSynced,
+      isDarkMode,
+      onToggleTheme,
+      openLead,
+      openTriage,
+      routeView,
+      shellRoute,
+      triageTab,
+      workshop,
+    ],
   )
 
   return (
@@ -832,7 +1028,7 @@ export default function DashboardShell({
       onNavigate={goToSection}
       onLogout={onLogout}
       onChangeWorkshop={onClearWorkshop}
-      onNewInbound={() => setInboundOpen(true)}
+      onNewInbound={openInbound}
       isDarkMode={isDarkMode}
       onToggleTheme={onToggleTheme}
       asesorName={asesor.displayName}
@@ -846,111 +1042,7 @@ export default function DashboardShell({
       workshop={workshop}
       onSelectCenter={onSelectCenter}
     >
-      <ViewPageHeader
-        route={shellRoute}
-        triageTab={shellRoute === 'reportes' ? 'tabla' : triageTab}
-        workshop={workshop}
-        botName={botName}
-        appRole={appRole}
-        isDarkMode={isDarkMode}
-        onToggleTheme={onToggleTheme}
-        onOpenLead={openLead}
-        onOpenTriage={(opts) => {
-          navigateShell('pending-citas', { tab: 'kanban', slaOnly: Boolean(opts?.slaOnly) })
-        }}
-        onSynced={() => setGestionBump((n) => n + 1)}
-      />
-      <div key={shellRoute} className="app-view-enter">
-      {shellRoute === 'dashboard-general' ? (
-        <DashboardGeneralView
-          workshop={workshop}
-          currentUser={currentUser}
-          appRole={appRole}
-          onOpenTriage={() => {
-            navigateShell('pending-citas', { tab: 'kanban' })
-          }}
-          onOpenCalendar={() => {
-            navigateShell('pending-citas', { tab: 'calendario' })
-          }}
-          onOpenTodayTasks={() => {
-            navigateShell('tareas-hoy')
-          }}
-          onOpenBoards={() => {
-            navigateShell('boards')
-          }}
-          onOpenLead={openLead}
-          refreshToken={gestionBump}
-        />
-      ) : shellRoute === 'equipos' ? (
-        <TeamsManagerView
-          workshop={workshop}
-          currentUser={currentUser}
-          readOnly={appRole === 'asesor'}
-          canCreateTallerAdmin={canEditHubBranding}
-          onOpenLead={openLead}
-        />
-      ) : shellRoute === 'asignar-tarea' ? (
-        <AssignTaskView
-          workshop={workshop}
-          currentUser={currentUser}
-          onOpenTodayTasks={() => {
-            navigateShell('tareas-hoy')
-          }}
-        />
-      ) : shellRoute === 'stats-equipo' ? (
-        <OperatorsDeskView
-          workshop={workshop}
-          currentUser={currentUser}
-          readOnly={appRole === 'asesor'}
-          onOpenLead={openLead}
-        />
-      ) : shellRoute === 'licencias' ? (
-        <LicensesDeskView workshop={workshop} />
-      ) : shellRoute === 'gasto-ia' ? (
-        <AiUsageView workshop={workshop} />
-      ) : shellRoute === 'tareas-hoy' ? (
-        <TodayTasksView workshop={workshop} currentUser={currentUser} appRole={appRole} onOpenLead={openLead} />
-      ) : shellRoute === 'boards' ? (
-        <BoardsManagerView
-          workshop={workshop}
-          currentUser={currentUser}
-          appRole={appRole}
-          onOpenLead={openLead}
-          refreshToken={gestionBump}
-        />
-      ) : shellRoute === 'laura' ? (
-        <LauraIntelligenceView
-          workshopName={workshop.name}
-          idtaller={workshop.containerIdTaller || String(workshop.id || '')}
-          idtalleres={[workshop.containerIdTaller, workshop.id, workshop.originalId].map((item) => String(item || ''))}
-          showCallCosts={showCallCosts}
-        />
-      ) : shellRoute === 'bot-identity' ? (
-        <BotIdentityView />
-      ) : shellRoute === 'configuration' ? (
-        <div className="dashboard-page">
-          <SettingsShellView
-            workshop={workshop}
-            isDarkMode={isDarkMode}
-            showBrandingTab={canEditHubBranding}
-            showTeamTab={appRole === 'admin'}
-          />
-        </div>
-      ) : (
-        <PendingCitasView
-          workshop={workshop}
-          currentUser={currentUser}
-          isDarkMode={isDarkMode}
-          initialTab={shellRoute === 'reportes' ? 'tabla' : triageTab}
-          initialSlaOnly={triageSlaOnly}
-          key={`${shellRoute}-${triageTab}`}
-          refreshToken={gestionBump}
-          onOpenLead={openLead}
-          appRole={appRole}
-          onTabChange={(tab) => navigateShell('pending-citas', { tab })}
-        />
-      )}
-      </div>
+      {shellChildren}
     </AppShell>
 
       {typeof document !== 'undefined'
@@ -970,10 +1062,11 @@ export default function DashboardShell({
                   key={session.id}
                   session={session}
                   workshop={workshop}
+                  workspace={workspace}
                   currentUser={currentUser}
                   appRole={appRole}
                   minimizeRequest={sideMinWave}
-                  staggerMs={index * 45}
+                  staggerMs={Math.min(index, 6) * 24}
                   onFocus={focusSession}
                   onRectChange={updateRect}
                   onObsChange={updateObs}

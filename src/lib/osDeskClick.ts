@@ -113,14 +113,26 @@ export function isScrollbarClick(event: Event): boolean {
   let node: Element | null = asElement(event.target)
   while (node) {
     if (node instanceof HTMLElement) {
-      const rect = node.getBoundingClientRect()
       const vBar = node.offsetWidth - node.clientWidth
       const hBar = node.offsetHeight - node.clientHeight
-      if (overflows(node, 'y') && vBar > 0 && clientX >= rect.left + node.clientWidth && clientX <= rect.right) {
-        return true
-      }
-      if (overflows(node, 'x') && hBar > 0 && clientY >= rect.top + node.clientHeight && clientY <= rect.bottom) {
-        return true
+      if (vBar > 0 || hBar > 0) {
+        const rect = node.getBoundingClientRect()
+        if (
+          vBar > 0 &&
+          clientX >= rect.left + node.clientWidth &&
+          clientX <= rect.right &&
+          overflows(node, 'y')
+        ) {
+          return true
+        }
+        if (
+          hBar > 0 &&
+          clientY >= rect.top + node.clientHeight &&
+          clientY <= rect.bottom &&
+          overflows(node, 'x')
+        ) {
+          return true
+        }
       }
     }
     node = node.parentElement
@@ -133,10 +145,11 @@ export function isIdleDeskClick(eventOrTarget: Event | EventTarget | null): bool
   const event = eventOrTarget instanceof Event ? eventOrTarget : null
   const el = asElement(eventOrTarget)
   if (!el) return false
+  if (!el.closest(DESK_ROOTS)) return false
   if (el.closest(OS_FURNITURE)) return false
   if (el.closest(DESK_ACTIONS)) return false
   if (event && isScrollbarClick(event)) return false
-  return Boolean(el.closest(DESK_ROOTS))
+  return true
 }
 
 /** @deprecated Usar isIdleDeskClick: recoger y restaurar son la misma zona. */

@@ -93,7 +93,7 @@ export function animateWinBox(el: HTMLElement, from: DOMRect): Animation {
       { left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px` },
       { left: `${to.left}px`, top: `${to.top}px`, width: `${to.width}px`, height: `${to.height}px` },
     ],
-    { duration: 420, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+    { duration: 280, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
   )
 }
 
@@ -136,7 +136,7 @@ export function applyScatterVars(el: HTMLElement, staggerMs = 0): void {
   const dy = Math.sin(angle) * distY
   const rot = Math.random() * 42 - 21
   const scale = 0.68 + Math.random() * 0.22
-  const delay = staggerMs + Math.round(Math.random() * 90)
+  const delay = staggerMs + Math.round(Math.random() * 45)
 
   el.style.setProperty('--scatter-dx', `${Math.round(dx)}px`)
   el.style.setProperty('--scatter-dy', `${Math.round(dy)}px`)

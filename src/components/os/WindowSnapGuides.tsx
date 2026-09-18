@@ -1,7 +1,8 @@
+import { memo } from 'react'
 import { useOsSnapLines } from '../../lib/osWindowRegistry'
 
 /** Guías al alinear una ventana con otra o con el borde del escritorio. */
-export default function WindowSnapGuides() {
+function WindowSnapGuides() {
   const lines = useOsSnapLines()
   if (lines.length === 0) return null
   return (
@@ -20,3 +21,5 @@ export default function WindowSnapGuides() {
     </div>
   )
 }
+
+export default memo(WindowSnapGuides)

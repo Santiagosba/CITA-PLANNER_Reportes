@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, UserRound } from 'lucide-react'
 import type { CrmAppRole } from '../lib/crmRoles'
@@ -85,7 +85,7 @@ function OwnerSelect({
   const menuRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ top: 0, left: 0, width: 280, maxH: 280 })
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return
     const place = () => {
       const trigger = triggerRef.current
@@ -94,20 +94,29 @@ function OwnerSelect({
       const width = Math.min(300, Math.max(260, window.innerWidth - 24))
       const below = window.innerHeight - rect.bottom - 12
       const above = rect.top - 12
-      const openUp = below < 200 && above > below
+      const measured = menuRef.current?.offsetHeight ?? 0
+      const needed = measured || 200
+      const openUp = below < needed && above > below
       const maxH = Math.min(360, Math.max(160, openUp ? above : below))
-      const top = openUp ? Math.max(12, rect.top - maxH - 6) : rect.bottom + 6
-      const left = Math.min(Math.max(12, rect.left), window.innerWidth - width - 12)
-      setPos({ top, left, width, maxH })
+      const usedH = measured ? Math.min(measured, maxH) : Math.min(needed, maxH)
+      const top = openUp ? Math.max(12, rect.top - usedH - 6) : rect.bottom + 6
+      const left = Math.min(Math.max(12, rect.left), Math.max(12, window.innerWidth - width - 12))
+      setPos((current) =>
+        current.top === top && current.left === left && current.width === width && current.maxH === maxH
+          ? current
+          : { top, left, width, maxH },
+      )
     }
     place()
+    const frame = window.requestAnimationFrame(place)
     window.addEventListener('resize', place)
     window.addEventListener('scroll', place, true)
     return () => {
+      window.cancelAnimationFrame(frame)
       window.removeEventListener('resize', place)
       window.removeEventListener('scroll', place, true)
     }
-  }, [open])
+  }, [open, compact])
 
   useEffect(() => {
     if (!open) return

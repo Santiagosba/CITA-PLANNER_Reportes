@@ -85,7 +85,7 @@ type Props = {
 }
 
 /** Ventanas de apps abiertas (teléfono, notas). Las minimizadas viven en la barra de tareas. */
-export default function AppWindows({ minimizeRequest, staggerOffset }: Props) {
+function AppWindows({ minimizeRequest, staggerOffset }: Props) {
   const windows = useApps()
   useEffect(() => {
     const onResize = () => apps.fitToViewport()
@@ -97,8 +97,15 @@ export default function AppWindows({ minimizeRequest, staggerOffset }: Props) {
       {windows
         .filter((w) => !w.minimized)
         .map((w, i) => (
-          <AppWindowItem key={w.id} win={w} minimizeRequest={minimizeRequest} staggerMs={(staggerOffset + i) * 45} />
+          <AppWindowItem
+            key={w.id}
+            win={w}
+            minimizeRequest={minimizeRequest}
+            staggerMs={Math.min(staggerOffset + i, 8) * 24}
+          />
         ))}
     </>
   )
 }
+
+export default memo(AppWindows)

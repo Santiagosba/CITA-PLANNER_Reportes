@@ -19,7 +19,7 @@ export default function TicketTeamPicker({ workspace, ticket, onAssign, disabled
 
   return (
     <label
-      className={`ticket-team-picker min-w-0 ${compact ? 'is-compact block' : 'flex flex-col gap-1'}`}
+      className={`ticket-team-picker min-w-0 max-w-full ${compact ? 'is-compact block w-full' : 'flex flex-col gap-1'}`}
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}
     >

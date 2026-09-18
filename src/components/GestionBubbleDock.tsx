@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -132,20 +133,32 @@ function sessionLabel(p: PeticionPendiente): { name: string; phone: string; deta
   return { name, phone, detail }
 }
 
+let pendingLayout: { pos: Pos; size: Size } | null = null
+let layoutWriteQueued = false
+
 function persistLayout(pos: Pos, size: Size) {
-  try {
-    localStorage.setItem(POS_KEY, JSON.stringify(pos))
-    localStorage.setItem(SIZE_KEY, JSON.stringify(size))
-  } catch {
-    /* ignore */
-  }
+  pendingLayout = { pos, size }
+  if (layoutWriteQueued) return
+  layoutWriteQueued = true
+  queueMicrotask(() => {
+    layoutWriteQueued = false
+    const next = pendingLayout
+    pendingLayout = null
+    if (!next) return
+    try {
+      localStorage.setItem(POS_KEY, JSON.stringify(next.pos))
+      localStorage.setItem(SIZE_KEY, JSON.stringify(next.size))
+    } catch {
+      /* ignore */
+    }
+  })
 }
 
 function reducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-export default function GestionBubbleDock({
+function GestionBubbleDock({
   sessions,
   tucked = false,
   zIndex,
@@ -343,6 +356,7 @@ export default function GestionBubbleDock({
       posRef.current = { x: next.x, y: next.y }
       sizeRef.current = { w: next.w, h: next.h }
       applyWinMoveToElement(el, origin, next)
+      updateOsWindowRect('taskbar', next)
     },
     [],
   )
@@ -837,4 +851,32 @@ export default function GestionBubbleDock({
   )
 }
 
+function sameDockProps(prev: Props, next: Props): boolean {
+  if (
+    prev.tucked !== next.tucked ||
+    prev.zIndex !== next.zIndex ||
+    prev.onFocus !== next.onFocus ||
+    prev.onUntuck !== next.onUntuck ||
+    prev.onTuck !== next.onTuck ||
+    prev.onOpen !== next.onOpen ||
+    prev.onMinimize !== next.onMinimize ||
+    prev.onClose !== next.onClose ||
+    prev.onCloseAll !== next.onCloseAll ||
+    prev.sessions.length !== next.sessions.length
+  ) {
+    return false
+  }
+  return prev.sessions.every((item, index) => {
+    const other = next.sessions[index]
+    if (!other) return false
+    return (
+      item.id === other.id &&
+      item.peticion === other.peticion &&
+      item.minimized === other.minimized &&
+      item.active === other.active
+    )
+  })
+}
+
+export default memo(GestionBubbleDock, sameDockProps)
 export { MAX_TASKS }

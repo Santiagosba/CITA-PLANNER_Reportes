@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown } from 'lucide-react'
 
@@ -47,25 +47,38 @@ export default function AppSelect<T extends string>({
   const display = selected?.label || placeholder
   const closeSelf = () => setOpen(false)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return
     const place = () => {
       const trigger = triggerRef.current
       if (!trigger) return
       const rect = trigger.getBoundingClientRect()
-      const width = Math.min(window.innerWidth - 24, Math.max(rect.width, variant === 'compact' ? 220 : 260))
-      const below = window.innerHeight - rect.bottom - 12
-      const above = rect.top - 12
-      const openUp = below < 180 && above > below
-      const maxH = Math.min(320, Math.max(140, openUp ? above : below))
-      const top = openUp ? Math.max(12, rect.top - maxH - 6) : rect.bottom + 6
-      const left = Math.min(Math.max(12, rect.left), window.innerWidth - width - 12)
-      setPos({ top, left, width, maxH })
+      const compact = variant === 'compact'
+      const gutter = compact ? 8 : 12
+      const width = compact
+        ? Math.max(rect.width, 0)
+        : Math.min(window.innerWidth - 24, Math.max(rect.width, 260))
+      const below = window.innerHeight - rect.bottom - gutter
+      const above = rect.top - gutter
+      const measured = menuRef.current?.offsetHeight ?? 0
+      const needed = measured || (compact ? 148 : 180)
+      const openUp = below < needed && above > below
+      const maxH = Math.min(320, Math.max(120, openUp ? above : below))
+      const usedH = measured ? Math.min(measured, maxH) : Math.min(needed, maxH)
+      const top = openUp ? Math.max(gutter, rect.top - usedH - 6) : rect.bottom + 6
+      const left = Math.min(Math.max(gutter, rect.left), Math.max(gutter, window.innerWidth - width - gutter))
+      setPos((current) =>
+        current.top === top && current.left === left && current.width === width && current.maxH === maxH
+          ? current
+          : { top, left, width, maxH },
+      )
     }
     place()
+    const frame = window.requestAnimationFrame(place)
     window.addEventListener('resize', place)
     window.addEventListener('scroll', place, true)
     return () => {
+      window.cancelAnimationFrame(frame)
       window.removeEventListener('resize', place)
       window.removeEventListener('scroll', place, true)
     }
@@ -106,7 +119,7 @@ export default function AppSelect<T extends string>({
     variant === 'inline'
       ? `relative inline-flex min-h-tap max-w-full shrink-0 items-center gap-2 rounded-md border border-avi-line bg-avi-surface-solid pl-3 pr-9 text-left shadow-glass ${className}`
       : variant === 'compact'
-        ? `relative flex h-9 min-h-9 w-full min-w-0 items-center rounded-md border border-avi-line bg-avi-surface-solid px-3 pr-9 text-left text-sm font-semibold text-avi-fog-strong shadow-glass ${className}`
+        ? `relative flex h-9 min-h-9 w-full min-w-0 max-w-full items-center overflow-hidden rounded-md border border-avi-line bg-avi-surface-solid px-3 pr-9 text-left text-sm font-semibold text-avi-fog-strong shadow-glass ${className}`
         : `relative flex min-h-tap w-full min-w-0 items-center rounded-md border border-avi-line bg-avi-surface-solid px-4 pr-11 text-left text-base font-semibold text-avi-fog-strong shadow-glass ${className}`
 
   const menu =
@@ -214,9 +227,9 @@ export default function AppSelect<T extends string>({
   }
 
   return (
-    <>
+    <div className={variant === 'compact' ? 'relative w-full min-w-0 max-w-full' : undefined}>
       {trigger}
       {menu}
-    </>
+    </div>
   )
 }

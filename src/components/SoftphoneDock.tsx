@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import {
   Check,
   FileText,
@@ -206,7 +206,7 @@ export function SoftphoneStatusChip() {
 }
 
 /** Conecta el softphone al montar y expone la barra de llamada flotante. */
-export default function SoftphoneDock() {
+function SoftphoneDock() {
   const { status, error, callerId, call, lastCall, toast } = useSoftphone()
   const [keypad, setKeypad] = useState(false)
   const [showTranscript, setShowTranscript] = useState(true)
@@ -381,3 +381,5 @@ export default function SoftphoneDock() {
     </>
   )
 }
+
+export default memo(SoftphoneDock)

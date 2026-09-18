@@ -125,7 +125,11 @@ export const apps = {
   },
 
   focus(id: AppId) {
-    if (!state.windows.some((w) => w.id === id)) return
+    const target = state.windows.find((w) => w.id === id)
+    if (!target) return
+    // Los clicks dentro de la app activa no deben reconstruir todo el store.
+    // El mousedown de la raíz llega también al usar inputs y botones.
+    if (state.activeAppId === id && !target.minimized) return
     const z = zProvider()
     setWindows(state.windows.map((w) => (w.id === id ? { ...w, z } : w)), { activeAppId: id })
   },

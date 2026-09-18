@@ -18,6 +18,34 @@ export function phoneMatchKey(value: string | null | undefined): string {
   return digits.slice(-9)
 }
 
+const NOT_A_PHONE =
+  /^(anonymous|restricted|unavailable|unknown|oculto|desconocido|privado|sin n[uú]mero|withheld)$/i
+
+const VOICE_MARK = /\bllamada\b|voz\s*laura|callbot|centralita/i
+
+/** Teléfono de cliente usable: no “anonymous” ni texto suelto. */
+export function isUsableClientPhone(value: string | null | undefined): boolean {
+  const raw = clean(value)
+  if (!raw || NOT_A_PHONE.test(raw)) return false
+  return looksLikePhone(raw)
+}
+
+/** Teléfonos que aparecen en una nota o descripción (Tel.: 677…). */
+export function phonesFromText(text: string | null | undefined): string[] {
+  const raw = String(text || '')
+  if (!raw) return []
+  const out: string[] = []
+  const seen = new Set<string>()
+  const chunks = raw.match(/\+?\d[\d\s().-]{7,}\d/g) || []
+  for (const chunk of chunks) {
+    const key = phoneMatchKey(chunk)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    out.push(clean(chunk))
+  }
+  return out
+}
+
 export type ClientNameSource = {
   nombre?: string | null
   apellidos?: string | null
@@ -38,6 +66,8 @@ export type TicketClientInput = {
   descripcion?: string | null
   tipopeticion?: string | null
   gestionobservaciones?: string | null
+  /** Canal explícito en altas manuales; las peticiones antiguas se infieren por texto. */
+  canalentrada?: 'voz' | 'whatsapp' | null
   /** Nombre cruzado por teléfono con una cita (sin enlazar IDCita). */
   clienteNombre?: string | null
   cita?: (ClientNameSource & { idEstadoCita?: number | null }) | null
@@ -92,8 +122,39 @@ export function ticketClientLabel(p: TicketClientInput): string {
   return ticketClientName(p) || TICKET_CLIENT_FALLBACK
 }
 
+/** Todos los teléfonos reales del ticket, sin repetir. */
+export function ticketClientPhones(p: TicketClientInput): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  const add = (value?: string | null) => {
+    if (!isUsableClientPhone(value)) return
+    const key = phoneMatchKey(value) || String(value || '').replace(/\D/g, '')
+    if (key.length < 6 || seen.has(key)) return
+    seen.add(key)
+    out.push(clean(value))
+  }
+  add(p.caller)
+  add(p.cita?.movil)
+  add(p.cita?.telefono)
+  for (const phone of phonesFromText(p.descripcion)) add(phone)
+  for (const phone of phonesFromText(p.gestionobservaciones)) add(phone)
+  return out
+}
+
 export function ticketClientPhone(p: TicketClientInput): string {
-  return clean(p.caller || p.cita?.movil || p.cita?.telefono)
+  return ticketClientPhones(p)[0] || ''
+}
+
+/** Consulta que nació de una llamada (Laura, centralita o alta de voz). */
+export function ticketLooksLikeVoice(p: TicketClientInput): boolean {
+  if (p.canalentrada === 'whatsapp') return false
+  if (p.canalentrada === 'voz') return true
+  const tipo = clean(p.tipopeticion)
+  if (/whatsapp|whats/i.test(tipo)) return false
+  if (VOICE_MARK.test(tipo)) return true
+  const text = `${p.descripcion || ''} ${p.gestionobservaciones || ''}`
+  if (/whatsapp/i.test(text) && !VOICE_MARK.test(text)) return false
+  return VOICE_MARK.test(text)
 }
 
 const CHANNEL_ONLY =

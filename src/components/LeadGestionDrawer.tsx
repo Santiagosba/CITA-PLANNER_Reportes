@@ -18,7 +18,13 @@ import { useCustomerCalls } from '../hooks/useCustomerCalls'
 import type { CustomerCallItem } from '../lib/crmApi'
 import { inferPeticionTipo, peticionToHistoryItem } from '../lib/interactionLabels'
 import { formatFecha, isPeticionPendiente, type PeticionPendiente } from '../lib/peticionesPendientes'
-import { ticketClientLabel, ticketClientPhone, ticketVehicleLabel } from '../lib/ticketClient'
+import {
+  ticketClientLabel,
+  ticketClientPhone,
+  ticketClientPhones,
+  ticketLooksLikeVoice,
+  ticketVehicleLabel,
+} from '../lib/ticketClient'
 import { scoreTicketUrgency } from '../lib/ticketUrgency'
 import TicketClientBlock from './TicketClientBlock'
 import TicketOwnerPicker from './TicketOwnerPicker'
@@ -94,7 +100,11 @@ function LeadGestionDrawer({
 }: Props) {
   const [tab, setTab] = useState<TabId>('resumen')
   const [selectedCall, setSelectedCall] = useState<CustomerCallItem | null>(null)
-  const calls = useCustomerCalls(p.caller)
+  const phones = useMemo(
+    () => ticketClientPhones(p),
+    [p.caller, p.cita?.movil, p.cita?.telefono, p.descripcion, p.gestionobservaciones],
+  )
+  const calls = useCustomerCalls(phones)
   const os = useOsWindow({
     windowId: `ficha:${p.idpeticion}`,
     title: ticketClientLabel(p),
@@ -131,10 +141,18 @@ function LeadGestionDrawer({
   const pendiente = isPeticionPendiente(p)
   const urgencyScore = scoreTicketUrgency(p)
   const channel = inferPeticionTipo(p.tipopeticion)
-  const callCount = useMemo(
-    () => calls.items.filter((item) => item.tipo === 'llamada').length,
-    [calls.items],
-  )
+  const voiceTicket = ticketLooksLikeVoice(p)
+  const callCount = useMemo(() => {
+    const crmCalls = calls.items.filter((item) => item.tipo === 'llamada')
+    if (!voiceTicket) return crmCalls.length
+    const ticketAt = Date.parse(String(p.fechainicio || p.fechacreacion || ''))
+    const alreadyLogged = crmCalls.some((item) => {
+      const at = Date.parse(item.fecha)
+      if (!Number.isFinite(ticketAt) || !Number.isFinite(at)) return false
+      return Math.abs(at - ticketAt) < 2 * 60 * 60 * 1000
+    })
+    return crmCalls.length + (alreadyLogged ? 0 : 1)
+  }, [calls.items, voiceTicket, p.fechainicio, p.fechacreacion])
 
   return (
     <div
@@ -180,7 +198,11 @@ function LeadGestionDrawer({
           <div className="lead-modal-header-actions">
             <span
               className="lead-call-count"
-              title="Llamadas de este cliente hasta hoy"
+              title={
+                voiceTicket
+                  ? 'Incluye la llamada que abrió esta consulta y las del teléfono del CRM'
+                  : 'Llamadas de este cliente registradas en el teléfono del CRM'
+              }
             >
               <PhoneCall size={16} aria-hidden />
               <strong>{calls.loading ? '…' : callCount}</strong>
