@@ -19,13 +19,14 @@ import {
   Users,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { memo, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { DashboardShellRoute } from './Sidebar'
 import { SoftphoneStatusChip } from './SoftphoneDock'
 import { BOT_CONFIG_EVENT, loadActiveBotProfile } from '../lib/botProfiles'
 import type { CrmAppRole } from '../lib/crmRoles'
 import { licenseViewEnabled, type LicenseViewId } from '../lib/crmViews'
 import { LOCAL_PREVIEW_ASESORES } from '../lib/localPreview'
+import AppSelect from './AppSelect'
 import CenterSwitcher from './CenterSwitcher'
 import { canSwitchCenters } from '../lib/activeCenter'
 import type { Workshop } from '../types'
@@ -150,7 +151,7 @@ type Props = {
   children: ReactNode
 }
 
-export default function AppShell({
+function AppShell({
   workshopName,
   groupName = null,
   centerName = null,
@@ -336,18 +337,14 @@ export default function AppShell({
                 </label>
               ) : null}
               {appRole === 'asesor' ? (
-                <select
+                <AppSelect
                   id="local-preview-advisor"
-                  className="field-input"
+                  variant="field"
                   value={previewAdvisorId || LOCAL_PREVIEW_ASESORES[0]?.id || ''}
-                  onChange={(event) => onLocalPreviewRole('asesor', event.target.value)}
-                >
-                  {LOCAL_PREVIEW_ASESORES.map((asesor) => (
-                    <option key={asesor.id} value={asesor.id}>
-                      {asesor.name}
-                    </option>
-                  ))}
-                </select>
+                  options={LOCAL_PREVIEW_ASESORES.map((asesor) => ({ id: asesor.id, label: asesor.name }))}
+                  onChange={(next) => onLocalPreviewRole('asesor', next)}
+                  className="max-w-none"
+                />
               ) : null}
             </div>
           ) : null}
@@ -405,3 +402,5 @@ export default function AppShell({
     </div>
   )
 }
+
+export default memo(AppShell)

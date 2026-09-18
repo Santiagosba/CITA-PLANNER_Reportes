@@ -11,6 +11,7 @@ import {
   Users,
   X,
 } from 'lucide-react'
+import AppSelect from '../components/AppSelect'
 import { HexLoaderScreen } from '../components/ui/HexLoader'
 import OperatorAvatar from '../components/OperatorAvatar'
 import Card from '../components/ui/Card'
@@ -521,28 +522,17 @@ export default function AssignTaskView({ workshop, currentUser, onOpenTodayTasks
                 </legend>
 
                 {workspace.teams.length > 1 ? (
-                  <label className="mt-2 block" htmlFor="assign-team">
-                    <span className="mb-1 block text-sm font-semibold text-avi-fog-strong">Equipo</span>
-                    <span className="relative block">
-                      <select
-                        id="assign-team"
-                        className="field-input min-h-tap max-w-none appearance-none pr-12 font-semibold"
-                        value={teamId}
-                        onChange={(event) => pickTeam(event.target.value)}
-                      >
-                        {workspace.teams.map((row) => (
-                          <option key={row.id} value={row.id}>
-                            {row.name}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown
-                        size={18}
-                        className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-avi-muted"
-                        aria-hidden
-                      />
-                    </span>
-                  </label>
+                  <div className="mt-2">
+                    <AppSelect
+                      id="assign-team"
+                      variant="field"
+                      label="Equipo"
+                      value={teamId}
+                      options={workspace.teams.map((row) => ({ id: row.id, label: row.name }))}
+                      onChange={pickTeam}
+                      className="max-w-none"
+                    />
+                  </div>
                 ) : (
                   <p className="mb-3 mt-1 text-sm text-avi-muted">
                     Equipo: <strong className="text-avi-fog-strong">{team?.name}</strong>

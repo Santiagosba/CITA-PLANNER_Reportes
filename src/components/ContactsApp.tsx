@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { Check, Headset, Mail, Pencil, Phone, Plus, Shield, Trash2, Wrench, X } from 'lucide-react'
+import AppSelect from './AppSelect'
 import { toDialNumber } from '../lib/softphone'
 
 const CONTACTS_KEY = 'avi-important-contacts'
@@ -73,13 +74,13 @@ function ContactForm({ initial, onSave, onCancel }: { initial: Draft; onSave: (d
     >
       <label className="contacts-field">
         <span>Tipo</span>
-        <select value={d.kind} onChange={set('kind')}>
-          {(Object.keys(KIND_LABEL) as ContactKind[]).map((k) => (
-            <option key={k} value={k}>
-              {KIND_LABEL[k]}
-            </option>
-          ))}
-        </select>
+        <AppSelect
+          variant="compact"
+          value={d.kind}
+          options={(Object.keys(KIND_LABEL) as ContactKind[]).map((k) => ({ id: k, label: KIND_LABEL[k] }))}
+          onChange={(next) => setD((prev) => ({ ...prev, kind: next }))}
+          className="max-w-none"
+        />
       </label>
       <label className="contacts-field">
         <span>Nombre</span>

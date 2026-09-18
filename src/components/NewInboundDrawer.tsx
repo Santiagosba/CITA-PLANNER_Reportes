@@ -10,6 +10,7 @@ import {
   X,
 } from 'lucide-react'
 import type { Workshop } from '../types'
+import AppSelect from './AppSelect'
 import VehiclePlate, { formatMatricula } from './ui/VehiclePlate'
 import { BOT_CONFIG_EVENT, loadActiveBotProfile } from '../lib/botProfiles'
 import {
@@ -246,23 +247,25 @@ export default function NewInboundDrawer({ workshop, onClose, onSubmit }: Props)
                   Qué ha entrado
                 </legend>
                 <div className="mt-2 grid min-w-0 gap-4 sm:grid-cols-2">
-                  <label className={labelClass}>
+                  <div className={labelClass}>
                     Tipo de tarea
-                    <select
-                      className={`${inputClass} field-select`}
-                      value={typeId}
-                      onChange={(event) => setTypeId(event.target.value)}
-                      disabled={loadingOptions || submitting}
+                    <AppSelect
+                      variant="field"
                       required
-                    >
-                      <option value="">{loadingOptions ? 'Cargando tipos…' : 'Elige un tipo'}</option>
-                      {options.types.map((item) => (
-                        <option key={item.idtipopeticion} value={item.idtipopeticion}>
-                          {item.tipopeticion}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      value={typeId}
+                      disabled={loadingOptions || submitting}
+                      placeholder={loadingOptions ? 'Cargando tipos…' : 'Elige un tipo'}
+                      options={[
+                        { id: '', label: loadingOptions ? 'Cargando tipos…' : 'Elige un tipo' },
+                        ...options.types.map((item) => ({
+                          id: String(item.idtipopeticion),
+                          label: item.tipopeticion,
+                        })),
+                      ]}
+                      onChange={setTypeId}
+                      className="max-w-none"
+                    />
+                  </div>
 
                   <div className={labelClass}>
                     Canal de entrada
@@ -371,24 +374,26 @@ export default function NewInboundDrawer({ workshop, onClose, onSubmit }: Props)
                   <MapPin size={18} className="text-avi-brand" aria-hidden />
                   Dónde se atenderá
                 </legend>
-                <label className={`${labelClass} mt-2`}>
+                <div className={`${labelClass} mt-2`}>
                   Centro
-                  <select
-                    className={`${inputClass} field-select`}
-                    value={centerId}
-                    onChange={(event) => setCenterId(event.target.value)}
-                    disabled={loadingOptions || submitting || options.centers.length === 1}
+                  <AppSelect
+                    variant="field"
                     required
-                  >
-                    <option value="">{loadingOptions ? 'Cargando centros…' : 'Elige un centro'}</option>
-                    {options.centers.map((center) => (
-                      <option key={center.idtaller} value={center.idtaller}>
-                        {center.nombre || workshop.name}
-                      </option>
-                    ))}
-                  </select>
+                    value={centerId}
+                    disabled={loadingOptions || submitting || options.centers.length === 1}
+                    placeholder={loadingOptions ? 'Cargando centros…' : 'Elige un centro'}
+                    options={[
+                      { id: '', label: loadingOptions ? 'Cargando centros…' : 'Elige un centro' },
+                      ...options.centers.map((center) => ({
+                        id: String(center.idtaller),
+                        label: center.nombre || workshop.name,
+                      })),
+                    ]}
+                    onChange={setCenterId}
+                    className="max-w-none"
+                  />
                   <span className="text-xs font-normal text-avi-muted">Licencia: {workshop.name}</span>
-                </label>
+                </div>
               </fieldset>
             </div>
 

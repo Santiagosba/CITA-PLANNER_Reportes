@@ -1,3 +1,4 @@
+import AppSelect from './AppSelect'
 import { assignedTicketTeamId, type AdvisorWorkspace } from '../lib/advisorWorkspace'
 import { ticketTeamLabel } from '../lib/teamScope'
 import type { PeticionPendiente } from '../lib/peticionesPendientes'
@@ -29,25 +30,16 @@ export default function TicketTeamPicker({ workspace, ticket, onAssign, disabled
           Equipo
         </span>
       )}
-      <select
-        className={
-          compact
-            ? 'field-select h-9 min-h-9 w-full min-w-0 max-w-full truncate px-3 text-sm font-semibold'
-            : 'field-select'
-        }
+      <AppSelect
+        variant={compact ? 'compact' : 'field'}
         value={assigned ?? ''}
         disabled={disabled}
-        aria-label="Meter este ticket en un equipo"
-        title={emptyLabel}
-        onChange={(event) => onAssign(event.target.value || null)}
-      >
-        <option value="">{compact && inferred && !assigned ? inferred : emptyLabel}</option>
-        {workspace.teams.map((team) => (
-          <option key={team.id} value={team.id}>
-            {team.name}
-          </option>
-        ))}
-      </select>
+        options={[
+          { id: '', label: compact && inferred && !assigned ? inferred : emptyLabel },
+          ...workspace.teams.map((team) => ({ id: team.id, label: team.name })),
+        ]}
+        onChange={(next) => onAssign(next || null)}
+      />
     </label>
   )
 }

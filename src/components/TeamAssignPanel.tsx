@@ -13,6 +13,7 @@ import { ticketClientLabel, ticketClientPhone } from '../lib/ticketClient'
 import { reassignTicketOwner } from '../lib/ticketOps'
 import { formatFecha, type PeticionPendiente } from '../lib/peticionesPendientes'
 import type { Workshop } from '../types'
+import AppSelect from './AppSelect'
 import Card from './ui/Card'
 
 type Props = {
@@ -132,69 +133,60 @@ export default function TeamAssignPanel({
         </div>
 
         <div className="dash-assign-grid grid items-end gap-3 max-[980px]:grid-cols-2 min-[981px]:grid-cols-[minmax(140px,1fr)_minmax(140px,1fr)_minmax(200px,1.4fr)_minmax(140px,0.8fr)]">
-          <label className="field-label" htmlFor="dash-assign-team">
-            Equipo
-            <select
-              id="dash-assign-team"
-              className="field-select"
-              value={teamId}
-              onChange={(event) => {
-                setTeamId(event.target.value)
-                setAssigneeId('')
-                setNotice(null)
-              }}
-            >
-              {teams.map((row) => (
-                <option key={row.id} value={row.id}>
-                  {row.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field-label" htmlFor="dash-assign-asesor">
-            Asesor
-            <select
-              id="dash-assign-asesor"
-              className="field-select"
-              value={assigneeId}
-              onChange={(event) => setAssigneeId(event.target.value)}
-              required
-            >
-              <option value="">
-                {members.length === 0 ? 'Sin asesores' : 'Elige un asesor'}
-              </option>
-              {members.map((person) => (
-                <option key={person.id} value={person.id}>
-                  {person.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field-label dash-assign-ticket max-[980px]:col-span-full" htmlFor="dash-assign-ticket">
-            Ticket suelto
-            <select
+          <AppSelect
+            id="dash-assign-team"
+            variant="field"
+            label="Equipo"
+            value={teamId}
+            options={teams.map((row) => ({ id: row.id, label: row.name }))}
+            onChange={(next) => {
+              setTeamId(next)
+              setAssigneeId('')
+              setNotice(null)
+            }}
+            className="max-w-none"
+          />
+          <AppSelect
+            id="dash-assign-asesor"
+            variant="field"
+            label="Asesor"
+            required
+            value={assigneeId}
+            placeholder={members.length === 0 ? 'Sin asesores' : 'Elige un asesor'}
+            options={[
+              { id: '', label: members.length === 0 ? 'Sin asesores' : 'Elige un asesor' },
+              ...members.map((person) => ({ id: person.id, label: person.name })),
+            ]}
+            onChange={setAssigneeId}
+            className="max-w-none"
+          />
+          <div className="dash-assign-ticket max-[980px]:col-span-full">
+            <AppSelect
               id="dash-assign-ticket"
-              className="field-select"
+              variant="field"
+              label="Ticket suelto"
               value={ticketId}
-              onChange={(event) => {
-                const next = event.target.value
+              placeholder={teamTickets.length === 0 ? 'Ninguno en este equipo' : `Ninguno · ${teamTickets.length} sueltos`}
+              options={[
+                {
+                  id: '',
+                  label: teamTickets.length === 0 ? 'Ninguno en este equipo' : `Ninguno · ${teamTickets.length} sueltos`,
+                },
+                ...teamTickets.map((item) => ({
+                  id: item.idpeticion,
+                  label: `${ticketClientLabel(item)} · ${item.tipopeticion || 'Sin tipo'} · ${formatFecha(item.fechainicio)}`,
+                })),
+              ]}
+              onChange={(next) => {
                 setTicketId(next)
                 const item = teamTickets.find((row) => row.idpeticion === next)
                 if (item && !title.trim()) {
                   setTitle(item.descripcion || item.tipopeticion || 'Seguimiento de consulta')
                 }
               }}
-            >
-              <option value="">
-                {teamTickets.length === 0 ? 'Ninguno en este equipo' : `Ninguno · ${teamTickets.length} sueltos`}
-              </option>
-              {teamTickets.map((item) => (
-                <option key={item.idpeticion} value={item.idpeticion}>
-                  {ticketClientLabel(item)} · {item.tipopeticion || 'Sin tipo'} · {formatFecha(item.fechainicio)}
-                </option>
-              ))}
-            </select>
-          </label>
+              className="max-w-none"
+            />
+          </div>
           <label className="field-label" htmlFor="dash-assign-due">
             Para el día
             <input

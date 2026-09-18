@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Coins, Cpu, RefreshCw, Sparkles, TriangleAlert } from 'lucide-react'
+import AppSelect from '../components/AppSelect'
 import ApiStatusBanner from '../components/ApiStatusBanner'
 import Card from '../components/ui/Card'
 import { HexLoaderScreen } from '../components/ui/HexLoader'
@@ -165,23 +166,19 @@ export default function AiUsageView({ workshop }: Props) {
         </div>
 
         {report && report.features.length > 0 ? (
-          <label className="field-label" htmlFor="ai-feature" style={{ marginTop: 'var(--space-4)' }}>
-            Función
-            <select
+          <div className="mt-4 max-w-sm">
+            <AppSelect
               id="ai-feature"
-              className="field-select"
+              variant="field"
+              label="Función"
               value={feature}
-              onChange={(event) => setFeature(event.target.value)}
-              style={{ marginTop: 8, maxWidth: 360 }}
-            >
-              <option value="all">Todas</option>
-              {report.features.map((item) => (
-                <option key={item.feature} value={item.feature}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
+              options={[
+                { id: 'all', label: 'Todas' },
+                ...report.features.map((item) => ({ id: item.feature, label: item.label })),
+              ]}
+              onChange={setFeature}
+            />
+          </div>
         ) : null}
 
         {loading ? <HexLoaderScreen size="md" label="Cargando el gasto de IA…" /> : null}
