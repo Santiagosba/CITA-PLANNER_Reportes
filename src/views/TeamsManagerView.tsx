@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { ArrowLeft, ChevronRight, Eye, EyeOff, KeyRound, Plus, RotateCcw, Search, Trash2, Users } from 'lucide-react'
 import OperatorAvatar from '../components/OperatorAvatar'
 import AccountPasswordFields, { type AccountPasswordForm } from '../components/AccountPasswordFields'
@@ -287,13 +287,13 @@ export default function TeamsManagerView({
     setAccountStatus('idle')
   }, [selected?.id, selected?.name])
 
-  const openTeam = (teamId: string, name?: string) => {
+  const openTeam = useCallback((teamId: string, name?: string) => {
     const team = workspace.teams.find((row) => row.id === teamId)
     setSelectedId(teamId)
     setNameDraft(name?.trim() || team?.name || '')
     setScreen('team')
     setNotice(null)
-  }
+  }, [workspace.teams])
 
   const openPerson = (personId: string, from: 'list' | 'team' = 'list') => {
     setSelectedPersonId(personId)

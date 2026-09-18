@@ -1758,6 +1758,40 @@
   contain-intrinsic-size: auto 164px;
 }
 
+/* ── Tarjetas densas del tablero de equipos: pintado barato ──
+   Hay decenas apiladas y solapadas. El `corner-shape: squircle` (superelipse
+   por tarjeta), la sombra de 4 capas con blur grande y el brillo `.glass::after`
+   se repintan en cada scroll/hover/arrastre y ahogan la GPU. Aquí usamos esquinas
+   redondeadas normales, una sombra ligera y sin brillo: aspecto casi idéntico,
+   sin el coste de composición. */
+.dashboard-shell .team-drop-board .team-ticket-card.is-lite,
+.dashboard-shell.is-light .team-drop-board .team-ticket-card.is-lite,
+.dashboard-shell:not(.is-light) .team-drop-board .team-ticket-card.is-lite {
+  corner-shape: round;
+  box-shadow:
+    0 1px 2px rgba(15, 17, 21, 0.06),
+    0 6px 14px rgba(15, 17, 21, 0.08);
+}
+
+.team-drop-board .team-ticket-card.is-lite::after,
+.team-drop-ghost .team-ticket-card::after {
+  display: none;
+}
+
+.team-drop-ghost .team-ticket-card {
+  corner-shape: round;
+}
+
+@media (hover: hover) {
+  .dashboard-shell .team-drop-board .team-ticket-card.is-lite:hover,
+  .dashboard-shell.is-light .team-drop-board .team-ticket-card.is-lite:hover,
+  .dashboard-shell:not(.is-light) .team-drop-board .team-ticket-card.is-lite:hover {
+    box-shadow:
+      0 2px 4px rgba(15, 17, 21, 0.08),
+      0 12px 24px rgba(15, 17, 21, 0.12);
+  }
+}
+
 .team-ticket-owner-line {
   margin: 0;
   color: var(--fog-strong);
@@ -1775,11 +1809,9 @@
   display: none;
 }
 
-.team-drop-board.is-live .kanban-card,
-.team-drop-board.is-live .team-drop-slot,
 .team-drop-board.is-live .team-drop-stack-item {
   pointer-events: none;
-  transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 90ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .team-drop-board.is-live .kanban-card:hover {
@@ -1799,8 +1831,7 @@
   pointer-events: none;
 }
 
-body.is-team-drop-dragging,
-body.is-team-drop-dragging * {
+body.is-team-drop-dragging {
   cursor: move !important;
   user-select: none !important;
 }
@@ -1960,15 +1991,17 @@ body.is-team-drop-dragging * {
 .team-drop-stack-item {
   position: relative;
   flex-shrink: 0;
-  transition: margin-top 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: margin-top 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .team-drop-stack-item + .team-drop-stack-item {
   margin-top: calc(-1 * var(--stack-overlap));
 }
 
-.team-drop-cards.is-stack .team-ticket-card {
-  content-visibility: visible;
+.team-drop-board:not(.is-live) .team-drop-stack-item .kanban-card {
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .team-drop-board:not(.is-live) .team-drop-stack-item:hover .kanban-card {
@@ -1981,6 +2014,36 @@ body.is-team-drop-dragging * {
 
 .team-drop-board:not(.is-live) .team-drop-stack-item:first-child:hover + .team-drop-stack-item {
   margin-top: 8px;
+}
+
+/* Entrada suave por tandas: cada tarjeta que se monta aparece deslizando. */
+@keyframes team-card-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.team-card-enter {
+  animation: team-card-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.team-drop-board.is-live .team-card-enter {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .team-card-enter {
+    animation: none;
+  }
+  .team-drop-stack-item,
+  .team-drop-board:not(.is-live) .team-drop-stack-item .kanban-card {
+    transition: none;
+  }
 }
 
 .team-drop-cards.is-stack > .team-drop-slot {

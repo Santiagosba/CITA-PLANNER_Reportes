@@ -325,6 +325,11 @@
     0 2px 6px rgba(15, 17, 21, 0.05),
     0 12px 28px rgba(15, 17, 21, 0.08),
     0 28px 48px rgba(15, 17, 21, 0.06);
+  /* El fondo es opaco: el blur de `.glass` es invisible y cada tarjeta crearía
+     una capa de composición con backdrop-filter. Con decenas de tarjetas hunde
+     la GPU (scroll/hover/arrastre a tirones). Lo anulamos: mismo aspecto, sin coste. */
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 @media (hover: hover) {

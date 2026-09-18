@@ -1,5 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { Sparkles, Undo2 } from 'lucide-react'
 import {
   isPersonOnTeam,
@@ -33,11 +32,23 @@ type DragLive = {
   width: number
   grabX: number
   grabY: number
+  source: HTMLElement
+  sourceWrapper: HTMLElement | null
+}
+
+type PendingDrag = {
+  item: PeticionPendiente
+  source: HTMLElement
+  startX: number
+  startY: number
+  grabX: number
+  grabY: number
+  width: number
 }
 
 type HoverSlot = { col: string; index: number }
 
-type CardGeom = { el: HTMLElement; height: number }
+type CardGeom = { el: HTMLElement }
 
 type ColGeom = {
   id: string
@@ -47,22 +58,20 @@ type ColGeom = {
   right: number
   top: number
   bottom: number
-  listLeft: number
-  stackTop: number
   cards: CardGeom[]
   slotIndex: number | null
 }
 
 type BoardDrag = {
   slot: HTMLElement
-  slotH: number
   geoms: ColGeom[]
-  dropCol: string | null
 }
 
 type FlipMove = { el: HTMLElement; dx: number; dy: number }
 
 const DRAG_START = 8
+const INITIAL_RENDER = 8
+const RENDER_BATCH = 10
 const CARD_SLOT = 178
 const CARD_GAP = 14
 const SLOT_H = CARD_SLOT - CARD_GAP
@@ -100,13 +109,12 @@ function measureBoard(root: HTMLElement, skipId?: string): ColGeom[] {
     const list = column.querySelector<HTMLElement>('.team-drop-cards')
     if (!id || !list) return
     const rect = column.getBoundingClientRect()
-    const listRect = list.getBoundingClientRect()
     const cards: CardGeom[] = []
     for (const node of list.children) {
       if (!(node instanceof HTMLElement) || node.classList.contains('team-drop-slot')) continue
       const ticketId = node.dataset.ticketId
       if (!ticketId || (skipId && ticketId === skipId) || node.classList.contains('is-dragging-source')) continue
-      cards.push({ el: node, height: node.offsetHeight })
+      cards.push({ el: node })
     }
     next.push({
       id,
@@ -116,8 +124,6 @@ function measureBoard(root: HTMLElement, skipId?: string): ColGeom[] {
       right: rect.right,
       top: rect.top,
       bottom: rect.bottom,
-      listLeft: listRect.left,
-      stackTop: listRect.top + 2,
       cards,
       slotIndex: null,
     })
@@ -130,11 +136,12 @@ function indexAtY(col: ColGeom, clientY: number, slot: HTMLElement | null, slotI
     const hole = slot.getBoundingClientRect()
     if (clientY >= hole.top - SLOT_STICK && clientY <= hole.bottom + SLOT_STICK) return slotIndex
   }
-  for (let i = 0; i < col.cards.length; i += 1) {
-    const rect = col.cards[i].el.getBoundingClientRect()
+  let rect = col.cards[0]?.el.getBoundingClientRect()
+  for (let i = 0; i < col.cards.length && rect; i += 1) {
     const next = col.cards[i + 1]?.el.getBoundingClientRect()
     const bottom = next ? next.top : rect.bottom
     if (clientY < (rect.top + bottom) / 2) return i
+    rect = next
   }
   return col.cards.length
 }
@@ -174,12 +181,18 @@ function placeSlot(board: BoardDrag, col: string, index: number) {
   if (dest.slotIndex === index && origin === dest) return
 
   const first = new Map<HTMLElement, DOMRect>()
-  const snapshot = (geom: ColGeom) => {
-    for (const card of geom.cards) first.set(card.el, card.el.getBoundingClientRect())
+  const snapshot = (geom: ColGeom, from: number, to = geom.cards.length) => {
+    for (let i = Math.max(0, from); i < Math.min(to, geom.cards.length); i += 1) {
+      const card = geom.cards[i]
+      first.set(card.el, card.el.getBoundingClientRect())
+    }
   }
-  snapshot(origin)
-  if (dest !== origin) snapshot(dest)
-  if (board.slot.isConnected) first.set(board.slot, board.slot.getBoundingClientRect())
+  const previousIndex = origin.slotIndex ?? 0
+  if (dest === origin) snapshot(origin, Math.min(previousIndex, index), Math.max(previousIndex, index) + 1)
+  else {
+    snapshot(origin, previousIndex)
+    snapshot(dest, index)
+  }
 
   if (origin !== dest) origin.slotIndex = null
   dest.slotIndex = index
@@ -288,35 +301,34 @@ function playAssignFlights(
 
 function StackList({
   items,
-  dragId,
+  limit,
   empty,
   render,
 }: {
   items: PeticionPendiente[]
-  dragId?: string | null
+  limit: number
   empty: ReactNode
   render: (item: PeticionPendiente) => ReactNode
 }) {
-  const visible = dragId ? items.filter((item) => item.idpeticion !== dragId) : items
+  const shown = limit >= items.length ? items : items.slice(0, limit)
   return (
-    <div className={`team-drop-cards${visible.length > 1 ? ' is-stack' : ''}`}>
-      {visible.length === 0
-        ? empty
-        : visible.map((item, index) => (
-            <div
-              key={item.idpeticion}
-              data-ticket-id={item.idpeticion}
-              className="team-drop-stack-item"
-              style={{ zIndex: index + 1 }}
-            >
-              {render(item)}
-            </div>
-          ))}
+    <div className={`team-drop-cards${items.length > 1 ? ' is-stack' : ''}`}>
+      {items.length === 0 ? empty : null}
+      {shown.map((item, index) => (
+        <div
+          key={item.idpeticion}
+          data-ticket-id={item.idpeticion}
+          className="team-drop-stack-item team-card-enter hover:!z-50"
+          style={{ zIndex: index + 1, animationDelay: `${Math.min(index, 10) * 16}ms` }}
+        >
+          {render(item)}
+        </div>
+      ))}
     </div>
   )
 }
 
-export default function TeamDropBoard({
+function TeamDropBoard({
   workshop,
   workspace,
   currentUser,
@@ -327,22 +339,14 @@ export default function TeamDropBoard({
   onOpenTeam,
 }: Props) {
   const rootRef = useRef<HTMLDivElement>(null)
-  const ghostRef = useRef<HTMLDivElement>(null)
-  const pendingRef = useRef<{
-    item: PeticionPendiente
-    startX: number
-    startY: number
-    grabX: number
-    grabY: number
-    width: number
-  } | null>(null)
+  const ghostRef = useRef<HTMLDivElement | null>(null)
+  const pendingRef = useRef<PendingDrag | null>(null)
   const dragRef = useRef<DragLive | null>(null)
   const overRef = useRef<string | null>(null)
   const slotRef = useRef<HoverSlot | null>(null)
   const boardRef = useRef<BoardDrag | null>(null)
   const columnsRef = useRef<Map<string, PeticionPendiente[]>>(new Map())
   const moveRaf = useRef(0)
-  const [drag, setDrag] = useState<DragLive | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busyTeam, setBusyTeam] = useState<string | null>(null)
@@ -364,6 +368,33 @@ export default function TeamDropBoard({
   }, [tickets, teams, workspace])
 
   columnsRef.current = columns
+
+  const maxColLen = useMemo(() => {
+    let max = 0
+    for (const list of columns.values()) max = Math.max(max, list.length)
+    return max
+  }, [columns])
+
+  // Montamos las tarjetas por tandas: primero un lote visible y el resto en
+  // fotogramas siguientes. Así no se paga un layout de decenas de tarjetas de golpe.
+  const [renderLimit, setRenderLimit] = useState(INITIAL_RENDER)
+  useEffect(() => {
+    setRenderLimit(INITIAL_RENDER)
+    if (maxColLen <= INITIAL_RENDER) return
+    let raf = 0
+    const step = () => {
+      setRenderLimit((current) => {
+        const next = current + RENDER_BATCH
+        if (next < maxColLen) raf = requestAnimationFrame(step)
+        return next
+      })
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [maxColLen])
+
+  // Al empezar a arrastrar montamos todo, para medir bien columnas y huecos.
+  const ensureAllMounted = useCallback(() => setRenderLimit((current) => (current >= maxColLen ? current : maxColLen)), [maxColLen])
 
   const teamMembers = useMemo(() => {
     const map = new Map<string, AdvisorPerson[]>()
@@ -399,7 +430,53 @@ export default function TeamDropBoard({
     paintOver(hover.col)
   }
 
-  const endDrag = () => {
+  const startLiveDrag = (pending: PendingDrag, live: DragLive) => {
+    const root = rootRef.current
+    if (!root) return false
+    const sourceWrapper = pending.source.closest<HTMLElement>('.team-drop-stack-item')
+    live.sourceWrapper = sourceWrapper
+    sourceWrapper?.classList.add('is-dragging-source', 'hidden')
+    root.classList.add('is-live')
+    document.body.classList.add('is-team-drop-dragging')
+
+    const ghost = document.createElement('div')
+    ghost.className = 'team-drop-ghost'
+    ghost.style.width = `${live.width}px`
+    ghost.style.contain = 'layout paint'
+    const card = pending.source.cloneNode(true) as HTMLElement
+    card.removeAttribute('data-ticket-id')
+    card.classList.remove('is-dragging-source')
+    card.setAttribute('aria-hidden', 'true')
+    ghost.appendChild(card)
+    document.body.appendChild(ghost)
+    ghostRef.current = ghost
+    moveGhost(pending.startX, pending.startY)
+
+    const slot = document.createElement('div')
+    slot.className = 'team-drop-slot'
+    slot.setAttribute('aria-hidden', 'true')
+    slot.style.minHeight = `${SLOT_H}px`
+    const geoms = measureBoard(root, live.item.idpeticion)
+    const from = ticketDropColumnId(workspace, live.item)
+    const origin = geoms.find((item) => item.id === from)
+    const fromIndex = Math.max(
+      0,
+      (columnsRef.current.get(from) ?? []).findIndex((item) => item.idpeticion === live.item.idpeticion),
+    )
+    const board: BoardDrag = { slot, geoms }
+    boardRef.current = board
+    slotRef.current = { col: from, index: fromIndex }
+    if (origin) {
+      origin.slotIndex = fromIndex
+      const before = origin.cards[fromIndex]?.el
+      if (before) origin.list.insertBefore(slot, before)
+      else origin.list.appendChild(slot)
+    }
+    paintOver(from)
+    return true
+  }
+
+  const endDrag = (commit = true) => {
     const live = dragRef.current
     const dest = slotRef.current
     pendingRef.current = null
@@ -409,8 +486,12 @@ export default function TeamDropBoard({
     slotRef.current = null
     clearLiveDragDom(board)
     paintOver(null)
-    setDrag(null)
-    if (!live || !dest) return
+    live?.sourceWrapper?.classList.remove('is-dragging-source', 'hidden')
+    ghostRef.current?.remove()
+    ghostRef.current = null
+    rootRef.current?.classList.remove('is-live')
+    document.body.classList.remove('is-team-drop-dragging')
+    if (!commit || !live || !dest) return
     const from = ticketDropColumnId(workspace, live.item)
     const fromIndex = Math.max(
       0,
@@ -431,48 +512,11 @@ export default function TeamDropBoard({
     )
   }
 
-  useLayoutEffect(() => {
-    if (!drag || !ghostRef.current) return
-    const pending = pendingRef.current
-    if (pending) moveGhost(pending.startX, pending.startY)
-  }, [drag])
-
-  useLayoutEffect(() => {
-    if (!drag || !rootRef.current) {
-      clearLiveDragDom(boardRef.current)
-      boardRef.current = null
-      return
-    }
-    const slot = document.createElement('div')
-    slot.className = 'team-drop-slot'
-    slot.setAttribute('aria-hidden', 'true')
-    slot.style.minHeight = `${SLOT_H}px`
-    const geoms = measureBoard(rootRef.current, drag.item.idpeticion)
-    const from = ticketDropColumnId(workspace, drag.item)
-    const origin = geoms.find((item) => item.id === from)
-    const fromIndex = Math.max(
-      0,
-      (columns.get(from) ?? []).findIndex((item) => item.idpeticion === drag.item.idpeticion),
-    )
-    const board: BoardDrag = { slot, slotH: SLOT_H, geoms, dropCol: from }
-    boardRef.current = board
-    slotRef.current = { col: from, index: fromIndex }
-    if (origin) {
-      origin.slotIndex = fromIndex
-      const before = origin.cards[fromIndex]?.el
-      if (before) origin.list.insertBefore(slot, before)
-      else origin.list.appendChild(slot)
-    }
-    paintOver(from)
-    return () => {
-      slot.remove()
-    }
-  }, [drag])
-
-  useEffect(() => {
-    document.body.classList.toggle('is-team-drop-dragging', Boolean(drag))
-    return () => document.body.classList.remove('is-team-drop-dragging')
-  }, [drag])
+  const flushHover = () => {
+    moveRaf.current = 0
+    const { x, y } = pointerRef.current
+    applyHover(x, y)
+  }
 
   useEffect(() => {
     const onMove = (event: PointerEvent) => {
@@ -486,59 +530,75 @@ export default function TeamDropBoard({
           width: pending.width,
           grabX: pending.grabX,
           grabY: pending.grabY,
+          source: pending.source,
+          sourceWrapper: null,
         }
         dragRef.current = next
-        setDrag(next)
+        if (!startLiveDrag(pending, next)) {
+          dragRef.current = null
+          return
+        }
       }
       if (!dragRef.current) return
       event.preventDefault()
-      if (moveRaf.current) cancelAnimationFrame(moveRaf.current)
-      const x = event.clientX
-      const y = event.clientY
-      moveRaf.current = requestAnimationFrame(() => {
-        moveGhost(x, y)
-        applyHover(x, y)
-      })
+      moveGhost(event.clientX, event.clientY)
+      if (!moveRaf.current) moveRaf.current = requestAnimationFrame(flushHover)
     }
     const onUp = () => {
       const started = Boolean(dragRef.current)
       pendingRef.current = null
       document.body.classList.remove('is-team-drop-dragging')
-      if (moveRaf.current) cancelAnimationFrame(moveRaf.current)
+      if (moveRaf.current) {
+        cancelAnimationFrame(moveRaf.current)
+        flushHover()
+      }
       if (!started) {
         paintOver(null)
-        setDrag(null)
         return
       }
       endDrag()
     }
+    const onCancel = () => {
+      pendingRef.current = null
+      document.body.classList.remove('is-team-drop-dragging')
+      if (moveRaf.current) {
+        cancelAnimationFrame(moveRaf.current)
+        moveRaf.current = 0
+      }
+      endDrag(false)
+    }
     window.addEventListener('pointermove', onMove, { passive: false })
     window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', onUp)
+    window.addEventListener('pointercancel', onCancel)
     return () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', onUp)
-      document.body.classList.remove('is-team-drop-dragging')
-      if (moveRaf.current) cancelAnimationFrame(moveRaf.current)
+      window.removeEventListener('pointercancel', onCancel)
+      if (moveRaf.current) {
+        cancelAnimationFrame(moveRaf.current)
+        moveRaf.current = 0
+      }
+      endDrag(false)
     }
   }, [onPlaceTicket, teams, workspace])
 
-  const onCardPointerDown = (item: PeticionPendiente, event: ReactPointerEvent<HTMLElement>) => {
+  const onCardPointerDown = useCallback((item: PeticionPendiente, event: ReactPointerEvent<HTMLElement>) => {
     if (isInteractive(event.target)) return
     if (event.button !== 0) return
     event.preventDefault()
+    ensureAllMounted()
     const rect = event.currentTarget.getBoundingClientRect()
     pointerRef.current = { x: event.clientX, y: event.clientY }
     pendingRef.current = {
       item,
+      source: event.currentTarget,
       startX: event.clientX,
       startY: event.clientY,
       grabX: event.clientX - rect.left,
       grabY: event.clientY - rect.top,
       width: rect.width,
     }
-  }
+  }, [ensureAllMounted])
 
   const autoAssign = async (team: AdvisorTeam) => {
     const items = columns.get(team.id) ?? []
@@ -607,25 +667,25 @@ export default function TeamDropBoard({
     setBusyTeam(null)
   }
 
-  const renderCard = (item: PeticionPendiente) => (
-    <TeamTicketCard
-      key={item.idpeticion}
-      item={item}
-      workshop={workshop}
-      workspace={workspace}
-      currentUser={currentUser}
-      lite
-      dragging={drag?.item.idpeticion === item.idpeticion}
-      onPointerDown={(event) => onCardPointerDown(item, event)}
-    />
+  const renderCard = useCallback(
+    (item: PeticionPendiente) => (
+      <TeamTicketCard
+        key={item.idpeticion}
+        item={item}
+        workshop={workshop}
+        workspace={workspace}
+        currentUser={currentUser}
+        lite
+        onDragStart={onCardPointerDown}
+      />
+    ),
+    [currentUser, onCardPointerDown, workshop, workspace],
   )
 
   const loose = columns.get(TEAM_FILTER_LOOSE) ?? []
-  const dragId = drag?.item.idpeticion ?? null
-  const live = Boolean(drag)
 
   return (
-    <div ref={rootRef} className={`team-drop-board${live ? ' is-live' : ''}`}>
+    <div ref={rootRef} className="team-drop-board">
       <p className="section-subtitle">Arrastra una tarjeta y suéltala encima de otra para colocarla.</p>
       {notice ? <p className="dash-assign-notice">{notice}</p> : null}
       {error ? <p className="ticket-owner-error">{error}</p> : null}
@@ -641,7 +701,7 @@ export default function TeamDropBoard({
           </header>
           <StackList
             items={loose}
-            dragId={dragId}
+            limit={renderLimit}
             empty={<p className="section-subtitle ops-empty kanban-empty">Suelta aquí para dejarlo sin equipo.</p>}
             render={renderCard}
           />
@@ -705,7 +765,7 @@ export default function TeamDropBoard({
               <p className="team-drop-auto-hint">{hint}</p>
               <StackList
                 items={items}
-                dragId={dragId}
+                limit={renderLimit}
                 empty={<p className="section-subtitle ops-empty kanban-empty">Arrastra aquí las tarjetas de este equipo.</p>}
                 render={renderCard}
               />
@@ -714,21 +774,8 @@ export default function TeamDropBoard({
         })}
       </div>
 
-      {drag
-        ? createPortal(
-            <div
-              ref={ghostRef}
-              className="team-drop-ghost"
-              style={{
-                width: drag.width,
-                transform: `translate3d(${Math.round(pointerRef.current.x - drag.grabX)}px, ${Math.round(pointerRef.current.y - drag.grabY)}px, 0)`,
-              }}
-            >
-              <TeamTicketCard item={drag.item} workshop={workshop} workspace={workspace} currentUser={currentUser} lite />
-            </div>,
-            document.body,
-          )
-        : null}
     </div>
   )
 }
+
+export default memo(TeamDropBoard)

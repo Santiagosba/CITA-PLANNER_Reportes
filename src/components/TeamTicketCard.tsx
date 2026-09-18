@@ -20,7 +20,7 @@ type Props = {
   lite?: boolean
   showTeamPicker?: boolean
   onAssignTeam?: (peticionId: string, teamId: string | null) => void
-  onPointerDown?: (event: ReactPointerEvent<HTMLElement>) => void
+  onDragStart?: (item: PeticionPendiente, event: ReactPointerEvent<HTMLElement>) => void
 }
 
 function formatCardWhen(iso: string | null | undefined, today: string): string {
@@ -53,7 +53,7 @@ function TeamTicketCard({
   lite = false,
   showTeamPicker = false,
   onAssignTeam,
-  onPointerDown,
+  onDragStart,
 }: Props) {
   const today = localTodayIso()
   const cita = item.cita
@@ -62,11 +62,11 @@ function TeamTicketCard({
   return (
     <article
       data-ticket-id={item.idpeticion}
-      className={`kanban-card glass glass-lite squircle team-ticket-card${lite ? ' is-lite' : ''}${dragging ? ' is-dragging-source' : ''}${onPointerDown ? ' is-draggable' : ''} flex flex-col gap-2 overflow-visible`}
-      onPointerDown={onPointerDown}
+      className={`kanban-card glass glass-lite squircle team-ticket-card${lite ? ' is-lite [contain:layout_style]' : ''}${dragging ? ' is-dragging-source' : ''}${onDragStart ? ' is-draggable' : ''} flex flex-col gap-2 overflow-visible`}
+      onPointerDown={onDragStart ? (event) => onDragStart(item, event) : undefined}
     >
       <div className="kanban-card-top flex items-center gap-2 overflow-visible">
-        {onPointerDown ? (
+        {onDragStart ? (
           <span className="kanban-drag-handle inline-flex shrink-0 text-[#7a8491]" aria-hidden>
             <GripVertical size={16} />
           </span>
@@ -110,4 +110,28 @@ function TeamTicketCard({
   )
 }
 
-export default memo(TeamTicketCard)
+function sameTeamTicketCardProps(previous: Props, next: Props): boolean {
+  if (previous.lite !== next.lite) return false
+  if (previous.lite && next.lite) {
+    return (
+      previous.item === next.item &&
+      previous.workspace.people === next.workspace.people &&
+      previous.dragging === next.dragging &&
+      previous.onDragStart === next.onDragStart
+    )
+  }
+  return (
+    previous.item === next.item &&
+    previous.workshop === next.workshop &&
+    previous.workspace === next.workspace &&
+    previous.currentUser === next.currentUser &&
+    previous.tickets === next.tickets &&
+    previous.readOnly === next.readOnly &&
+    previous.dragging === next.dragging &&
+    previous.showTeamPicker === next.showTeamPicker &&
+    previous.onAssignTeam === next.onAssignTeam &&
+    previous.onDragStart === next.onDragStart
+  )
+}
+
+export default memo(TeamTicketCard, sameTeamTicketCardProps)
