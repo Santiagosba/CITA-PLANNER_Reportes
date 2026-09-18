@@ -10,6 +10,7 @@ type Props = {
   label?: string
   alwaysShow?: boolean
   emptyHint?: string
+  className?: string
 }
 
 export default function TeamFilter({
@@ -20,6 +21,7 @@ export default function TeamFilter({
   label = 'Equipo',
   alwaysShow = false,
   emptyHint = 'Crea equipos en Cuentas y equipos para filtrar.',
+  className = '',
 }: Props) {
   if (teams.length === 0 && !alwaysShow) return null
 
@@ -39,6 +41,7 @@ export default function TeamFilter({
       options={options}
       onChange={onChange}
       emptyHint={emptyHint}
+      className={className}
     />
   )
 }

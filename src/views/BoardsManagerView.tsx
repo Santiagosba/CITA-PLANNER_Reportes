@@ -1,6 +1,6 @@
 import {
-  ChevronDown,
-  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   GripVertical,
   Plus,
   X,
@@ -651,7 +651,7 @@ export default function BoardsManagerView({
   const [draftPhone, setDraftPhone] = useState('')
   const [draftNote, setDraftNote] = useState('')
   const tabsRef = useRef<HTMLElement>(null)
-  const [tabsOverflow, setTabsOverflow] = useState({ up: false, down: false })
+  const [tabsOverflow, setTabsOverflow] = useState({ left: false, right: false })
 
   const ghostLayerRef = useRef<HTMLElement | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
@@ -798,12 +798,12 @@ export default function BoardsManagerView({
   const updateTabsOverflow = useCallback(() => {
     const el = tabsRef.current
     if (!el) {
-      setTabsOverflow({ up: false, down: false })
+      setTabsOverflow({ left: false, right: false })
       return
     }
     setTabsOverflow({
-      up: el.scrollTop > 4,
-      down: el.scrollTop + el.clientHeight < el.scrollHeight - 4,
+      left: el.scrollLeft > 4,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4,
     })
   }, [])
 
@@ -830,8 +830,8 @@ export default function BoardsManagerView({
     const el = tabsRef.current
     if (!el) return
     const card = el.querySelector<HTMLElement>('.department-tab')
-    const step = (card?.offsetHeight ?? 148) + 10
-    el.scrollBy({ top: dir * step, behavior: 'smooth' })
+    const step = (card?.offsetWidth ?? 240) + 10
+    el.scrollBy({ left: dir * step, behavior: 'smooth' })
   }
 
   const placeCard = useCallback((id: string, to: PriorityId, index: number) => {
@@ -1107,9 +1107,50 @@ export default function BoardsManagerView({
   }
 
   return (
-    <div className="dashboard-page boards-page">
+    <div className="dashboard-page boards-page !gap-3 !px-3">
       {error ? <ApiStatusBanner message={error} variant="error" /> : null}
       {sourceNotice && !error ? <ApiStatusBanner message={sourceNotice} variant="warning" /> : null}
+
+      <section className="glass glass-lite flex flex-col gap-3 rounded-lg p-3 lg:flex-row lg:items-center">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <div className="department-tab-icon mt-0.5 !h-10 !w-10"><ActiveIcon size={20} /></div>
+          <div className="min-w-0 flex-1">
+            <p className="section-eyebrow !m-0">{todayHeading(today)}</p>
+            <h2 className="mt-0.5 text-lg font-bold leading-snug text-avi-fog-strong [overflow-wrap:break-word]">
+              {active.label}
+            </h2>
+            <p className="mt-0.5 text-sm text-avi-muted">
+              {appRole === 'asesor' ? 'Consultas de hoy de tus equipos' : 'Solo las consultas de hoy'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex min-w-0 flex-wrap items-center gap-2 lg:justify-end">
+          <TeamFilter
+            teams={visibleTeams}
+            value={teamFilter}
+            onChange={setTeamFilter}
+            label={appRole === 'admin' ? 'Ver equipo' : 'Equipo'}
+            alwaysShow={appRole === 'admin'}
+            className="[&>select]:!min-w-[4.75rem]"
+          />
+          <OwnerScopeFilter
+            value={ownerScope}
+            onChange={setOwnerScope}
+            label="Dueño"
+            className="[&>select]:!min-w-[5rem]"
+          />
+          <CitaLinkFilterControl
+            value={citaLink}
+            onChange={setCitaLink}
+            className="[&>select]:!min-w-[4.75rem]"
+          />
+          <button type="button" className="client-submit whitespace-nowrap" onClick={openNewEntry}>
+            <Plus size={16} />
+            Nueva entrada
+          </button>
+        </div>
+      </section>
 
       {!loading && scopedItems.length === 0 && (citaLink === 'con_cita' || manualEntries.length === 0) ? (
         <p className="section-subtitle">
@@ -1123,8 +1164,12 @@ export default function BoardsManagerView({
         </p>
       ) : null}
 
-      <div className="operation-tabs-rail">
-        <nav ref={tabsRef} className="department-tabs custom-scrollbar-light" aria-label="Operaciones">
+      <div className="operation-tabs-rail !gap-2">
+        <nav
+          ref={tabsRef}
+          className="department-tabs custom-scrollbar-light !flex !max-h-none !snap-x !snap-mandatory !overflow-x-auto !overflow-y-hidden !p-1"
+          aria-label="Tipos de consulta"
+        >
           {visibleOperations.map((operation) => {
             const Icon = operation.icon
             const selected = operation.id === active.id
@@ -1133,76 +1178,50 @@ export default function BoardsManagerView({
               <button
                 key={operation.id}
                 type="button"
-                className={`department-tab glass glass-lite ${selected ? 'is-active' : ''}`}
+                className={`department-tab glass glass-lite !flex h-auto min-h-[72px] w-max min-w-[17.5rem] shrink-0 snap-start !flex-row !items-center !gap-3 !p-3 ${selected ? 'is-active bg-avi-brand-soft' : ''}`}
                 onClick={() => {
                   setActiveOperation(operation.id)
                   setShowNewEntry(false)
                 }}
                 aria-current={selected ? 'page' : undefined}
               >
-                <span className="department-tab-count">
-                  {loading ? '—' : count} {count === 1 ? 'caso' : 'casos'}
-                </span>
-                <span className="department-tab-icon"><Icon size={18} /></span>
-                <span className="department-tab-copy">
-                  <strong>{operation.label}</strong>
-                  <small>{operation.description}</small>
+                <span className="department-tab-icon shrink-0"><Icon size={18} /></span>
+                <strong className="min-w-[8.5rem] max-w-[16rem] flex-1 text-left text-[15px] font-bold leading-snug text-avi-fog-strong [overflow-wrap:break-word]">
+                  {operation.label}
+                </strong>
+                <span className="flex min-w-[3.5rem] shrink-0 flex-col items-end border-l border-avi-line pl-3 text-right">
+                  <strong className="text-2xl font-extrabold leading-none text-avi-brand">
+                    {loading ? '—' : count}
+                  </strong>
+                  <small className="mt-1 text-2xs font-bold uppercase tracking-wide text-avi-muted">
+                    {count === 1 ? 'consulta' : 'consultas'}
+                  </small>
                 </span>
               </button>
             )
           })}
         </nav>
-        <div className="operation-tabs-arrows">
+        <div className="operation-tabs-arrows !flex-row items-center">
           <button
             type="button"
             className="ghost-button calendar-nav"
             onClick={() => scrollOperationTabs(-1)}
-            disabled={!tabsOverflow.up}
-            aria-label="Ver operaciones de arriba"
+            disabled={!tabsOverflow.left}
+            aria-label="Ver tipos de consulta anteriores"
           >
-            <ChevronUp size={17} />
+            <ChevronLeft size={17} />
           </button>
           <button
             type="button"
             className="ghost-button calendar-nav"
             onClick={() => scrollOperationTabs(1)}
-            disabled={!tabsOverflow.down}
-            aria-label="Ver operaciones de abajo"
+            disabled={!tabsOverflow.right}
+            aria-label="Ver más tipos de consulta"
           >
-            <ChevronDown size={17} />
+            <ChevronRight size={17} />
           </button>
         </div>
       </div>
-
-      <section className="board-heading glass glass-lite">
-        <div className="department-tab-icon"><ActiveIcon size={20} /></div>
-        <div className="board-heading-copy">
-          <p className="section-eyebrow">{todayHeading(today)}</p>
-          <h2 className="ops-card-title">{active.label}</h2>
-          <p className="section-subtitle">
-            {appRole === 'asesor'
-              ? 'Solo las consultas de hoy: tus equipos, tickets sueltos y los que puedes pasar.'
-              : `Solo las consultas de hoy · ${active.description}`}
-          </p>
-          <div className="board-team-bar">
-            <TeamFilter
-              teams={visibleTeams}
-              value={teamFilter}
-              onChange={setTeamFilter}
-              label={appRole === 'admin' ? 'Ver equipo' : 'Equipo'}
-              alwaysShow={appRole === 'admin'}
-            />
-          </div>
-          <div className="mt-3 flex flex-wrap items-end gap-3">
-            <OwnerScopeFilter value={ownerScope} onChange={setOwnerScope} label="Dueño" />
-            <CitaLinkFilterControl value={citaLink} onChange={setCitaLink} />
-          </div>
-        </div>
-        <button type="button" className="client-submit" onClick={openNewEntry}>
-          <Plus size={16} />
-          Nueva entrada para esta operación
-        </button>
-      </section>
 
       {showNewEntry ? (
         <form className="board-new-entry glass glass-lite" onSubmit={submitNewEntry}>
@@ -1257,7 +1276,7 @@ export default function BoardsManagerView({
 
       <div
         ref={gridRef}
-        className="kanban-grid custom-scrollbar-light"
+        className="kanban-grid custom-scrollbar-light !grid-cols-[repeat(5,minmax(250px,1fr))] !gap-3"
         role="list"
         onPointerDown={onGridPointerDown}
       >
